@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Campanhas • {{ company_id }}</h1>
+
+<div class="grid">
+  <div class="card">
+    <h2>Criar campanha</h2>
+    <div class="form">
+      <input id="name" placeholder="Nome" />
+      <input id="channel" placeholder="Canal (instagram, google...)" />
+      <input id="objective" placeholder="Objetivo (leads, sales...)" />
+      <input id="targets" placeholder="Target segments (ex: 18-24,25-34)" />
+      <button class="btn primary" onclick="createCampaign()">Criar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Lista</h2>
+    <pre id="list">Carregando...</pre>
+  </div>
+</div>
+
+<script>
+async function refresh(){
+  const r = await fetch(`/api/campaigns/{{ company_id }}`);
+  const data = await r.json();
+  document.querySelector("#list").textContent = JSON.stringify(data, null, 2);
+}
+async function createCampaign(){
+  const payload = {
+    name: document.querySelector("#name").value,
+    channel: document.querySelector("#channel").value,
+    objective: document.querySelector("#objective").value,
+    status: "active",
+    target_segments: (document.querySelector("#targets").value || "").split(",").map(s => s.trim()).filter(Boolean)
+  };
+  await fetch(`/api/campaigns/{{ company_id }}`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(payload)
+  });
+  await refresh();
+}
+refresh();
+</script>
+{% endblock %}

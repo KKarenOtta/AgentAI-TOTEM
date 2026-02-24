@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Dashboard Admin</h1>
+<p>Gerenciar empresas cadastradas (MVP).</p>
+
+<div class="card">
+  <h2>Empresas</h2>
+  <table class="table">
+    <thead><tr><th>ID</th><th>Nome</th><th>Ações</th></tr></thead>
+    <tbody>
+    {% for c in companies %}
+      <tr>
+        <td>{{ c.company_id }}</td>
+        <td>{{ c.name }}</td>
+        <td>
+          <a class="btn" href="/client/{{ c.company_id }}">Dashboard Cliente</a>
+          <a class="btn" href="/client/{{ c.company_id }}/campaigns">Campanhas</a>
+          <a class="btn" href="/totem/sim/{{ c.company_id }}">Simulador</a>
+          <a class="btn" href="/totem/live/{{ c.company_id }}">Live</a>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

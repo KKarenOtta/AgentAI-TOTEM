@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Simulador Totem • {{ company_id }}</h1>
+
+<div class="card">
+  <h2>Perfil (Nível 1)</h2>
+  <div class="form">
+    <select id="age">
+      <option value="">Selecione faixa etária</option>
+      <option>18-24</option>
+      <option>25-34</option>
+      <option>35-44</option>
+      <option>45-54</option>
+      <option>55-64</option>
+      <option>65+</option>
+    </select>
+    <select id="segment">
+      <option value="new_visitor">new_visitor</option>
+      <option value="returning">returning</option>
+      <option value="vip">vip</option>
+    </select>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Interação</h2>
+  <div class="form">
+    <textarea id="msg" rows="3" placeholder="Digite a mensagem...">Quais promoções estão ativas para mim hoje?</textarea>
+    <button class="btn primary" onclick="send()">Enviar</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Resposta</h2>
+  <pre id="out">—</pre>
+</div>
+
+<script>
+async function send(){
+  const payload = {
+    company_id: "{{ company_id }}",
+    session_id: "sim-web",
+    message: document.querySelector("#msg").value,
+    prefer_audio: false,
+    profile: {
+      age_range: document.querySelector("#age").value || null,
+      gender: "unknown",
+      segment: document.querySelector("#segment").value,
+      device: "sim_web",
+      locale: "pt-BR",
+      extra: {}
+    }
+  };
+  const r = await fetch("/totem/interact", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(payload)
+  });
+  const data = await r.json();
+  document.querySelector("#out").textContent = JSON.stringify(data, null, 2);
+}
+</script>
+{% endblock %}

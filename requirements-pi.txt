@@ -1,0 +1,5 @@
+-r requirements.txt
+RPi.GPIO==0.7.1
+adafruit-blinka==8.50.0
+adafruit-circuitpython-dht==4.0.4
+adafruit-circuitpython-ds3231==2.4.19

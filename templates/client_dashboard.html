@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Cliente: {{ company_id }}</h1>
+
+<div class="grid">
+  <div class="card">
+    <h2>Métricas (últimos 7 dias)</h2>
+    <pre id="metrics">Carregando...</pre>
+  </div>
+
+  <div class="card">
+    <h2>Atalhos</h2>
+    <a class="btn" href="/client/{{ company_id }}/campaigns">Gerenciar Campanhas</a>
+    <a class="btn" href="/totem/sim/{{ company_id }}">Simulador do Totem</a>
+    <a class="btn" href="/totem/live/{{ company_id }}">Monitor ao vivo</a>
+  </div>
+</div>
+
+<script>
+(async () => {
+  const r = await fetch(`/api/metrics/{{ company_id }}?days=7`);
+  const data = await r.json();
+  document.querySelector("#metrics").textContent = JSON.stringify(data, null, 2);
+})();
+</script>
+{% endblock %}
