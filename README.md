@@ -91,6 +91,7 @@ Para verificar os templates localmente:
 		python3 -m uvicorn app.main:app --host 127.0.0.1 --port 9000 --log-level debug
 
 Abrir navegador em: 
+
 	- http://127.0.0.1:9000/docs
 	- http://127.0.0.1:9000/admin
 	- http://127.0.0.1:9000/totem/sim/FLX-001
