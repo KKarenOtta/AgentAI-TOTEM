@@ -16,6 +16,12 @@ CRIAR UMA PASTA na sua máquina e uma BRANCH: Antes de fazer alterações, cada 
 
 		code .
 
+###OBS: cada usuário deverá criar sua pasta .env incluindo suas chaves secretas para as contas: 
+	As pastas já estão protegidas pelo arquivo gitignore.
+
+	OPENAI_API_KEY=
+	HUGGING_FACE_API_KEY=
+
 
 APÓS TRABALHAR NAS SUAS ALTERAÇOES: criar o COMMIT:
 	
