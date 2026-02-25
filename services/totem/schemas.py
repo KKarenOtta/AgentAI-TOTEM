@@ -23,6 +23,9 @@ class TotemInteractRequest(BaseModel):
     message: str
     profile: Optional[DemographicProfile] = None
     prefer_audio: bool = True
+    audio_base64: str | None = None
+    input_mode: str | None = None  # "text" | "audio"
+    message_id: str | None = None  # para idempotência depois
 
 class TotemInteractResponse(BaseModel):
     session_id: str
@@ -31,3 +34,24 @@ class TotemInteractResponse(BaseModel):
     recommendations: Dict[str, Any]
     audio_file: Optional[str] = None
     metrics: Dict[str, Any]
+
+class TotemActivateRequest(BaseModel):
+    company_id: str
+    session_id: str = Field(default="sim-web")
+    profile: Optional[Any] = None  # pode ser seu ProfileModel se quiser
+
+class TotemActivateResponse(BaseModel):
+    session_id: str
+    language: str
+    greeting: str
+    next: str  # "listening"
+
+class TotemNPSRequest(BaseModel):
+    company_id: str
+    session_id: str
+    score: int  # 0..10
+    comment: str | None = None
+
+class TotemNPSResponse(BaseModel):
+    ok: bool
+    message: str

@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ================== CONFIG ==================
-TOTEM_API = os.getenv("TOTEM_API_URL", "http://localhost:8000/totem/interact")
-COMPANY_ID = os.getenv("COMPANY_ID", "ACME-001")
+TOTEM_API = os.getenv("TOTEM_API_URL", "http://localhost:9000/totem/interact")
+COMPANY_ID = os.getenv("COMPANY_ID", "FLX-001")
 SESSION_ID = os.getenv("SESSION_ID", f"sess-{uuid.uuid4().hex[:8]}")
 PREFER_AUDIO = os.getenv("PREFER_AUDIO", "true").lower() == "true"
 PIR_PIN = int(os.getenv("PIR_PIN", "17"))

@@ -5,13 +5,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ====== CONFIG ======
-TOTEM_API = os.getenv("TOTEM_API_URL", "http://localhost:8000/totem/interact")
-COMPANY_ID = os.getenv("COMPANY_ID", "ACME-001")
+TOTEM_API = os.getenv("TOTEM_API_URL", "http://localhost:9000/totem/interact")
+COMPANY_ID = os.getenv("COMPANY_ID", "FLX-001")
 SESSION_ID = os.getenv("SESSION_ID", f"sess-{uuid.uuid4().hex[:8]}")
 PREFER_AUDIO = os.getenv("PREFER_AUDIO", "true").lower() == "true"
-
-# GPIO pins (ajuste conforme seu wiring)
-PIR_PIN = int(os.getenv("PIR_PIN", "17"))  # presença (opção recomendada)
+PIR_PIN = int(os.getenv("PIR_PIN", "17")) 
 
 # ====== GPIO ======
 import RPi.GPIO as GPIO
@@ -30,18 +28,9 @@ i2c = busio.I2C(board.SCL, board.SDA)
 rtc = adafruit_ds3231.DS3231(i2c)
 
 def beep():
-    # Beep simples via terminal (se você tiver buzzer real, dá pra usar PWM no GPIO18)
     print("\a", end="", flush=True)
 
 def estimate_profile_simple():
-    """
-    Caminho A: perfil 'pronto' vindo do sensor.
-    Aqui você pode substituir por:
-    - resultado de um modelo local (camera)
-    - ou dados de um formulário na tela (faixa etária etc.)
-    """
-    # Placeholder seguro: pede mínimo e usa 'unknown' se não houver
-    # Exemplo didático (troque pelo seu pipeline real)
     return {
         "age_estimate": 28,
         "age_range": "25-34",

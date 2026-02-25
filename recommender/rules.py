@@ -1,33 +1,36 @@
-from typing import Dict, Any, List, Optional
+from recommender.scoring import infer_intent, score_campaign
 
-def recommend_actions(profile: Optional[Dict[str, Any]], active_campaigns: List[Dict[str, Any]]) -> Dict[str, Any]:
-    profile = profile or {}
-    age_range = profile.get("age_range")
-    segment = profile.get("segment")
+def recommend_actions(profile, active_campaigns, intent=None, top_k=3):
+    """
+    Retorna recomendações ordenadas por score.
+    intent deve vir pronto (ex.: inferido no orchestrator).
+    """
+    intent = intent or "general"
 
-    # Regras simples (você substitui/combina com ML depois)
-    recs = []
+    scored = []
     for c in active_campaigns:
-        if age_range and age_range in (c.get("target_segments") or []):
-            recs.append({
-                "type": "campaign_match",
-                "campaign_id": c["campaign_id"],
-                "action": f"Oferecer CTA da campanha '{c['name']}'",
-                "why": f"Campanha ativa segmentada para {age_range}."
-            })
+        s, why = score_campaign(c, profile, intent)
+        scored.append((s, c, why))
 
-    if segment == "new_visitor":
-        recs.append({
-            "type": "funnel",
-            "action": "Priorizar captura de lead (cupom / cadastro rápido)",
-            "why": "Visitante novo → maior chance de conversão com incentivo imediato."
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    top = []
+    for s, c, why in scored[:top_k]:
+        top.append({
+            "type": "campaign",
+            "campaign_id": c.get("id") or c.get("campaign_id"),
+            "title": c.get("title") or c.get("name") or "Campanha",
+            "action": c.get("cta") or "Ver oferta",
+            "score": s,
+            "why": why,
         })
 
-    if not recs:
-        recs.append({
+    if not top:
+        top = [{
             "type": "generic",
             "action": "Mostrar melhores ofertas e perguntar preferência do usuário",
-            "why": "Sem segmentação confiável; coletar intenção melhora recomendação."
-        })
+            "why": "Sem campanhas elegíveis; coletar intenção melhora recomendação.",
+            "score": 0.1,
+        }]
 
-    return {"top_actions": recs[:5]}
+    return {"top_actions": top}

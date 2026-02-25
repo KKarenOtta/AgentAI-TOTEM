@@ -5,13 +5,17 @@ from fastapi.templating import Jinja2Templates
 templates = Jinja2Templates(directory="templates")
 router = APIRouter(tags=["web"])
 
+@router.get("/", include_in_schema=False)
+def home():
+    return HTMLResponse("<h1>Totem Dashboard</h1><p>OK</p>")
+
 # Admin (main): lista empresas (por enquanto simples)
 @router.get("/admin", response_class=HTMLResponse)
 def admin(request: Request):
     # MVP: sem DB -> empresas fixas
     companies = [
-        {"company_id": "ACME-001", "name": "ACME"},
-        {"company_id": "KAREN-001", "name": "Karen Demo"},
+        {"company_id": "FLEXMEDIA-001", "name": "FLEXMEDIA"},
+        {"company_id": "FLX-001", "name": "FLX Demo"},
     ]
     return templates.TemplateResponse("admin.html", {"request": request, "companies": companies})
 
