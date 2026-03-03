@@ -49,6 +49,8 @@ Entre na sua pasta de projeto da sua máquina:
 	ex: cd "/Users/karenota/Desktop/AgentAI-TOTEM”
 
 Ative seu ambiente virtual: 
+
+		python3 -m venv venv # macOS/Linux
 		
 		source venv/bin/activate  # macOS/Linux
 		
