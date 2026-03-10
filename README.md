@@ -31,7 +31,7 @@ APÓS TRABALHAR NAS SUAS ALTERAÇOES: criar o COMMIT:
 
 antes de fazer o push, é uma boa prática puxar as últimas alterações de branch principal para evitar conflitos: 
 		
-		git pull request origin main/master
+		git pull origin main/master
 		
 		git push -u origin nome-do-branch
 
