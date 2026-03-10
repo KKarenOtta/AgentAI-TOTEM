@@ -1,26 +1,84 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Dashboard Admin</h1>
-<p>Gerenciar empresas cadastradas (MVP).</p>
+<section class="page-header">
+  <div>
+    <span class="badge">Admin</span>
+    <h1 class="page-title">Empresas e ambientes do totem</h1>
+    <p class="page-subtitle">Cadastre empresas, acesse dashboards e abra rapidamente os modos de simulação e monitoramento.</p>
+  </div>
+</section>
 
-<div class="card">
+<div class="grid">
+  <div class="card">
+    <h2>Cadastrar nova empresa</h2>
+    <p class="muted">Crie uma nova unidade para campanhas, métricas e simulação do totem.</p>
+
+    <form method="post" action="/admin/create" class="form">
+      <div class="row">
+        <div>
+          <label>ID (company_id)</label>
+          <input name="company_id" placeholder="Ex: FLX-002" required />
+        </div>
+
+        <div>
+          <label>Nome</label>
+          <input name="name" placeholder="Ex: FLX Nova Unidade" required />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" type="submit">Criar empresa</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Resumo</h2>
+    <div class="row">
+      <div class="stat">
+        <div class="stat-label">Empresas cadastradas</div>
+        <div class="stat-value">{{ companies|length }}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Ambiente</div>
+        <div class="stat-value">MVP</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
   <h2>Empresas</h2>
-  <table class="table">
-    <thead><tr><th>ID</th><th>Nome</th><th>Ações</th></tr></thead>
-    <tbody>
-    {% for c in companies %}
-      <tr>
-        <td>{{ c.company_id }}</td>
-        <td>{{ c.name }}</td>
-        <td>
-          <a class="btn" href="/client/{{ c.company_id }}">Dashboard Cliente</a>
-          <a class="btn" href="/client/{{ c.company_id }}/campaigns">Campanhas</a>
-          <a class="btn" href="/totem/sim/{{ c.company_id }}">Simulador</a>
-          <a class="btn" href="/totem/live/{{ c.company_id }}">Live</a>
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nome</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for c in companies %}
+        <tr>
+          <td><strong>{{ c.company_id }}</strong></td>
+          <td>{{ c.name }}</td>
+          <td>
+            <div class="actions">
+              <a class="btn" href="/client/{{ c.company_id }}">Dashboard</a>
+              <a class="btn" href="/client/{{ c.company_id }}/campaigns">Campanhas</a>
+              <a class="btn" href="/totem/sim/{{ c.company_id }}">Simulador</a>
+              <a class="btn" href="/totem/live/{{ c.company_id }}">Live</a>
+
+              <form method="post" action="/admin/delete/{{ c.company_id }}" onsubmit="return confirm('Deletar {{ c.company_id }}?');">
+                <button class="btn danger" type="submit">Excluir</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

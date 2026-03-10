@@ -5,12 +5,14 @@ from services.totem.language import detect_language
 from services.totem.tts import gerar_audio
 from services.totem.metrics import MetricsLogger
 from services.llm_gateway_openai import chatgpt_generate
+from services.realtime.event_bus import publish
+
 from marketing.campaigns import get_active_campaigns
 from recommender.rules import recommend_actions
 from recommender.scoring import infer_intent
-from services.realtime.event_bus import publish
 
 IDIOMAS = {"pt": "Português", "en": "Inglês", "es": "Espanhol"}
+
 
 class TotemOrchestrator:
     def __init__(self, hugging_key: str | None = None):
@@ -32,45 +34,70 @@ class TotemOrchestrator:
     ):
         interaction_start = datetime.now()
         timestamp_iso = interaction_start.isoformat(timespec="seconds")
-        idioma = detect_language(pergunta)
+        idioma = detect_language(pergunta or "")
         data_hora = interaction_start.strftime("%d/%m/%Y (%A), %H:%M")
 
         # 1) marketing ativo
         active_campaigns = get_active_campaigns(company_id)
 
-        # 2) intenção (NLP leve)
-        intent = infer_intent(pergunta)
+        campaign_ids = [
+            (c.get("id") or c.get("campaign_id") or c.get("code"))
+            for c in (active_campaigns or [])
+            if (c.get("id") or c.get("campaign_id") or c.get("code"))
+        ]
 
-        # 3) recomendação por scoring (nível 1)
-        recs = recommend_actions(profile, active_campaigns, intent=intent)
+        # 2) intenção
+        intent = infer_intent(pergunta or "")
 
-        # 4) prompt final para ChatGPT
+        # 3) recomendação
+        recs = recommend_actions(profile, active_campaigns, intent=intent) or {}
+
+        # 4) prompt final
         prompt = f"""
-            Agora são {data_hora}.
-            Responda em {IDIOMAS.get(idioma, "Português")}.
-            Você é um assistente de totem de autoatendimento (rápido, claro, educado).
-            Use o perfil e as campanhas ativas para personalizar a conversa.
+Agora são {data_hora}.
+Responda em {IDIOMAS.get(idioma, "Português")}.
+Você é um assistente de totem de autoatendimento (rápido, claro, educado).
+Use o perfil e as campanhas ativas para personalizar a conversa.
 
-            PERGUNTA DO USUÁRIO:
-            {pergunta}
+PERGUNTA DO USUÁRIO:
+{pergunta}
 
-            PERFIL (informado pelo totem):
-            {profile}
+PERFIL (informado pelo totem):
+{profile}
 
-            CAMPANHAS ATIVAS (marketing):
-            {active_campaigns}
+CAMPANHAS ATIVAS (marketing):
+{active_campaigns}
 
-            RECOMENDAÇÕES (estruturadas):
-            {recs}
+RECOMENDAÇÕES (estruturadas):
+{recs}
 
-            REGRAS DE RESPOSTA:
-            - Seja direto e amigável.
-            - Faça no máximo 1 pergunta de clarificação (se necessário).
-            - Inclua um "próximo passo" para o usuário.
-        """
+REGRAS DE RESPOSTA:
+- Seja direto e amigável.
+- Faça no máximo 1 pergunta de clarificação (se necessário).
+- Inclua um "próximo passo" para o usuário.
+""".strip()
 
-        resposta, gen_latency = chatgpt_generate(prompt)
- 
+        llm_meta: dict = {}
+        resposta = ""
+        gen_latency = None
+
+        try:
+            resposta, gen_latency = chatgpt_generate(prompt, meta=llm_meta)
+        except Exception as e:
+            llm_meta["llm_provider_used"] = "demo"
+            llm_meta["llm_fallback_chain"] = llm_meta.get("llm_fallback_chain") or ["gateway:fail"]
+            llm_meta["llm_error"] = f"{type(e).__name__}: {e}"
+            gen_latency = None
+            resposta = (
+                "[DEMO/OFFLINE] No momento não consigo acessar o modelo de IA.\n\n"
+                "Ainda assim posso te orientar com base nas campanhas e recomendações.\n"
+                "Toque em “Quero essa oferta” para gerar um QR."
+            )
+
+        llm_provider_used = llm_meta.get("llm_provider_used")
+        llm_fallback_chain = llm_meta.get("llm_fallback_chain")
+        llm_error = llm_meta.get("llm_error")
+
         # 5) TTS
         audio_path = None
         voice_source = None
@@ -85,64 +112,138 @@ class TotemOrchestrator:
                 audio_path, voice_source, hf_status, hf_err, tts_latency = gerar_audio(
                     resposta, idioma, hugging_key=self.hugging_key
                 )
-            except Exception as e:
-                hf_err = f"{type(e).__name__}: {e}"
                 audio_t1 = time.perf_counter()
                 total_audio_latency = round((audio_t1 - audio_t0), 3)
+            except Exception as e:
+                audio_t1 = time.perf_counter()
+                total_audio_latency = round((audio_t1 - audio_t0), 3)
+                hf_err = f"{type(e).__name__}: {e}"
 
-        # 6) métricas
+        latency_total_s = (
+            (gen_latency or 0.0) +
+            (tts_latency or 0.0) +
+            (stt_latency_s or 0.0)
+        )
+
+        # 6) métricas principais
         metric = {
             "timestamp": timestamp_iso,
             "company_id": company_id,
             "session_id": session_id,
 
-            # contexto da interação
             "turn_index": turn,
             "input_mode": input_mode,
             "message_id": message_id,
             "intent": intent,
 
-            # pergunta/resposta
             "question": pergunta,
             "response": resposta,
 
-            # idioma
             "language_detected": idioma,
             "language_name": IDIOMAS.get(idioma, "Português"),
 
-            # perfil e marketing
             "profile": profile,
-            "campaigns_active": [
-                (c.get("id") or c.get("campaign_id") or c.get("code"))
-                for c in active_campaigns
-                if (c.get("id") or c.get("campaign_id") or c.get("code"))
-            ],
-            "active_campaigns_count": len(active_campaigns),
+            "campaigns_active": campaign_ids,
+            "active_campaigns_count": len(active_campaigns or []),
 
-            # recomendação estruturada
+            "campaign_impressions": campaign_ids,
+            "campaign_impressions_count": len(campaign_ids),
+
             "recommendations": recs,
-            "recommendations_top": recs.get("top_actions"),
+            "recommendations_top": (recs.get("top_actions") if isinstance(recs, dict) else None),
 
-            # áudio/STT
             "stt_provider": stt_provider,
             "stt_latency_s": stt_latency_s,
             "voice_source": voice_source,
             "audio_file": audio_path,
 
-            # latências
             "gen_latency_s": gen_latency,
             "tts_latency_s": tts_latency,
             "total_audio_time_s": total_audio_latency,
 
-            # status externos
+            "latency_llm_s": gen_latency,
+            "latency_tts_s": tts_latency,
+            "latency_total_s": latency_total_s,
+
             "hf_status_code": hf_status,
             "hf_error": hf_err,
+
+            "llm_provider_used": llm_provider_used,
+            "llm_fallback_chain": llm_fallback_chain,
+            "llm_error": llm_error,
         }
-        
+
+        impression_event = {
+            "event": "campaign_impression",
+            "timestamp": timestamp_iso,
+            "company_id": company_id,
+            "session_id": session_id,
+            "turn_index": turn,
+            "campaign_ids": campaign_ids,
+            "campaign_count": len(campaign_ids),
+            "intent": intent,
+            "language_detected": idioma,
+            "llm_provider_used": llm_provider_used,
+        }
+
+        # 7) publica eventos em tempo real para /api/events/{company_id}
+        live_event = {
+            "type": "totem_interaction",
+            "event": "totem_interaction",
+            "timestamp": timestamp_iso,
+            "company_id": company_id,
+            "session_id": session_id,
+            "turn_index": turn,
+            "input_mode": input_mode,
+            "message_id": message_id,
+            "intent": intent,
+            "language": idioma,
+            "question": pergunta,
+            "response": resposta,
+            "profile": profile,
+            "recommendations": recs,
+            "recommendations_top": (recs.get("top_actions") if isinstance(recs, dict) else []),
+            "audio_file": audio_path,
+            "voice_source": voice_source,
+            "latency": {
+                "stt": stt_latency_s,
+                "llm": gen_latency,
+                "tts": tts_latency,
+                "total": latency_total_s,
+            },
+            "campaign_ids": campaign_ids,
+            "llm_provider_used": llm_provider_used,
+            "status": {
+                "hf_status_code": hf_status,
+                "hf_error": hf_err,
+                "llm_error": llm_error,
+            },
+        }
+
+        live_impression_event = {
+            "type": "campaign_impression",
+            "event": "campaign_impression",
+            "timestamp": timestamp_iso,
+            "company_id": company_id,
+            "session_id": session_id,
+            "turn_index": turn,
+            "campaign_ids": campaign_ids,
+            "campaign_count": len(campaign_ids),
+            "intent": intent,
+            "language": idioma,
+        }
+
         try:
             self.metrics.save(metric)
+            self.metrics.save(impression_event)
             self.metrics.build_report()
         except Exception as e:
             metric["metrics_error"] = f"{type(e).__name__}: {e}"
+
+        try:
+            publish(company_id, live_event)
+            publish(company_id, live_impression_event)
+        except Exception as e:
+            metric["publish_error"] = f"{type(e).__name__}: {e}"
 
         return resposta, recs, audio_path, metric, idioma

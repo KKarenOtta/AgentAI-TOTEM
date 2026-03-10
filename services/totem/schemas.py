@@ -55,3 +55,19 @@ class TotemNPSRequest(BaseModel):
 class TotemNPSResponse(BaseModel):
     ok: bool
     message: str
+
+class TotemTrackRequest(BaseModel):
+    company_id: str
+    session_id: str
+    event: str  # ex: "action_click", "qr_open", "coupon_generated", "call_attendant"
+    action_id: Optional[str] = None
+    action_label: Optional[str] = None
+    campaign_id: Optional[str] = None
+    turn_index: Optional[int] = None
+    message_id: Optional[str] = None
+    value: Optional[float] = None  # ex: valor estimado/score
+    meta: Optional[Dict[str, Any]] = None
+
+class TotemTrackResponse(BaseModel):
+    ok: bool = True
+    message: str = "tracked"

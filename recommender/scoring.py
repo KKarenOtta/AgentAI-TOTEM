@@ -25,26 +25,25 @@ def score_campaign(campaign: dict, profile: dict | None, intent: str, weights: d
     score = 0.0
     why = []
 
-    # 1) prioridade base (se existir)
     priority = float(campaign.get("priority", 1.0))
     score += w["base_priority"] * priority
     why.append(f"prioridade={priority}")
 
-    # 2) match por intenção
-    tags = set((campaign.get("tags") or []))
+    tags = set(campaign.get("tags") or [])
     if intent in tags:
         score += w["intent_match"]
         why.append("match_intent")
 
-    # 3) returning
     if profile and profile.get("customer_type") == "returning":
         if campaign.get("returning_only") is True or "returning" in tags:
             score += w["returning_bonus"]
             why.append("returning")
 
-    # 4) faixa etária (se tiver)
-    if profile and profile.get("age_range") and campaign.get("age_ranges"):
-        if profile["age_range"] in campaign["age_ranges"]:
+    campaign_age_ranges = campaign.get("age_ranges") or campaign.get("target_segments") or []
+    user_age_range = profile.get("age_range") if profile else None
+
+    if user_age_range and campaign_age_ranges:
+        if user_age_range in campaign_age_ranges:
             score += w["age_match"]
             why.append("age_match")
 

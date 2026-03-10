@@ -1,6 +1,9 @@
 import json
 import time
+from datetime import datetime
 from typing import Optional, Dict, Any, List
+from services.totem.metrics import MetricsLogger
+from services.totem.schemas import TotemTrackRequest, TotemTrackResponse
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse, JSONResponse
 import pandas as pd
@@ -14,8 +17,9 @@ from marketing.campaigns import (
 router = APIRouter(tags=["api"])
 
 METRICS_CSV = "data/metrics/metrics.csv"  # mantenha isso como padrão
+metrics_logger = MetricsLogger(path="data/metrics/metrics.jsonl")
 
-@router.get("/api/events/{company_id}")
+@router.get("/events/{company_id}")
 def sse_events(company_id: str):
     def gen():
         q = get_queue(company_id)
@@ -30,7 +34,7 @@ def sse_events(company_id: str):
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
-@router.get("/api/metrics/{company_id}")
+@router.get("/metrics/{company_id}")
 def get_metrics(company_id: str, days: int = 7):
     if not os.path.exists(METRICS_CSV):
         return JSONResponse({"interactions_per_day": [], "tts_share": {}, "age_range": {}, "avg_latency": {} })
@@ -94,21 +98,44 @@ def get_metrics(company_id: str, days: int = 7):
 
 # ---------------- Campaigns CRUD ----------------
 
-@router.get("/api/campaigns/{company_id}")
+@router.get("/campaigns/{company_id}")
 def api_list_campaigns(company_id: str):
     return JSONResponse({"campaigns": list_campaigns(company_id)})
 
-@router.post("/api/campaigns/{company_id}")
+@router.post("/campaigns/{company_id}")
 def api_create_campaign(company_id: str, payload: Dict[str, Any]):
     created = create_campaign(company_id, payload)
     return JSONResponse(created)
 
-@router.patch("/api/campaigns/{company_id}/{campaign_id}")
+@router.post("/track", response_model=TotemTrackResponse)
+def track_event(req: TotemTrackRequest) -> TotemTrackResponse:
+    event_row = {
+        "event": req.event,
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "company_id": req.company_id,
+        "session_id": req.session_id,
+        "action_id": req.action_id,
+        "action_label": req.action_label,
+        "campaign_id": req.campaign_id,
+        "turn_index": req.turn_index,
+        "message_id": req.message_id,
+        "value": req.value,
+        "meta": req.meta,
+    }
+    try:
+        metrics_logger.save(event_row)
+        # não precisa rebuild report toda vez; mas se quiser:
+        # metrics_logger.build_report()
+        return TotemTrackResponse(ok=True, message="tracked")
+    except Exception as e:
+        return TotemTrackResponse(ok=False, message=f"track_error: {type(e).__name__}: {e}")
+
+@router.patch("/campaigns/{company_id}/{campaign_id}")
 def api_update_campaign(company_id: str, campaign_id: str, payload: Dict[str, Any]):
     updated = update_campaign(company_id, campaign_id, payload)
     return JSONResponse(updated)
 
-@router.delete("/api/campaigns/{company_id}/{campaign_id}")
+@router.delete("/campaigns/{company_id}/{campaign_id}")
 def api_delete_campaign(company_id: str, campaign_id: str):
     delete_campaign(company_id, campaign_id)
     return JSONResponse({"ok": True})

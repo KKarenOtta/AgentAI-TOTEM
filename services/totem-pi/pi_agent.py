@@ -1,84 +1,57 @@
-import base64
-import time
-import json
-import requests
-import sounddevice as sd
-import numpy as np
-from gpiozero import MotionSensor
+import os
+import sys
+import traceback
+from dotenv import load_dotenv
 
-TOTEM_BASE_URL = "http://192.168.0.10:9000"  # <-- troque para o IP do seu servidor FastAPI
-COMPANY_ID = "FLX-001"
-SESSION_ID = "pi-kiosk-001"
+load_dotenv()
 
-PIR_GPIO = 17
-SAMPLE_RATE = 16000
-CHANNELS = 1
-RECORD_SECONDS = 4
+from sensors.pi_totem_ui import TotemApp
 
-def post_json(path: str, payload: dict, timeout=30):
-    url = f"{TOTEM_BASE_URL}{path}"
-    r = requests.post(url, json=payload, timeout=timeout)
-    r.raise_for_status()
-    return r.json()
 
-def activate():
-    payload = {"company_id": COMPANY_ID, "session_id": SESSION_ID}
-    resp = post_json("/totem/activate", payload)
-    print("[ACTIVATE]", resp["greeting"])
-    return resp
+def print_boot_info():
+    print("========================================")
+    print(" Totem I.A.Gora | Raspberry Pi Launcher ")
+    print("========================================")
+    print(f"TOTEM_API_URL: {os.getenv('TOTEM_API_URL', 'http://localhost:9000/totem/interact')}")
+    print(f"TRACK_API_URL: {os.getenv('TRACK_API_URL', 'http://localhost:9000/api/track')}")
+    print(f"COMPANY_ID: {os.getenv('COMPANY_ID', 'FLX-001')}")
+    print(f"PREFER_AUDIO: {os.getenv('PREFER_AUDIO', 'true')}")
+    print(f"PIR_PIN: {os.getenv('PIR_PIN', '17')}")
+    print(f"PRESENCE_HOLD_SECONDS: {os.getenv('PRESENCE_HOLD_SECONDS', '3')}")
+    print(f"COOLDOWN_SECONDS: {os.getenv('COOLDOWN_SECONDS', '8')}")
+    print("Modo: UI touchscreen + PIR HC-SR501")
+    print("========================================")
 
-def record_audio_wav_bytes():
-    print("[AUDIO] Gravando...")
-    audio = sd.rec(int(RECORD_SECONDS * SAMPLE_RATE), samplerate=SAMPLE_RATE, channels=CHANNELS, dtype="int16")
-    sd.wait()
-    print("[AUDIO] OK")
-    raw = audio.tobytes()
-    # aqui estamos mandando PCM cru; ideal é WAV/FLAC (ver nota abaixo)
-    return raw
 
-def interact_audio(audio_bytes: bytes):
-    audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
-    payload = {
-        "company_id": COMPANY_ID,
-        "session_id": SESSION_ID,
-        "audio_base64": audio_b64,
-        "prefer_audio": False,  # depois você liga TTS
-        "message": None
+def validate_environment():
+    required_vars = {
+        "TOTEM_API_URL": os.getenv("TOTEM_API_URL", "http://localhost:9000/totem/interact"),
+        "TRACK_API_URL": os.getenv("TRACK_API_URL", "http://localhost:9000/api/track"),
+        "COMPANY_ID": os.getenv("COMPANY_ID", "FLX-001"),
     }
-    resp = post_json("/totem/interact", payload, timeout=60)
-    print("[BOT]", resp["text"])
-    print("[RECS]", json.dumps(resp["recommendations"], ensure_ascii=False))
-    return resp
 
-def interact_text(text: str):
-    payload = {
-        "company_id": COMPANY_ID,
-        "session_id": SESSION_ID,
-        "message": text,
-        "prefer_audio": False,
-    }
-    resp = post_json("/totem/interact", payload, timeout=60)
-    print("[BOT]", resp["text"])
-    return resp
+    for key, value in required_vars.items():
+        if not value:
+            raise RuntimeError(f"Variável de ambiente obrigatória ausente: {key}")
+
 
 def main():
-    pir = MotionSensor(PIR_GPIO)
-    print("Aguardando presença...")
+    try:
+        validate_environment()
+        print_boot_info()
 
-    while True:
-        pir.wait_for_motion()
-        print("[PIR] Presença detectada")
-        activate()
+        app = TotemApp()
+        app.mainloop()
 
-        # fallback simples: digitar texto (teste rápido sem STT real)
-        # interact_text("Tem promo hoje?")
+    except KeyboardInterrupt:
+        print("\n[PI_AGENT] Encerrado pelo usuário.")
+        sys.exit(0)
 
-        # áudio
-        audio_bytes = record_audio_wav_bytes()
-        interact_audio(audio_bytes)
+    except Exception as e:
+        print(f"\n[PI_AGENT] Erro fatal: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        sys.exit(1)
 
-        # pausa para não ficar retriggerando toda hora
-        time.sleep(5)
 
 if __name__ == "__main__":
     main()

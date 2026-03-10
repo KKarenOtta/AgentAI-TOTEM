@@ -1,18 +1,26 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Cliente: {{ company_id }}</h1>
+<section class="page-header">
+  <div>
+    <span class="badge">Cliente</span>
+    <h1 class="page-title">Dashboard • {{ company_id }}</h1>
+    <p class="page-subtitle">Acompanhe métricas, campanhas e o comportamento do totem desta empresa.</p>
+  </div>
+</section>
 
 <div class="grid">
   <div class="card">
-    <h2>Métricas (últimos 7 dias)</h2>
-    <pre id="metrics">Carregando...</pre>
+    <h2>Métricas dos últimos 7 dias</h2>
+    <pre id="metrics">Carregando métricas...</pre>
   </div>
 
   <div class="card">
-    <h2>Atalhos</h2>
-    <a class="btn" href="/client/{{ company_id }}/campaigns">Gerenciar Campanhas</a>
-    <a class="btn" href="/totem/sim/{{ company_id }}">Simulador do Totem</a>
-    <a class="btn" href="/totem/live/{{ company_id }}">Monitor ao vivo</a>
+    <h2>Ações rápidas</h2>
+    <div class="actions">
+      <a class="btn" href="/client/{{ company_id }}/campaigns">Gerenciar campanhas</a>
+      <a class="btn" href="/totem/sim/{{ company_id }}">Abrir simulador</a>
+      <a class="btn" href="/totem/live/{{ company_id }}">Monitor ao vivo</a>
+    </div>
   </div>
 </div>
 

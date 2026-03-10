@@ -1,22 +1,37 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Campanhas • {{ company_id }}</h1>
+<section class="page-header">
+  <div>
+    <span class="badge">Campanhas</span>
+    <h1 class="page-title">Campanhas ativas • {{ company_id }}</h1>
+    <p class="page-subtitle">Gerencie ações promocionais usadas pelo motor de recomendação do totem.</p>
+  </div>
+</section>
 
 <div class="grid">
   <div class="card">
     <h2>Criar campanha</h2>
     <div class="form">
-      <input id="name" placeholder="Nome" />
-      <input id="channel" placeholder="Canal (instagram, google...)" />
-      <input id="objective" placeholder="Objetivo (leads, sales...)" />
-      <input id="targets" placeholder="Target segments (ex: 18-24,25-34)" />
-      <button class="btn primary" onclick="createCampaign()">Criar</button>
+      <div class="row">
+        <input id="name" placeholder="Nome da campanha" />
+        <input id="channel" placeholder="Canal (instagram, google...)" />
+      </div>
+
+      <div class="row">
+        <input id="objective" placeholder="Objetivo (leads, sales...)" />
+        <input id="targets" placeholder="Faixas etárias (ex: 18-24,25-34)" />
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" onclick="createCampaign()">Criar campanha</button>
+        <a class="btn" href="/client/{{ company_id }}">Voltar ao dashboard</a>
+      </div>
     </div>
   </div>
 
   <div class="card">
-    <h2>Lista</h2>
-    <pre id="list">Carregando...</pre>
+    <h2>Lista de campanhas</h2>
+    <pre id="list">Carregando campanhas...</pre>
   </div>
 </div>
 
@@ -26,21 +41,28 @@ async function refresh(){
   const data = await r.json();
   document.querySelector("#list").textContent = JSON.stringify(data, null, 2);
 }
+
 async function createCampaign(){
   const payload = {
     name: document.querySelector("#name").value,
     channel: document.querySelector("#channel").value,
     objective: document.querySelector("#objective").value,
     status: "active",
-    target_segments: (document.querySelector("#targets").value || "").split(",").map(s => s.trim()).filter(Boolean)
+    target_segments: (document.querySelector("#targets").value || "")
+      .split(",")
+      .map(s => s.trim())
+      .filter(Boolean)
   };
+
   await fetch(`/api/campaigns/{{ company_id }}`, {
     method: "POST",
     headers: {"Content-Type":"application/json"},
     body: JSON.stringify(payload)
   });
+
   await refresh();
 }
+
 refresh();
 </script>
 {% endblock %}
