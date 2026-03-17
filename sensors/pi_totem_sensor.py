@@ -9,6 +9,7 @@ import uuid
 import requests
 from enum import Enum
 from dotenv import load_dotenv
+import adafruit_dht
 
 load_dotenv()
 
@@ -32,7 +33,6 @@ import busio
 import adafruit_ds3231
 i2c = busio.I2C(board.SCL, board.SDA)
 rtc = adafruit_ds3231.DS3231(i2c)
-
 
 class Event(str, Enum):
     AWARE = "aware"
@@ -72,7 +72,7 @@ def read_env():
                 return temp, hum
         except Exception as e:
             print("Falha ao ler DHT22:", e)
-            time.sleep(0.5)
+            time.sleep(2)
     return None, None
 
 
@@ -81,7 +81,7 @@ def read_time_iso():
         t = rtc.datetime
         return time.strftime("%Y-%m-%dT%H:%M:%S", t)
     except Exception as e:
-        print("Falha ao ler RTC:", e)
+        #print("Falha ao ler RTC:", e)
         return time.strftime("%Y-%m-%dT%H:%M:%S")
 
 

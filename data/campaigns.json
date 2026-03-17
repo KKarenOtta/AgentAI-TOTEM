@@ -32,5 +32,19 @@
       ],
       "start_date": "2026-03-02"
     }
+  ],
+  "ACME-001": [
+    {
+      "campaign_id": "CAMP-001",
+      "name": "Promo Verão",
+      "channel": "instagram",
+      "objective": "leads",
+      "status": "active",
+      "target_segments": [
+        "18-24",
+        "25-34"
+      ],
+      "start_date": "2026-03-16"
+    }
   ]
 }
