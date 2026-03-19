@@ -24,6 +24,9 @@ CRIAR UMA PASTA na sua máquina e uma BRANCH: Antes de fazer alterações, cada 
 
 
 APÓS TRABALHAR NAS SUAS ALTERAÇOES: criar o COMMIT:
+
+		pip freeze > requirements.txt
+		pip freeze > requirements-pi.txt
 	
 		git add .
 	
@@ -31,14 +34,14 @@ APÓS TRABALHAR NAS SUAS ALTERAÇOES: criar o COMMIT:
 
 antes de fazer o push, é uma boa prática puxar as últimas alterações de branch principal para evitar conflitos: 
 		
-		git pull origin main/master
+		git pull origin main
 		
 		git push -u origin nome-do-branch
 
 
 Atualizar o Branch Local
 Após a mesclagem, cada membro deve atualizar seu branch local para garantir que está trabalhando com a versão mais recente:
-		
+	
 		git checkout main
 		
 		git pull origin main
@@ -54,7 +57,7 @@ Ative seu ambiente virtual:
 		
 		source venv/bin/activate  # macOS/Linux
 		
-		venv\Scripts\activate       # Windows
+		venv\Scripts\activate     # Windows
 
 
 Atualize sua branch principal:
