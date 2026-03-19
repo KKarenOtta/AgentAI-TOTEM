@@ -84,12 +84,6 @@ Continue seu Trabalho: Agora você pode mudar para o branch onde estava trabalha
 	  
 		git checkout -b nome-do-branch
 
-Para atualizar o requirements utilize:
-
-		pip freeze > requirements.txt
-		pip freeze > requirements-pi.txt
-
-
 Para verificar os templates localmente:
 	Certifique-se de estar com o venv ativado!
 
