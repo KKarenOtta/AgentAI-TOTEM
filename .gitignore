@@ -1,118 +1,18 @@
-# ==============================
-# 🔐 ENV / SEGREDOS
-# ==============================
-.env
-.env.*
-*.env
-*.key
-*.pem
-*.crt
-secrets.json
-config.local.py
-
-# ==============================
-# 🐍 PYTHON
-# ==============================
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# ==============================
-# 🧪 TESTES / COVERAGE
-# ==============================
-.coverage
-.coverage.*
-.cache
-.pytest_cache/
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-
-# ==============================
-# 🧠 VENV / AMBIENTE VIRTUAL
-# ==============================
 venv/
-ENV/
-env/
-.venv/
-
-# ==============================
-# 🖥️ IDE / EDITORES
-# ==============================
-.vscode/
-.idea/
-*.swp
-*.swo
-*.swn
-*.bak
-
-# ==============================
-# 🍎 MACOS
-# ==============================
+__pycache__/
+*.pyc
+*.pyo
 .DS_Store
-.AppleDouble
-.LSOverride
-Icon?
-._*
-.Spotlight-V100
-.Trashes
-
-# ==============================
-# 📊 LOGS / MÉTRICAS
-# ==============================
-*.log
-logs/
-metrics/
-reports/
-*.csv
-
-# ==============================
-# 🎙️ ÁUDIO / MÍDIA GERADA
-# ==============================
-audio/
-*.mp3
-*.wav
-*.ogg
-
-# ==============================
-# 📦 DOCKER (se usar)
-# ==============================
-docker-compose.override.yml
-
-# ==============================
-# 📄 DATABASE
-# ==============================
-*.sqlite3
-*.db
-
-# ==============================
-# 🧠 JUPYTER
-# ==============================
-.ipynb_checkpoints/
-
-# ==============================
-# 🔁 CACHE DIVERSOS
-# ==============================
+.pytest_cache/
 .mypy_cache/
-.pyre/
 .ruff_cache/
+.env
+backup_campaign_refactor/
+backup_pre_campaign_refine/
+static/uploads/campaigns/*
+static/uploads/qrcodes/*
+!static/uploads/campaigns/.gitkeep
+!static/uploads/qrcodes/.gitkeep
+data/metrics/metrics.jsonl
+data/metrics/metrics.bak.jsonl
+data/metrics/voz_fallback.mp3

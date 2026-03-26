@@ -17,6 +17,28 @@
       "status": "active",
       "campaign_id": "CAMP-F53872",
       "start_date": "2026-02-25"
+    },
+    {
+      "name": "Teste",
+      "description": "",
+      "channel": "totem",
+      "status": "active",
+      "objective": "conversion",
+      "cta_label": "Quero meu desconto",
+      "discount_type": "percent",
+      "discount_value": 45.0,
+      "coupon_code": "maisdesc",
+      "landing_url": "",
+      "priority": "normal",
+      "target_intents": [],
+      "qr_mode": "coupon",
+      "media_image": "/static/uploads/campaigns/FLX-001-e8ec648362694f54a769c24d65134e5d.png",
+      "company_id": "FLX-001",
+      "campaign_id": "CAMP-DDEBF7",
+      "start_date": "2026-03-26",
+      "end_date": null,
+      "target_segments": [],
+      "tags": []
     }
   ],
   "demo": [
@@ -45,6 +67,31 @@
         "25-34"
       ],
       "start_date": "2026-03-16"
+    }
+  ],
+  "FLEXMEDIA-001": [
+    {
+      "campaign_id": "CAMP-001",
+      "name": "Promo Verão",
+      "channel": "instagram",
+      "objective": "leads",
+      "status": "active",
+      "target_segments": [
+        "18-24",
+        "25-34"
+      ],
+      "start_date": "2026-03-26"
+    },
+    {
+      "name": "verao",
+      "channel": "totem",
+      "status": "active",
+      "objective": "desconto",
+      "target_intents": [
+        "roupa"
+      ],
+      "campaign_id": "CAMP-80A0EB",
+      "start_date": "2026-03-26"
     }
   ]
 }

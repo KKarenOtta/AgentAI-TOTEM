@@ -2,33 +2,170 @@
 {% block content %}
 <section class="page-header">
   <div>
-    <span class="badge">Cliente</span>
-    <h1 class="page-title">Dashboard • {{ company_id }}</h1>
-    <p class="page-subtitle">Acompanhe métricas, campanhas e o comportamento do totem desta empresa.</p>
+    <span class="badge">Dashboard</span>
+    <h1 class="page-title">Dashboard do cliente • {{ company_id }}</h1>
+    <p class="page-subtitle">
+      Acompanhe uso do totem, distribuição de interações, latência e indicadores operacionais.
+    </p>
   </div>
 </section>
 
 <div class="grid">
-  <div class="card">
-    <h2>Métricas dos últimos 7 dias</h2>
-    <pre id="metrics">Carregando métricas...</pre>
-  </div>
+  <section class="card">
+    <div class="stat-label">Interações no período</div>
+    <div class="stat-value" id="kpiInteractions">—</div>
+  </section>
 
-  <div class="card">
-    <h2>Ações rápidas</h2>
-    <div class="actions">
-      <a class="btn" href="/client/{{ company_id }}/campaigns">Gerenciar campanhas</a>
-      <a class="btn" href="/totem/sim/{{ company_id }}">Abrir simulador</a>
-      <a class="btn" href="/totem/live/{{ company_id }}">Monitor ao vivo</a>
-    </div>
+  <section class="card">
+    <div class="stat-label">Latência média LLM</div>
+    <div class="stat-value" id="kpiLatencyLlm">—</div>
+  </section>
+
+  <section class="card">
+    <div class="stat-label">Latência média TTS</div>
+    <div class="stat-value" id="kpiLatencyTts">—</div>
+  </section>
+
+  <section class="card">
+    <div class="stat-label">Fonte de voz dominante</div>
+    <div class="stat-value" id="kpiVoice">—</div>
+  </section>
+</div>
+
+<div class="grid" style="margin-top:20px;">
+  <section class="card">
+    <h2>Interações por dia</h2>
+    <div id="interactionsCards" class="stack-list muted">Carregando...</div>
+  </section>
+
+  <section class="card">
+    <h2>Distribuição por faixa etária</h2>
+    <div id="ageCards" class="stack-list muted">Carregando...</div>
+  </section>
+</div>
+
+<div class="grid" style="margin-top:20px;">
+  <section class="card">
+    <h2>Uso de voz</h2>
+    <div id="voiceCards" class="stack-list muted">Carregando...</div>
+  </section>
+
+  <section class="card">
+    <h2>Resumo operacional</h2>
+    <div id="opsSummary" class="stack-list muted">Carregando...</div>
+  </section>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2>Ações rápidas</h2>
+  <div class="actions">
+    <a class="btn primary" href="/client/{{ company_id }}/campaigns">Gerenciar campanhas</a>
+    <a class="btn" href="/totem/sim/{{ company_id }}">Abrir simulador</a>
+    <a class="btn" href="/totem/live/{{ company_id }}">Monitor ao vivo</a>
+    <a class="btn" href="/api/metrics/{{ company_id }}">Ver API de métricas</a>
   </div>
 </div>
 
 <script>
-(async () => {
-  const r = await fetch(`/api/metrics/{{ company_id }}?days=7`);
-  const data = await r.json();
-  document.querySelector("#metrics").textContent = JSON.stringify(data, null, 2);
-})();
+const companyId = "{{ company_id }}";
+
+function formatNumber(value) {
+  if (value === null || value === undefined || value === "") return "—";
+  return Number(value).toLocaleString("pt-BR");
+}
+
+function formatSeconds(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "—";
+  return `${Number(value).toFixed(2)}s`;
+}
+
+function renderMetricList(containerId, items, emptyMessage) {
+  const container = document.getElementById(containerId);
+
+  if (!items || items.length === 0) {
+    container.innerHTML = `<div class="empty-state">${emptyMessage}</div>`;
+    return;
+  }
+
+  container.innerHTML = items.map(item => `
+    <div class="metric-row">
+      <div class="metric-row-label">${item.label}</div>
+      <div class="metric-row-value">${item.value}</div>
+    </div>
+  `).join("");
+}
+
+async function loadMetrics() {
+  const response = await fetch(`/api/metrics/${companyId}`);
+  const data = await response.json();
+
+  const interactions = Array.isArray(data.interactions_per_day) ? data.interactions_per_day : [];
+  const ageRange = data.age_range || {};
+  const ttsShare = data.tts_share || {};
+  const avgLatency = data.avg_latency || {};
+
+  const totalInteractions = interactions.reduce((acc, item) => acc + (Number(item.count) || 0), 0);
+
+  const voiceEntries = Object.entries(ttsShare);
+  const dominantVoice = voiceEntries.length
+    ? voiceEntries.sort((a, b) => b[1] - a[1])[0][0]
+    : null;
+
+  document.getElementById("kpiInteractions").textContent = formatNumber(totalInteractions);
+  document.getElementById("kpiLatencyLlm").textContent = formatSeconds(avgLatency.gen);
+  document.getElementById("kpiLatencyTts").textContent = formatSeconds(avgLatency.tts);
+  document.getElementById("kpiVoice").textContent = dominantVoice || "—";
+
+  renderMetricList(
+    "interactionsCards",
+    interactions.map(item => ({
+      label: item.date || "Sem data",
+      value: formatNumber(item.count || 0),
+    })),
+    "Nenhuma interação registrada."
+  );
+
+  renderMetricList(
+    "ageCards",
+    Object.entries(ageRange).map(([label, value]) => ({
+      label,
+      value: formatNumber(value),
+    })),
+    "Sem dados de faixa etária."
+  );
+
+  renderMetricList(
+    "voiceCards",
+    Object.entries(ttsShare).map(([label, value]) => ({
+      label,
+      value: formatNumber(value),
+    })),
+    "Sem dados de voz."
+  );
+
+  renderMetricList(
+    "opsSummary",
+    [
+      { label: "Empresa", value: companyId },
+      { label: "Período agregado", value: "Últimos 7 dias" },
+      { label: "Latência LLM média", value: formatSeconds(avgLatency.gen) },
+      { label: "Latência TTS média", value: formatSeconds(avgLatency.tts) },
+      { label: "Fonte de voz dominante", value: dominantVoice || "—" },
+    ],
+    "Sem dados operacionais."
+  );
+}
+
+loadMetrics().catch((error) => {
+  console.error(error);
+  document.getElementById("kpiInteractions").textContent = "Erro";
+  document.getElementById("kpiLatencyLlm").textContent = "Erro";
+  document.getElementById("kpiLatencyTts").textContent = "Erro";
+  document.getElementById("kpiVoice").textContent = "Erro";
+
+  ["interactionsCards", "ageCards", "voiceCards", "opsSummary"].forEach((id) => {
+    document.getElementById(id).innerHTML = `<div class="empty-state">Falha ao carregar métricas.</div>`;
+  });
+});
 </script>
 {% endblock %}

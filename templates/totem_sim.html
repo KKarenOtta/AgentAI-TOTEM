@@ -4,7 +4,7 @@
   <div>
     <span class="badge">Simulador</span>
     <h1 class="page-title">Simulador do Totem • {{ company_id }}</h1>
-    <p class="page-subtitle">Teste o backend com perfil manual antes de rodar no Raspberry Pi 3.</p>
+    <p class="page-subtitle">Teste o backend com campanha visual, desconto e QR code na tela.</p>
   </div>
 </section>
 
@@ -43,15 +43,107 @@
   </div>
 </div>
 
-<div class="card" style="margin-top:20px;">
-  <h2>Resposta</h2>
-  <pre id="out">—</pre>
+<div class="grid" style="margin-top:20px;">
+  <div class="card">
+    <h2>Resposta da IA</h2>
+    <div id="answerText" class="answer-box">—</div>
+  </div>
+
+  <div class="card">
+    <h2>Resumo técnico</h2>
+    <div id="metaInfo" class="stack-list">
+      <div class="empty-state">Aguardando interação...</div>
+    </div>
+  </div>
 </div>
+
+<section class="card" style="margin-top:20px;">
+  <h2>Recomendações de marketing</h2>
+  <div id="recommendationGrid" class="card-grid">
+    <div class="empty-state">Nenhuma recomendação exibida ainda.</div>
+  </div>
+</section>
 
 <script>
 let busy = false;
 
-async function send(){
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function renderMeta(data) {
+  const metrics = data.metrics || {};
+  const language = data.language || "—";
+
+  document.getElementById("metaInfo").innerHTML = `
+    <div class="metric-row">
+      <div class="metric-row-label">Sessão</div>
+      <div class="metric-row-value">${escapeHtml(data.session_id || "—")}</div>
+    </div>
+    <div class="metric-row">
+      <div class="metric-row-label">Idioma</div>
+      <div class="metric-row-value">${escapeHtml(language)}</div>
+    </div>
+    <div class="metric-row">
+      <div class="metric-row-label">Latência total</div>
+      <div class="metric-row-value">${metrics.latency_total_s ? Number(metrics.latency_total_s).toFixed(2) + "s" : "—"}</div>
+    </div>
+    <div class="metric-row">
+      <div class="metric-row-label">LLM</div>
+      <div class="metric-row-value">${metrics.llm_provider_used || "demo"}</div>
+    </div>
+  `;
+}
+
+function renderRecommendations(data) {
+  const recommendationGrid = document.getElementById("recommendationGrid");
+  const recs = data.recommendations || {};
+  const topActions = Array.isArray(recs.top_actions) ? recs.top_actions : [];
+
+  if (!topActions.length) {
+    recommendationGrid.innerHTML = `<div class="empty-state">Nenhuma recomendação retornada.</div>`;
+    return;
+  }
+
+  recommendationGrid.innerHTML = topActions.map(item => `
+    <article class="mini-card">
+      ${item.media_image ? `<img src="${escapeHtml(item.media_image)}" alt="${escapeHtml(item.title || item.name || "Campanha")}" class="campaign-thumb">` : ""}
+      <div class="mini-card-top">
+        <div>
+          <div class="mini-card-title">${escapeHtml(item.title || item.name || "Oferta")}</div>
+          <div class="mini-card-subtitle">${escapeHtml(item.campaign_id || item.id || "sem-id")}</div>
+        </div>
+        ${item.discount_label ? `<span class="badge">${escapeHtml(item.discount_label)}</span>` : ""}
+      </div>
+
+      <p>${escapeHtml(item.description || "Sem descrição.")}</p>
+
+      <div class="stack-list compact">
+        <div class="metric-row">
+          <div class="metric-row-label">CTA</div>
+          <div class="metric-row-value">${escapeHtml(item.cta_label || "Quero meu desconto")}</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-row-label">Cupom</div>
+          <div class="metric-row-value">${escapeHtml(item.coupon_code || "—")}</div>
+        </div>
+      </div>
+
+      ${item.qr_code_url ? `
+        <div class="qr-wrap">
+          <img src="${escapeHtml(item.qr_code_url)}" alt="QR code da campanha" class="qr-image">
+        </div>
+      ` : ""}
+    </article>
+  `).join("");
+}
+
+async function send() {
   if (busy) return;
 
   busy = true;
@@ -83,10 +175,15 @@ async function send(){
     });
 
     const data = await r.json();
-    document.querySelector("#out").textContent = JSON.stringify(data, null, 2);
 
-  } catch(e) {
-    document.querySelector("#out").textContent = `Erro: ${e}`;
+    document.getElementById("answerText").textContent = data.text || "Sem resposta.";
+    renderMeta(data);
+    renderRecommendations(data);
+
+  } catch (e) {
+    document.getElementById("answerText").textContent = `Erro: ${e}`;
+    document.getElementById("metaInfo").innerHTML = `<div class="empty-state">Falha ao processar interação.</div>`;
+    document.getElementById("recommendationGrid").innerHTML = `<div class="empty-state">Falha ao carregar recomendações.</div>`;
     console.error(e);
   } finally {
     busy = false;
