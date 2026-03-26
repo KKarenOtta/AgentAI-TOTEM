@@ -1,36 +1,51 @@
-from recommender.scoring import infer_intent, score_campaign
+from __future__ import annotations
+
+from recommender.scoring import score_campaign
+
 
 def recommend_actions(profile, active_campaigns, intent=None, top_k=3):
-    """
-    Retorna recomendações ordenadas por score.
-    intent deve vir pronto (ex.: inferido no orchestrator).
-    """
     intent = intent or "general"
 
     scored = []
-    for c in active_campaigns:
-        s, why = score_campaign(c, profile, intent)
-        scored.append((s, c, why))
+    for campaign in active_campaigns or []:
+        score, why = score_campaign(campaign, profile, intent)
+        scored.append((score, campaign, why))
 
-    scored.sort(key=lambda x: x[0], reverse=True)
+    scored.sort(key=lambda item: item[0], reverse=True)
 
-    top = []
-    for s, c, why in scored[:top_k]:
-        top.append({
+    top_actions = []
+    for score, campaign, why in scored[:top_k]:
+        top_actions.append({
             "type": "campaign",
-            "campaign_id": c.get("id") or c.get("campaign_id"),
-            "title": c.get("title") or c.get("name") or "Campanha",
-            "action": c.get("cta") or "Ver oferta",
-            "score": s,
+            "campaign_id": campaign.get("campaign_id") or campaign.get("id") or campaign.get("code"),
+            "title": campaign.get("title") or campaign.get("name") or "Campanha",
+            "description": campaign.get("description") or "",
+            "cta_label": campaign.get("cta_label") or campaign.get("cta") or "Quero meu desconto",
+            "action": campaign.get("cta_label") or campaign.get("cta") or "Quero meu desconto",
+            "media_image": campaign.get("media_image") or "",
+            "coupon_code": campaign.get("coupon_code") or "",
+            "discount_type": campaign.get("discount_type") or "",
+            "discount_value": campaign.get("discount_value") or 0,
+            "landing_url": campaign.get("landing_url") or "",
+            "score": score,
             "why": why,
         })
 
-    if not top:
-        top = [{
+    if not top_actions:
+        top_actions = [{
             "type": "generic",
-            "action": "Mostrar melhores ofertas e perguntar preferência do usuário",
-            "why": "Sem campanhas elegíveis; coletar intenção melhora recomendação.",
+            "campaign_id": None,
+            "title": "Sem campanha elegível",
+            "description": "Nenhuma campanha ativa compatível com a intenção atual.",
+            "cta_label": "Explorar opções",
+            "action": "Explorar opções",
+            "media_image": "",
+            "coupon_code": "",
+            "discount_type": "",
+            "discount_value": 0,
+            "landing_url": "",
             "score": 0.1,
+            "why": "Sem campanhas elegíveis; coletar intenção melhora recomendação.",
         }]
 
-    return {"top_actions": top}
+    return {"top_actions": top_actions}

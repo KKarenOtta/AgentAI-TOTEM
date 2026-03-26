@@ -1,22 +1,35 @@
-from dotenv import load_dotenv
-load_dotenv()
+from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.routes.totem import router as totem_router
-from app.routes.dashboard import router as dashboard_router
+from app.config import settings
 from app.routes.api import router as api_router
+from app.routes.dashboard import router as dashboard_router
+from app.routes.presence import router as presence_router
+from app.routes.totem import router as totem_router
+from core.logging import configure_logging
 
-app = FastAPI()
+
+configure_logging(settings.log_level)
+
+app = FastAPI(
+    title=settings.app_name,
+    version="2.0.0",
+)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-@app.get("/")
-def root():
-    return {"ok": True, "docs": "/docs", "totem": "/totem"}
-
-# routers
 app.include_router(dashboard_router)
-app.include_router(totem_router, prefix="/totem")
-app.include_router(api_router, prefix="/api")
+app.include_router(totem_router, prefix="/totem", tags=["totem"])
+app.include_router(api_router, prefix="/api", tags=["api"])
+app.include_router(presence_router, prefix="/api", tags=["presence"])
+
+
+@app.get("/health")
+def health() -> dict:
+    return {
+        "status": "ok",
+        "app": settings.app_name,
+        "env": settings.app_env,
+    }
