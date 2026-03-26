@@ -20,7 +20,22 @@ CRIAR UMA PASTA na sua máquina e uma BRANCH: Antes de fazer alterações, cada 
 	As pastas já estão protegidas pelo arquivo gitignore.
 
 	OPENAI_API_KEY=
-	HUGGING_FACE_API_KEY=
+	GEMINI_API_KEY=
+	OPENROUTER_API_KEY=
+	HUGGING_FACE= (LLM: se nenhuma chave de LLM estiver definida, o sistema opera em modo fallback/demo)
+	APP_NAME=AgentAI-TOTEM
+	APP_ENV=development
+	LOG_LEVEL=INFO
+	HOST=127.0.0.1
+	PORT=9000
+	DEFAULT_COMPANY_ID=FLX-001
+	PRESENCE_TIMEOUT_S=15
+	TOTEM_API_URL=http://127.0.0.1:9000/api
+	COMPANY_ID=FLX-001
+	DEVICE_ID=RPI3-PIR-001
+	PIR_PIN=17
+	POLL_INTERVAL_S=0.20
+	CLEAR_DELAY_S=4
 
 
 APÓS TRABALHAR NAS SUAS ALTERAÇOES: criar o COMMIT:
@@ -53,12 +68,8 @@ Entre na sua pasta de projeto da sua máquina:
 
 Ative seu ambiente virtual: 
 
-		python3 -m venv venv # macOS/Linux
-		
-		source venv/bin/activate  # macOS/Linux
-		
-		venv\Scripts\activate     # Windows
-
+		python3.11 -m venv venv
+		source venv/bin/activate
 
 Atualize sua branch principal:
 		
@@ -67,13 +78,9 @@ Atualize sua branch principal:
 Puxe as últimas alterações do repositório remoto:
 		
 		git pull origin main
-
-Verifique se há novas dependencias: 
-	Se houver alterações nas dependencias do projeto (ex: requirements.txt): 	
+		./venv/bin/python -m pip install --upgrade pip setuptools wheel
+		./venv/bin/python -m pip install -r requirements.txt
 		
-		pip install -r requirements.txt
-		pip install -r requirements-pi.txt
-
 Verifique o status do repositório:
 	
 		git status
@@ -87,20 +94,43 @@ Continue seu Trabalho: Agora você pode mudar para o branch onde estava trabalha
 Para verificar os templates localmente:
 	Certifique-se de estar com o venv ativado!
 
-		python3 -m uvicorn app.main:app --host 127.0.0.1 --port 9000 --log-level debug
+		./venv/bin/python -m uvicorn app.main:app \
+		  --host 127.0.0.1 \
+		  --port 9000 \
+		  --reload \
+		  --reload-dir app \
+		  --reload-dir services \
+		  --reload-dir agents \
+		  --reload-dir repositories \
+		  --reload-dir templates \
+		  --reload-dir static \
+		  --reload-exclude 'venv/*'
 
 Abrir navegador em: 
 
-	- http://127.0.0.1:9000/docs
-	- http://127.0.0.1:9000/admin
-	- http://127.0.0.1:9000/totem/sim/FLX-001
-	- http://127.0.0.1:9000/totem/live/FLX-001
-	- http://127.0.0.1:9000/client/demo
-	- http://127.0.0.1:9000/client/dashboard
+		http://127.0.0.1:9000/ → página inicial
+		http://127.0.0.1:9000/docs → Swagger / documentação das rotas
+		http://127.0.0.1:9000/health → health check
+		http://127.0.0.1:9000/admin → painel admin
+		http://127.0.0.1:9000/client/FLX-001 → dashboard do cliente
+		http://127.0.0.1:9000/client/FLX-001/campaigns → campanhas do cliente
+		http://127.0.0.1:9000/totem/sim/FLX-001 → simulador visual do totem
+		http://127.0.0.1:9000/totem/live/FLX-001 → monitor ao vivo
 
 Gerar relatórios em CMD:
-
+Relatório resumido
+		
 		sed -n '1,200p' data/metrics/metrics_report.md
+
+Últimas interações de uma empresa
+
 		grep -n '"company_id": "FLX-001"' data/metrics/metrics.jsonl | tail -n 20
-	
+
+Ver campanhas salvas
+		
+		cat data/campaigns.json
+
+Ver empresas salvas
+
+		cat data/companies.json
 	
