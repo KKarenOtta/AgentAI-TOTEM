@@ -1,24 +1,17 @@
-from __future__ import annotations
+import RPi.GPIO as GPIO
+from config import PIR_PIN
 
-try:
-    import RPi.GPIO as GPIO
-except Exception:  # pragma: no cover
-    GPIO = None  # type: ignore
+GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BCM)
 
+GPIO.setup(PIR_PIN, GPIO.IN)
 
-class PirSensor:
-    def __init__(self, pin: int) -> None:
-        if GPIO is None:
-            raise RuntimeError("RPi.GPIO não está disponível neste ambiente.")
-
-        self.pin = pin
-        GPIO.setwarnings(False)
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.pin, GPIO.IN)
-
-    def read(self) -> bool:
-        return bool(GPIO.input(self.pin))
-
-    def cleanup(self) -> None:
-        if GPIO is not None:
-            GPIO.cleanup(self.pin)
+def read_motion() -> bool:
+    """
+    Retorna True se houver movimento (HIGH no PIR)
+    """
+    try:
+        return GPIO.input(PIR_PIN) == 1
+    except Exception as e:
+        print(f"Erro leitura PIR: {e}")
+        return False

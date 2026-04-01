@@ -21,7 +21,7 @@ def trigger_presence(payload: PresenceRequest) -> dict:
     state = presence_service.trigger(
         company_id=payload.company_id,
         device_id=payload.device_id,
-        image_base64=payload.image_base64,
+        image_base64=payload.image_base64
     )
     return {"ok": True, "state": state}
 

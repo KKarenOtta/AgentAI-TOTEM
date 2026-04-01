@@ -1,0 +1,27 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# =========================
+# API / IDENTIDADE
+# =========================
+TOTEM_API_URL = os.getenv("TOTEM_API_URL")
+COMPANY_ID = os.getenv("COMPANY_ID", "FLX-001")
+DEVICE_ID = os.getenv("DEVICE_ID", "RPI3-PRESENCE-001")
+
+# =========================
+# SENSOR PIR
+# =========================
+PIR_PIN = int(os.getenv("PIR_PIN", "17"))
+
+# tempo contínuo necessário para validar presença
+PRESENCE_HOLD_SECONDS = float(os.getenv("PRESENCE_HOLD_SECONDS", "5"))
+
+# tempo de bloqueio após disparo
+COOLDOWN_SECONDS = float(os.getenv("COOLDOWN_SECONDS", "8"))
+
+# =========================
+# REDE
+# =========================
+REQUEST_TIMEOUT_SECONDS = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "5"))
