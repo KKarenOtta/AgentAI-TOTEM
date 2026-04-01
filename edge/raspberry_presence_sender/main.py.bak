@@ -1,16 +1,21 @@
 import time
-from config import PIR_PIN, PRESENCE_HOLD_SECONDS
+
+from config import PIR_PIN, PRESENCE_HOLD_SECONDS, COOLDOWN_SECONDS
 from pir_sensor import read_motion
 from sender import send_trigger
+from tts import speak_welcome  # novo módulo
+from audio import record_audio
+from sender_audio import send_audio
 
 SAMPLE_INTERVAL_SECONDS = 0.1
 MIN_ACTIVE_RATIO = 0.35
 WARMUP_SECONDS = 30
 
-COOLDOWN_SECONDS = 10
+# controle de sessão
+SESSION_TIMEOUT = 20  # segundos sem movimento para encerrar sessão
 
 
-def confirm_presence() -> bool:
+def confirm_presence_window() -> bool:
     total_samples = max(1, int(PRESENCE_HOLD_SECONDS / SAMPLE_INTERVAL_SECONDS))
     active_samples = 0
 
@@ -21,9 +26,7 @@ def confirm_presence() -> bool:
         time.sleep(SAMPLE_INTERVAL_SECONDS)
 
     ratio = active_samples / total_samples
-    print(
-        f"Janela presença | ativos={active_samples} total={total_samples} ratio={ratio:.2f}"
-    )
+    print(f"Janela presença | ativos={active_samples} total={total_samples} ratio={ratio:.2f}")
     return ratio >= MIN_ACTIVE_RATIO
 
 
@@ -34,27 +37,56 @@ def main():
     print(f"Aguardando estabilização do PIR por {WARMUP_SECONDS}s...")
 
     time.sleep(WARMUP_SECONDS)
-
     print("Sensor estabilizado. Monitorando presença...")
 
-    last_trigger_time = 0
+    last_trigger_time = 0.0
+    last_motion_time = 0.0
+    in_session = False
 
     while True:
         try:
             now = time.time()
 
-            # cooldown para evitar spam
+            motion = read_motion()
+
+            if motion:
+                last_motion_time = now
+
+            # encerrar sessão por inatividade
+            if in_session and (now - last_motion_time > SESSION_TIMEOUT):
+                print("Sessão encerrada por inatividade")
+                in_session = False
+
+            # evitar spam global
             if now - last_trigger_time < COOLDOWN_SECONDS:
                 time.sleep(0.2)
                 continue
 
-            if read_motion():
-                print("Movimento detectado - validando presença...")
+            # já existe sessão → não dispara de novo
+            if in_session:
+                time.sleep(0.2)
+                continue
 
-                if confirm_presence():
-                    print("Presença confirmada - enviando trigger")
-                    send_trigger()
-                    last_trigger_time = time.time()
+            # detectar nova presença
+            if motion:
+                print("Movimento detectado - validando janela do PIR...")
+
+                if confirm_presence_window():
+                    print("Janela válida - enviando para AWS")
+
+                    accepted = send_trigger()
+
+                    if accepted:
+                        print("Sessão iniciada")
+                        in_session = True
+                        last_trigger_time = time.time()
+
+                        # ativação do totem
+                        speak_welcome()
+
+                    else:
+                        print("Presença rejeitada pela AWS")
+
                 else:
                     print("Falso positivo descartado")
 

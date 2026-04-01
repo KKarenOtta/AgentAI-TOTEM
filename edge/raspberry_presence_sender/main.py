@@ -1,12 +1,19 @@
+import os
 import time
 
 from config import PIR_PIN, PRESENCE_HOLD_SECONDS, COOLDOWN_SECONDS
 from pir_sensor import read_motion
 from sender import send_trigger
+from tts import speak_welcome
+from audio import record_audio
+from sender_audio import send_audio
 
 SAMPLE_INTERVAL_SECONDS = 0.1
 MIN_ACTIVE_RATIO = 0.35
 WARMUP_SECONDS = 30
+
+# controle de sessão
+SESSION_TIMEOUT = 20  # segundos sem movimento para encerrar sessão
 
 
 def confirm_presence_window() -> bool:
@@ -27,6 +34,29 @@ def confirm_presence_window() -> bool:
     return ratio >= MIN_ACTIVE_RATIO
 
 
+def handle_voice_interaction() -> None:
+    print("[VOICE] iniciando captura de áudio do usuário...")
+
+    audio_path = record_audio(4)
+    if not audio_path:
+        print("[VOICE] falha ao gravar áudio")
+        return
+
+    user_text = send_audio(audio_path)
+    if not user_text:
+        print("[VOICE] falha ao transcrever áudio")
+        return
+
+    print(f"[USUÁRIO]: {user_text}")
+
+    # resposta temporária; depois você liga isso ao backend conversacional real
+    response_text = f"Você disse: {user_text}"
+    print(f"[IA]: {response_text}")
+
+    # fala a resposta
+    os.system(f'espeak -v pt-br "{response_text}"')
+
+
 def main():
     print("Presence sender iniciado")
     print(f"PIR_PIN={PIR_PIN}")
@@ -34,30 +64,57 @@ def main():
     print(f"Aguardando estabilização do PIR por {WARMUP_SECONDS}s...")
 
     time.sleep(WARMUP_SECONDS)
-
     print("Sensor estabilizado. Monitorando presença...")
+
     last_trigger_time = 0.0
+    last_motion_time = 0.0
+    in_session = False
 
     while True:
         try:
             now = time.time()
+            motion = read_motion()
 
+            if motion:
+                last_motion_time = now
+
+            # encerrar sessão por inatividade
+            if in_session and (now - last_motion_time > SESSION_TIMEOUT):
+                print("Sessão encerrada por inatividade")
+                in_session = False
+
+            # cooldown global anti-spam
             if now - last_trigger_time < COOLDOWN_SECONDS:
                 time.sleep(0.2)
                 continue
 
-            if read_motion():
+            # se já existe sessão, não dispara novamente
+            if in_session:
+                time.sleep(0.2)
+                continue
+
+            # detectar nova presença
+            if motion:
                 print("Movimento detectado - validando janela do PIR...")
 
                 if confirm_presence_window():
-                    print("Janela PIR válida - capturando imagem e enviando para AWS")
+                    print("Janela válida - enviando para AWS")
                     accepted = send_trigger()
+
                     if accepted:
+                        print("Sessão iniciada")
+                        in_session = True
                         last_trigger_time = time.time()
+
+                        # fala inicial do totem
+                        speak_welcome()
+
+                        # interação de voz básica
+                        handle_voice_interaction()
                     else:
-                        print("AWS rejeitou a presença ou houve falha no envio")
+                        print("Presença rejeitada pela AWS")
                 else:
-                    print("Janela PIR inválida - falso positivo descartado")
+                    print("Falso positivo descartado")
 
                 time.sleep(1.0)
                 continue
