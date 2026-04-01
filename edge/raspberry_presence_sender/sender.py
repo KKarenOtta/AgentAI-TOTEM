@@ -1,28 +1,54 @@
-from __future__ import annotations
-
 import requests
 
+from camera import capture_image_base64
+from config import (
+    TOTEM_API_URL,
+    COMPANY_ID,
+    DEVICE_ID,
+    REQUEST_TIMEOUT_SECONDS,
+)
 
-class PresenceSender:
-    def __init__(self, api_base_url: str) -> None:
-        self.api_base_url = api_base_url.rstrip("/")
 
-    def _post(self, path: str, company_id: str, device_id: str) -> None:
+def send_trigger() -> bool:
+    if not TOTEM_API_URL:
+        print("Erro: TOTEM_API_URL não configurada")
+        return False
+
+    image_base64 = capture_image_base64()
+    if not image_base64:
+        print("Erro: imagem não capturada; trigger cancelado")
+        return False
+
+    payload = {
+        "company_id": COMPANY_ID,
+        "device_id": DEVICE_ID,
+        "image_base64": image_base64,
+    }
+
+    try:
         response = requests.post(
-            f"{self.api_base_url}/{path}",
-            json={
-                "company_id": company_id,
-                "device_id": device_id,
-            },
-            timeout=5,
+            TOTEM_API_URL,
+            json=payload,
+            timeout=REQUEST_TIMEOUT_SECONDS,
         )
-        response.raise_for_status()
 
-    def trigger(self, company_id: str, device_id: str) -> None:
-        self._post("presence/trigger", company_id, device_id)
+        print(f"Status: {response.status_code}")
+        print(response.text)
 
-    def heartbeat(self, company_id: str, device_id: str) -> None:
-        self._post("presence/heartbeat", company_id, device_id)
+        if response.status_code != 200:
+            return False
 
-    def clear(self, company_id: str, device_id: str) -> None:
-        self._post("presence/clear", company_id, device_id)
+        data = response.json()
+        state = data.get("state", {})
+        accepted = bool(state.get("present", False))
+
+        if accepted:
+            print("Presença aceita pela AWS")
+        else:
+            print("Presença rejeitada pela AWS")
+
+        return accepted
+
+    except Exception as exc:
+        print(f"Erro ao enviar trigger: {exc}")
+        return False
