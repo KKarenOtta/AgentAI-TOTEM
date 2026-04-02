@@ -12,13 +12,28 @@ def test_db(db: Session = Depends(get_db)):
     row = result.mappings().first()
     return row
 
-@router.get("/animals")
-def list_animals(limit: int = 10, offset: int = 0, db: Session = Depends(get_db)):
+@router.get("/animals-test")
+def animals_test(db: Session = Depends(get_db)):
     result = db.execute(text("""
-        SELECT a.name, s.common_name
+        SELECT
+            a.id,
+            a.name AS animal_name,
+            s.common_name AS species,
+            s.scientific_name,
+            a.sex,
+            a.status,
+            e.name AS enclosure,
+            a.date_of_birth,
+            a.date_of_arrival
         FROM animals a
         JOIN species s ON a.species_id = s.id
-        LIMIT :limit OFFSET :offset
-    """), {"limit": limit, "offset": offset})
+        JOIN enclosures e ON a.enclosure_id = e.id
+        ORDER BY a.name
+    """))
 
-    return {"animals": result.mappings().all()}
+    rows = result.mappings().all()
+
+    return {
+        "total": len(rows),
+        "animals": rows
+    }
