@@ -12,8 +12,28 @@ def test_db(db: Session = Depends(get_db)):
     row = result.mappings().first()
     return row
 
-@router.get("/species-test")
-def species_test(db: Session = Depends(get_db)):
-    result = db.execute(text("SELECT * FROM species"))
+@router.get("/animals-test")
+def animals_test(db: Session = Depends(get_db)):
+    result = db.execute(text("""
+        SELECT
+            a.id,
+            a.name AS animal_name,
+            s.common_name AS species,
+            s.scientific_name,
+            a.sex,
+            a.status,
+            e.name AS enclosure,
+            a.date_of_birth,
+            a.date_of_arrival
+        FROM animals a
+        JOIN species s ON a.species_id = s.id
+        JOIN enclosures e ON a.enclosure_id = e.id
+        ORDER BY a.name
+    """))
+
     rows = result.mappings().all()
-    return {"dados": rows}
+
+    return {
+        "total": len(rows),
+        "animals": rows
+    }
