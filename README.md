@@ -3,40 +3,68 @@
 # AgentAI-TOTEM
 Desenvolvimento de agentes para um totem interativo com Inteligência Artificial da IA.Gora
 
-INSTRUÇOES GIT: 
-CLONAR repositório: 
+###OBS: Modelo arquivo .env
 
-		git clone https://github.com/KKarenOtta/AgentAI-TOTEM.git
+PIR_PIN=17
+PRESENCE_HOLD_SECONDS=5
+COOLDOWN_SECONDS=10
+CAMERA_INDEX=0
+CAMERA_WIDTH=640
+CAMERA_HEIGHT=480
+CAMERA_WARMUP_SECONDS=2.0
+JPEG_QUALITY=95
+PRESENCE_REQUIRE_IMAGE=true
+PRESENCE_REQUIRE_HUMAN_VALIDATION=true
 
-CRIAR UMA PASTA na sua máquina e uma BRANCH: Antes de fazer alterações, cada membro deve criar um branch para suas alterações. Isso ajuda a manter o histórico do projeto limpo e organizado.
+# =========================
+# BACKEND LOCAL DO TOTEM
+# =========================
+TOTEM_ACTIVATE_URL=http://127.0.0.1:8000/totem/activate
+TOTEM_INTERACT_URL=http://127.0.0.1:8000/totem/interact
+AUDIO_TRANSCRIBE_URL=http://127.0.0.1:8000/api/audio/transcribe
+TRACK_API_URL=http://52.201.76.45:8000/api/track
 
-		cd 	AgentAI-TOTEM
+TOTEM_REQUEST_TIMEOUT=30
+REQUEST_TIMEOUT_SECONDS=10
 
-		git checkout -b nome-do-branch
+# =========================
+# STT / TRANSCRIÇÃO
+# =========================
+AUDIO_TRANSCRIBE_PROVIDER=openai
+AUDIO_TRANSCRIBE_LANGUAGE=pt
 
-		code .
+WHISPER_CPP_BIN=
+WHISPER_CPP_MODEL=
 
-###OBS: cada usuário deverá criar sua pasta .env incluindo suas chaves secretas para as contas: 
-	As pastas já estão protegidas pelo arquivo gitignore.
+LOCAL_WHISPER_MODEL=base
+LOCAL_WHISPER_DEVICE=cpu
+LOCAL_WHISPER_COMPUTE_TYPE=int8
+LOCAL_WHISPER_BEAM_SIZE=1
+LOCAL_WHISPER_CPU_THREADS=4
 
-	OPENAI_API_KEY=
-	GEMINI_API_KEY=
-	OPENROUTER_API_KEY=
-	HUGGING_FACE= (LLM: se nenhuma chave de LLM estiver definida, o sistema opera em modo fallback/demo)
-	APP_NAME=AgentAI-TOTEM
-	APP_ENV=development
-	LOG_LEVEL=INFO
-	HOST=127.0.0.1
-	PORT=9000
-	DEFAULT_COMPANY_ID=FLX-001
-	PRESENCE_TIMEOUT_S=15
-	TOTEM_API_URL=http://127.0.0.1:9000/api
-	COMPANY_ID=FLX-001
-	DEVICE_ID=RPI3-PIR-001
-	PIR_PIN=17
-	POLL_INTERVAL_S=0.20
-	CLEAR_DELAY_S=4
+# =========================
+# LLM
+# =========================
+OPENAI_API_KEY="COLOQUE_AQUI"
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_TIMEOUT_S=45
 
+GEMINI_API_KEY="COLOQUE_AQUI"
+GEMINI_MODEL=gemini-2.5-flash
+
+OPENROUTER_API_KEY="COLOQUE_AQUI"
+OPENROUTER_MODEL=openrouter/free
+
+HUGGING_FACE_API_KEY="COLOQUE_AQUI"
+-------------------------------------------------------
+
+		git pull origin main
+
+		source venv/bin/activate
+		
+		./venv/bin/python -m pip install --upgrade pip setuptools wheel
+		./venv/bin/python -m pip install -r requirements.txt
+		./venv/bin/python -m pip install -r requirements-edge.txt
 
 APÓS TRABALHAR NAS SUAS ALTERAÇOES: criar o COMMIT:
 
@@ -46,76 +74,46 @@ APÓS TRABALHAR NAS SUAS ALTERAÇOES: criar o COMMIT:
 		git add .
 	
 		git commit -m "Descrição das alterações que você realizou”
-
-antes de fazer o push, é uma boa prática puxar as últimas alterações de branch principal para evitar conflitos: 
 		
-		git pull origin main
-		
-		git push -u origin nome-do-branch
+		git push -u origin main
 
 
-Atualizar o Branch Local
-Após a mesclagem, cada membro deve atualizar seu branch local para garantir que está trabalhando com a versão mais recente:
-	
-		git checkout main
-		
-		git pull origin main
-
-
-+++ DIA-A-DIA: Antes de iniciar o trabalho diário em seu projeto, é importante garantir que você esteja trabalhando com a versão mais recente do código. Aqui está um passo a passo para atualizar seu projeto e continuar:
-Entre na sua pasta de projeto da sua máquina:
-	ex: cd "/Users/karenota/Desktop/AgentAI-TOTEM”
-
-Ative seu ambiente virtual: 
-
-		python3.11 -m venv venv
-		source venv/bin/activate
-
-Atualize sua branch principal:
-		
-		git checkout main
-
-Puxe as últimas alterações do repositório remoto:
-		
-		git pull origin main
-		./venv/bin/python -m pip install --upgrade pip setuptools wheel
-		./venv/bin/python -m pip install -r requirements.txt
-		
 Verifique o status do repositório:
 	
 		git status
 
-Se houver alterações não comitadas, você pode querer fazer um commit ou stash delas antes de continuar.
 
-Continue seu Trabalho: Agora você pode mudar para o branch onde estava trabalhando ou criar um novo branch para suas alterações:
-	  
-		git checkout -b nome-do-branch
+RECARREGAR VARIAVEIS E REINICIAR BACKEND
 
-Para verificar os templates localmente:
-	Certifique-se de estar com o venv ativado!
+		pkill -f "uvicorn app.main:app"
+		cd ~/AgentAI-TOTEM
+		set -a
+		source .env
+		set +a
+		python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
-		./venv/bin/python -m uvicorn app.main:app \
-		  --host 127.0.0.1 \
-		  --port 9000 \
-		  --reload \
-		  --reload-dir app \
-		  --reload-dir services \
-		  --reload-dir agents \
-		  --reload-dir repositories \
-		  --reload-dir templates \
-		  --reload-dir static \
-		  --reload-exclude 'venv/*'
+		
+		http://192.168.15.12:8000/totem/sim/FLX-001
 
-Abrir navegador em: 
+Endereços de suporte navegador em: 
 
-		http://127.0.0.1:9000/ → página inicial
-		http://127.0.0.1:9000/docs → Swagger / documentação das rotas
-		http://127.0.0.1:9000/health → health check
-		http://127.0.0.1:9000/admin → painel admin
-		http://127.0.0.1:9000/client/FLX-001 → dashboard do cliente
-		http://127.0.0.1:9000/client/FLX-001/campaigns → campanhas do cliente
-		http://127.0.0.1:9000/totem/sim/FLX-001 → simulador visual do totem
-		http://127.0.0.1:9000/totem/live/FLX-001 → monitor ao vivo
+		http://127.0.0.1:8000/docs
+		http://127.0.0.1:8000/openapi.json
+		http://127.0.0.1:8000/health
+		http://127.0.0.1:8000/totem/sim/FLX-001
+		http://127.0.0.1:8000/admin
+		http://127.0.0.1:8000/client/FLX-001)
+
+
+Testar Fluxo completo: 
+
+		cd ~/AgentAI-TOTEM
+		set -a
+		source .env
+		set +a
+		cd edge/raspberry_presence_sender
+		python3 main.py
+
 
 Gerar relatórios em CMD:
 Relatório resumido
