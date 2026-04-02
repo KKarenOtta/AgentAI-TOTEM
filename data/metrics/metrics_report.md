@@ -1,54 +1,54 @@
 # Relatório de Métricas do Totem
 
-- Total de interações: **28**
-- Latência média (geração): **0.0s**
-- Latência média (TTS): **4.585s**
+- Total de interações: **58**
+- Latência média (geração): **2.621s**
+- Latência média (TTS): **4.598s**
 
 ## Interações por empresa
-- FLX-001: 24
+- FLX-001: 54
 - ACME-001: 4
 
 ## Interações por idioma detectado
-- pt: 28
+- pt: 58
 
 ## Últimas interações
 
-### 2026-03-16T12:28:36 — FLX-001/sess-d7d00bbd
-- Pergunta: Olá! Quais ofertas e recomendações você tem para mim hoje?
-- Resposta: [DEMO/OFFLINE] No momento não consigo acessar o modelo de IA.  Ainda assim, posso te ajudar com recomendações baseadas nas campanhas ativas e no perfil. Toque em “Quero essa oferta” para gerar um QR.
+### 2026-04-02T11:17:50 — FLX-001/sim-web
+- Pergunta: Onde fica a farmácia mais próxima?
+- Resposta: A farmácia mais próxima está localizada a alguns quarteirões daqui. Para te ajudar melhor, você gostaria de saber se tem algum medicamento específico que está procurando?  Enquanto isso, aproveite nossa campanha "Teste" e obtenha 45% de des…
 
-### 2026-03-16T12:28:36 — FLX-001/sess-d7d00bbd
+### 2026-04-02T11:17:50 — FLX-001/sim-web
 - Pergunta: 
 - Resposta: 
 
-### 2026-03-16T12:34:25 — FLX-001/sess-d5b841b7
-- Pergunta: Olá! Quais ofertas e recomendações você tem para mim hoje?
-- Resposta: [DEMO/OFFLINE] No momento não consigo acessar o modelo de IA.  Ainda assim, posso te ajudar com recomendações baseadas nas campanhas ativas e no perfil. Toque em “Quero essa oferta” para gerar um QR.
+### 2026-04-02T11:28:58 — FLX-001/sim-web
+- Pergunta: Onde fica a farmácia mais próxima?
+- Resposta: A farmácia mais próxima está localizada a cerca de 500 metros daqui. Você pode seguir pela rua principal até a rotatória e, em seguida, virar à direita.   Aproveitando, você gostaria de aproveitar um desconto de 45% na sua próxima compra? P…
 
-### 2026-03-16T12:34:25 — FLX-001/sess-d5b841b7
+### 2026-04-02T11:28:58 — FLX-001/sim-web
 - Pergunta: 
 - Resposta: 
 
-### 2026-03-16T12:53:02 — FLX-001/sess-7e9c7055
-- Pergunta: Olá! Quais ofertas e recomendações você tem para mim hoje?
-- Resposta: [DEMO/OFFLINE] No momento não consigo acessar o modelo de IA.  Ainda assim, posso te ajudar com recomendações baseadas nas campanhas ativas e no perfil. Toque em “Quero essa oferta” para gerar um QR.
+### 2026-04-02T11:55:04 — FLX-001/sim-web
+- Pergunta: Quais animais mais procurados pelo zoo de sao paulo?
+- Resposta: Os animais mais procurados no Zoo de São Paulo geralmente incluem leões, tigres, girafas, elefantes e pandas. Esses animais costumam ser os favoritos dos visitantes.  Aproveitando que você é um novo visitante, que tal garantir um desconto e…
 
-### 2026-03-16T12:53:02 — FLX-001/sess-7e9c7055
+### 2026-04-02T11:55:04 — FLX-001/sim-web
 - Pergunta: 
 - Resposta: 
 
-### 2026-03-16T12:54:37 — FLX-001/sess-11f3e5d2
-- Pergunta: Olá! Quais ofertas e recomendações você tem para mim hoje?
-- Resposta: [DEMO/OFFLINE] No momento não consigo acessar o modelo de IA.  Ainda assim, posso te ajudar com recomendações baseadas nas campanhas ativas e no perfil. Toque em “Quero essa oferta” para gerar um QR.
+### 2026-04-02T11:59:06 — FLX-001/sim-web
+- Pergunta: qual animal as criancas mais gostam?
+- Resposta: As crianças costumam gostar muito de animais como cães, gatos, coelhos e, claro, delfins! Esses animais são populares pelas suas características amigáveis e divertidas.  Aproveitando, você gostaria de saber sobre alguma promoção especial? T…
 
-### 2026-03-16T12:54:37 — FLX-001/sess-11f3e5d2
+### 2026-04-02T11:59:06 — FLX-001/sim-web
 - Pergunta: 
 - Resposta: 
 
-### 2026-03-16T12:56:35 — FLX-001/sess-827b9405
-- Pergunta: Olá! Quais ofertas e recomendações você tem para mim hoje?
-- Resposta: [DEMO/OFFLINE] No momento não consigo acessar o modelo de IA.  Ainda assim, posso te ajudar com recomendações baseadas nas campanhas ativas e no perfil. Toque em “Quero essa oferta” para gerar um QR.
+### 2026-04-02T11:59:52 — FLX-001/rpi-4f5eebec
+- Pergunta: botão quero meu desconto
+- Resposta: Claro! Você pode aproveitar um desconto de **45% OFF** utilizando o código **maisdesc**.   ![Desconto 45% OFF](static/uploads/campaigns/FLX-001-e8ec648362694f54a769c24d65134e5d.png)  Para continuar, você gostaria de saber mais sobre como us…
 
-### 2026-03-16T12:56:35 — FLX-001/sess-827b9405
+### 2026-04-02T11:59:52 — FLX-001/rpi-4f5eebec
 - Pergunta: 
 - Resposta: 

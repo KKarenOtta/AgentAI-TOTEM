@@ -1,6 +1,7 @@
 import base64
 import os
 import subprocess
+import time
 
 from config import CAMERA_INDEX, CAMERA_WIDTH, CAMERA_HEIGHT, JPEG_QUALITY
 
@@ -12,6 +13,8 @@ def capture_image_base64() -> str | None:
 
     if os.path.exists(OUTPUT_PATH):
         os.remove(OUTPUT_PATH)
+
+    time.sleep(0.5)
 
     cmd = [
         "fswebcam",
@@ -29,7 +32,7 @@ def capture_image_base64() -> str | None:
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            timeout=3
+            timeout=5
         )
 
         print("[DEBUG stdout]:", result.stdout.decode(errors="ignore"))
@@ -51,7 +54,6 @@ def capture_image_base64() -> str | None:
     except subprocess.TimeoutExpired:
         print("[ERRO] fswebcam travou (timeout)")
         return None
-
     except Exception as e:
         print(f"[ERRO inesperado]: {e}")
         return None

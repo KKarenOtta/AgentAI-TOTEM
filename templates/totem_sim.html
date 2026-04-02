@@ -4,7 +4,9 @@
   <div>
     <span class="badge">Simulador</span>
     <h1 class="page-title">Simulador do Totem • {{ company_id }}</h1>
-    <p class="page-subtitle">Teste o backend com campanha visual, desconto e QR code na tela.</p>
+    <p class="page-subtitle">
+      Teste a conversa do totem com resposta escrita, recomendações e áudio.
+    </p>
   </div>
 </section>
 
@@ -76,6 +78,18 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function playAudioBase64(base64Data) {
+  if (!base64Data) {
+    console.warn("audio_base64 ausente");
+    return;
+  }
+
+  const audio = new Audio("data:audio/mp3;base64," + base64Data);
+  audio.play().catch(err => {
+    console.warn("Erro ao tocar áudio:", err);
+  });
+}
+
 function renderMeta(data) {
   const metrics = data.metrics || {};
   const language = data.language || "—";
@@ -95,7 +109,7 @@ function renderMeta(data) {
     </div>
     <div class="metric-row">
       <div class="metric-row-label">LLM</div>
-      <div class="metric-row-value">${metrics.llm_provider_used || "demo"}</div>
+      <div class="metric-row-value">${escapeHtml(metrics.llm_provider_used || "demo")}</div>
     </div>
   `;
 }
@@ -155,7 +169,7 @@ async function send() {
       company_id: "{{ company_id }}",
       session_id: "sim-web",
       message: document.querySelector("#msg").value,
-      prefer_audio: false,
+      prefer_audio: true,
       profile: {
         age_range: document.querySelector("#age").value || null,
         gender: "unknown",
@@ -170,7 +184,7 @@ async function send() {
 
     const r = await fetch("/totem/interact", {
       method: "POST",
-      headers: {"Content-Type":"application/json"},
+      headers: {"Content-Type": "application/json"},
       body: JSON.stringify(payload)
     });
 
@@ -180,6 +194,9 @@ async function send() {
     renderMeta(data);
     renderRecommendations(data);
 
+    if (data.audio_base64) {
+      playAudioBase64(data.audio_base64);
+    }
   } catch (e) {
     document.getElementById("answerText").textContent = `Erro: ${e}`;
     document.getElementById("metaInfo").innerHTML = `<div class="empty-state">Falha ao processar interação.</div>`;

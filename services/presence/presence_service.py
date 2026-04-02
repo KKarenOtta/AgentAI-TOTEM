@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import os
 
 from repositories.presence_repository import PresenceRepository
 
@@ -9,6 +10,12 @@ _presence_repo = PresenceRepository()
 
 
 class PresenceService:
+    def __init__(self) -> None:
+        self.require_image = os.getenv("PRESENCE_REQUIRE_IMAGE", "true").strip().lower() == "true"
+        self.require_human_validation = (
+            os.getenv("PRESENCE_REQUIRE_HUMAN_VALIDATION", "true").strip().lower() == "true"
+        )
+
     def trigger(
         self,
         company_id: str,
@@ -16,12 +23,16 @@ class PresenceService:
         image_base64: str | None = None,
     ) -> dict:
         attributes: dict = {
-            "validation_engine": "opencv_haar_v1",
+            "validation_engine": "opencv_haar_v2",
             "human_validated": False,
             "faces_detected": 0,
+            "profiles_detected": 0,
+            "image_received": bool(image_base64),
+            "require_image": self.require_image,
+            "require_human_validation": self.require_human_validation,
         }
 
-        if not image_base64:
+        if self.require_image and not image_base64:
             return {
                 "company_id": company_id,
                 "device_id": device_id,
@@ -30,9 +41,13 @@ class PresenceService:
                 "attributes": attributes,
             }
 
-        validated, attributes = self._validate_human_with_image(image_base64)
+        if image_base64:
+            validated, detected_attributes = self._validate_human_with_image(image_base64)
+            attributes.update(detected_attributes)
+        else:
+            validated = False
 
-        if not validated:
+        if self.require_human_validation and not validated:
             return {
                 "company_id": company_id,
                 "device_id": device_id,
@@ -63,9 +78,10 @@ class PresenceService:
             import numpy as np
         except Exception as exc:
             return False, {
-                "validation_engine": "opencv_haar_v1",
+                "validation_engine": "opencv_haar_v2",
                 "human_validated": False,
                 "faces_detected": 0,
+                "profiles_detected": 0,
                 "reason": f"opencv_unavailable: {exc}",
             }
 
@@ -76,37 +92,54 @@ class PresenceService:
 
             if image is None:
                 return False, {
-                    "validation_engine": "opencv_haar_v1",
+                    "validation_engine": "opencv_haar_v2",
                     "human_validated": False,
                     "faces_detected": 0,
+                    "profiles_detected": 0,
                     "reason": "invalid_image",
                 }
 
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            gray = cv2.equalizeHist(gray)
 
-            cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-            face_cascade = cv2.CascadeClassifier(cascade_path)
+            frontal_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+            profile_path = cv2.data.haarcascades + "haarcascade_profileface.xml"
 
-            faces = face_cascade.detectMultiScale(
+            frontal_cascade = cv2.CascadeClassifier(frontal_path)
+            profile_cascade = cv2.CascadeClassifier(profile_path)
+
+            faces = frontal_cascade.detectMultiScale(
                 gray,
-                scaleFactor=1.1,
-                minNeighbors=5,
-                minSize=(60, 60),
+                scaleFactor=1.10,
+                minNeighbors=4,
+                minSize=(30, 30),
+            )
+
+            profiles = profile_cascade.detectMultiScale(
+                gray,
+                scaleFactor=1.10,
+                minNeighbors=4,
+                minSize=(30, 30),
             )
 
             faces_detected = len(faces)
+            profiles_detected = len(profiles)
+            human_validated = (faces_detected + profiles_detected) > 0
 
-            return faces_detected > 0, {
-                "validation_engine": "opencv_haar_v1",
-                "human_validated": faces_detected > 0,
+            return human_validated, {
+                "validation_engine": "opencv_haar_v2",
+                "human_validated": human_validated,
                 "faces_detected": faces_detected,
+                "profiles_detected": profiles_detected,
+                "reason": "ok" if human_validated else "no_face_or_profile_detected",
             }
 
         except Exception as exc:
             return False, {
-                "validation_engine": "opencv_haar_v1",
+                "validation_engine": "opencv_haar_v2",
                 "human_validated": False,
                 "faces_detected": 0,
+                "profiles_detected": 0,
                 "reason": f"validation_error: {exc}",
             }
 
