@@ -1,1 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Animais</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #111827;
+      color: white;
+      margin: 0;
+      padding: 24px;
+    }
 
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: #1f2937;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    }
+
+    .card h2 {
+      margin-top: 0;
+      color: #60a5fa;
+    }
+
+    .label {
+      color: #9ca3af;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Animais do Zoológico</h1>
+  <div id="animals" class="grid"></div>
+
+  <script>
+    async function carregarAnimais() {
+      const response = await fetch("/api/animals-test");
+      const data = await response.json();
+
+      const container = document.getElementById("animals");
+
+      data.animals.forEach(animal => {
+        const card = document.createElement("div");
+        card.className = "card";
+
+        card.innerHTML = `
+          <h2>${animal.animal_name}</h2>
+          <p><span class="label">Espécie:</span> ${animal.species}</p>
+          <p><span class="label">Nome científico:</span> ${animal.scientific_name}</p>
+          <p><span class="label">Sexo:</span> ${animal.sex}</p>
+          <p><span class="label">Status:</span> ${animal.status}</p>
+          <p><span class="label">Recinto:</span> ${animal.enclosure}</p>
+          <p><span class="label">Nascimento:</span> ${animal.date_of_birth}</p>
+          <p><span class="label">Chegada:</span> ${animal.date_of_arrival}</p>
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    carregarAnimais();
+  </script>
+</body>
+</html>
