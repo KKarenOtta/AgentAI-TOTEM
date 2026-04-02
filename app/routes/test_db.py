@@ -11,3 +11,9 @@ def test_db(db: Session = Depends(get_db)):
     result = db.execute(text("SELECT DATABASE() AS banco_atual"))
     row = result.mappings().first()
     return row
+
+@router.get("/species-test")
+def species_test(db: Session = Depends(get_db)):
+    result = db.execute(text("SELECT * FROM species"))
+    rows = result.mappings().all()
+    return {"dados": rows}
