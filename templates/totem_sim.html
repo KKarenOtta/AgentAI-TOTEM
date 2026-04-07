@@ -207,5 +207,37 @@ async function send() {
     btn.disabled = false;
   }
 }
+
+// ESCUTA EVENTOS DO BACKEND (SSE)
+function listenEvents() {
+  const companyId = "{{ company_id }}";
+  const evtSource = new EventSource(`/api/events/${companyId}`);
+
+  evtSource.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+
+    if (data.type === "totem_activate") {
+      console.log("Totem ativado:", data.payload);
+
+      const payload = data.payload;
+
+      // texto
+      if (payload.greeting_text) {
+        document.getElementById("answerText").textContent = payload.greeting_text;
+      }
+
+      // áudio (principal)
+      if (payload.greeting_audio_url) {
+        const audio = new Audio(payload.greeting_audio_url);
+        audio.play().catch(err => console.warn("Erro autoplay:", err));
+      }
+    }
+  };
+}
+
+// iniciar escuta ao carregar página
+window.onload = () => {
+  listenEvents();
+};
 </script>
 {% endblock %}
