@@ -1,5 +1,7 @@
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, Literal
+from typing import Any, Dict, Literal, Optional
+
+from pydantic import BaseModel, EmailStr, Field
+
 
 Gender = Literal["female", "male", "nonbinary", "unknown"]
 Language = Literal["pt", "en", "es"]
@@ -41,6 +43,7 @@ class TotemActivateRequest(BaseModel):
     company_id: str
     session_id: str = Field(default="sim-web")
     profile: Optional[Any] = None
+    prefer_audio: bool = True
 
 
 class TotemActivateResponse(BaseModel):
@@ -48,6 +51,8 @@ class TotemActivateResponse(BaseModel):
     language: str
     greeting: str
     next: str
+    audio_base64: Optional[str] = None
+    audio_provider: Optional[str] = None
 
 
 class TotemNPSRequest(BaseModel):
@@ -78,3 +83,37 @@ class TotemTrackRequest(BaseModel):
 class TotemTrackResponse(BaseModel):
     ok: bool = True
     message: str = "tracked"
+
+
+class TotemLeadCaptureRequest(BaseModel):
+    company_id: str
+    session_id: str
+    full_name: str = Field(..., min_length=3)
+    age: int = Field(..., ge=0, le=120)
+    gender: Gender
+    email: EmailStr
+    cpf: str = Field(..., min_length=11)
+    favorite_brands: list[str] = Field(default_factory=list)
+    lgpd_consent: bool
+    source: str = "totem_live"
+
+    newsletter_opt_in: bool = True
+    consent_version: str = "lgpd-v1"
+    consent_text: str = (
+        "Autorizo o tratamento dos meus dados para acesso às ofertas, "
+        "newsletter e recuperação resumida do atendimento."
+    )
+
+    research_summary: str | None = None
+    recommendations_snapshot: Dict[str, Any] = Field(default_factory=dict)
+
+    ip_address: str | None = None
+    user_agent: str | None = None
+
+
+class TotemLeadCaptureResponse(BaseModel):
+    ok: bool
+    message: str
+    lead_id: str | None = None
+    access_qr_url: str | None = None
+    recovery_qr_url: str | None = None

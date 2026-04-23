@@ -2,3 +2,8 @@
 {"timestamp": "2026-02-24T23:10:08", "company_id": "FLX-001", "session_id": "sim-web", "score": 10, "comment": "Excelente"}
 {"timestamp": "2026-02-24T23:19:20", "company_id": "FLX-001", "session_id": "sim-web", "score": 10, "comment": "Excelente"}
 {"timestamp": "2026-02-24T23:24:09", "company_id": "FLX-001", "session_id": "sim-web", "score": 10, "comment": "Excelente"}
+{"timestamp": "2026-04-23T13:06:55", "company_id": "FLX-001", "session_id": "fluxo-completo-001", "score": 10, "comment": "Fluxo validado com sucesso"}
+{"timestamp": "2026-04-23T13:26:04", "company_id": "FLX-001", "session_id": "live-1776961530073", "score": 9, "comment": null}
+{"timestamp": "2026-04-23T13:30:59", "company_id": "FLX-001", "session_id": "live-1776961839593", "score": 10, "comment": null}
+{"timestamp": "2026-04-23T13:31:00", "company_id": "FLX-001", "session_id": "live-1776961839593", "score": 10, "comment": null}
+{"timestamp": "2026-04-23T13:35:27", "company_id": "FLX-001", "session_id": "live-1776962100823", "score": 6, "comment": null}

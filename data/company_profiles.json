@@ -1,0 +1,30 @@
+{
+  "FLX-001": {
+    "display_name": "FLX Demo",
+    "description": "Centro comercial com lojas, praça de alimentação e serviços.",
+    "address": "Av. Exemplo, 123 - São Paulo",
+    "maps_url": "https://maps.google.com",
+    "opening_hours": "10:00 - 22:00",
+    "services": [
+      "Praça de alimentação",
+      "Cinema",
+      "Estacionamento",
+      "Wi-Fi gratuito"
+    ],
+    "faq": [
+      {
+        "question": "Onde fica a praça de alimentação?",
+        "answer": "No segundo andar, próximo ao cinema."
+      },
+      {
+        "question": "Tem estacionamento?",
+        "answer": "Sim, estacionamento no subsolo."
+      }
+    ],
+    "local_attractions": [
+      "Cinema",
+      "Área kids",
+      "Eventos sazonais"
+    ]
+  }
+}

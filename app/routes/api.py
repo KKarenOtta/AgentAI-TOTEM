@@ -19,8 +19,17 @@ from marketing.campaigns import (
     delete_campaign,
 )
 from services.realtime.event_bus import get_queue
+from services.totem.coupon_store import redeem_coupon
+from services.totem.lead_store import save_lead
 from services.totem.metrics import MetricsLogger
-from services.totem.schemas import TotemTrackRequest, TotemTrackResponse
+from services.totem.qr import generate_qr_from_text
+from services.totem.recovery_store import save_session_handoff
+from services.totem.schemas import (
+    TotemTrackRequest,
+    TotemTrackResponse,
+    TotemLeadCaptureRequest,
+    TotemLeadCaptureResponse,
+)
 
 
 router = APIRouter(tags=["api"])
@@ -31,7 +40,16 @@ UPLOAD_DIR = Path("static/uploads/campaigns")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
-@router.get("/events/{company_id}")
+def _get_public_base_url() -> str:
+    base_url = (
+        os.getenv("TOTEM_PUBLIC_BASE_URL")
+        or os.getenv("APP_BASE_URL")
+        or "http://127.0.0.1:8000"
+    ).strip()
+    return base_url.rstrip("/")
+
+
+@router.get("/api/events/{company_id}")
 def sse_events(company_id: str):
     def gen():
         q = get_queue(company_id)
@@ -46,7 +64,7 @@ def sse_events(company_id: str):
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
-@router.get("/metrics/{company_id}")
+@router.get("/api/metrics/{company_id}")
 def get_metrics(company_id: str, days: int = 7):
     empty_payload = {
         "interactions_per_day": [],
@@ -78,13 +96,13 @@ def get_metrics(company_id: str, days: int = 7):
 
     age_counts: Dict[str, int] = {}
     if "profile" in df.columns:
-        for p in df["profile"].dropna().tolist():
+        for profile in df["profile"].dropna().tolist():
             age_range = None
 
-            if isinstance(p, dict):
-                age_range = p.get("age_range")
+            if isinstance(profile, dict):
+                age_range = profile.get("age_range")
             else:
-                text = str(p)
+                text = str(profile)
                 if "age_range" in text:
                     import re
                     match = re.search(r"age_range['\"]?\s*[:=]\s*['\"]([^'\"]+)['\"]", text)
@@ -108,18 +126,24 @@ def get_metrics(company_id: str, days: int = 7):
     })
 
 
-@router.get("/campaigns/{company_id}")
+@router.get("/api/dashboard/{company_id}")
+def get_marketing_dashboard(company_id: str):
+    data = metrics_logger.build_dashboard(company_id)
+    return JSONResponse(data)
+
+
+@router.get("/api/campaigns/{company_id}")
 def api_list_campaigns(company_id: str):
     return JSONResponse({"campaigns": list_campaigns(company_id)})
 
 
-@router.post("/campaigns/{company_id}")
+@router.post("/api/campaigns/{company_id}")
 def api_create_campaign(company_id: str, payload: Dict[str, Any]):
     created = create_campaign(company_id, payload)
     return JSONResponse(created)
 
 
-@router.post("/campaigns/{company_id}/upload")
+@router.post("/api/campaigns/{company_id}/upload")
 async def api_create_campaign_with_image(
     company_id: str,
     name: str = Form(...),
@@ -157,8 +181,8 @@ async def api_create_campaign_with_image(
         filename = f"{company_id}-{uuid4().hex}{suffix}"
         out_path = UPLOAD_DIR / filename
 
-        with out_path.open("wb") as f:
-            f.write(await image.read())
+        with out_path.open("wb") as file:
+            file.write(await image.read())
 
         payload["media_image"] = f"/static/uploads/campaigns/{filename}"
 
@@ -166,19 +190,19 @@ async def api_create_campaign_with_image(
     return JSONResponse(created)
 
 
-@router.patch("/campaigns/{company_id}/{campaign_id}")
+@router.patch("/api/campaigns/{company_id}/{campaign_id}")
 def api_update_campaign(company_id: str, campaign_id: str, payload: Dict[str, Any]):
     updated = update_campaign(company_id, campaign_id, payload)
     return JSONResponse(updated)
 
 
-@router.delete("/campaigns/{company_id}/{campaign_id}")
+@router.delete("/api/campaigns/{company_id}/{campaign_id}")
 def api_delete_campaign(company_id: str, campaign_id: str):
     delete_campaign(company_id, campaign_id)
     return JSONResponse({"ok": True})
 
 
-@router.post("/track", response_model=TotemTrackResponse)
+@router.post("/api/track", response_model=TotemTrackResponse)
 def track_event(req: TotemTrackRequest) -> TotemTrackResponse:
     event_row = {
         "event": req.event,
@@ -197,5 +221,103 @@ def track_event(req: TotemTrackRequest) -> TotemTrackResponse:
     try:
         metrics_logger.save(event_row)
         return TotemTrackResponse(ok=True, message="tracked")
-    except Exception as e:
-        return TotemTrackResponse(ok=False, message=f"track_error: {type(e).__name__}: {e}")
+    except Exception as exc:
+        return TotemTrackResponse(ok=False, message=f"track_error: {type(exc).__name__}: {exc}")
+
+
+@router.post("/api/lead-capture", response_model=TotemLeadCaptureResponse)
+def api_lead_capture(req: TotemLeadCaptureRequest) -> TotemLeadCaptureResponse:
+    if not req.lgpd_consent:
+        return TotemLeadCaptureResponse(
+            ok=False,
+            message="É obrigatório aceitar os termos LGPD.",
+            lead_id=None,
+            access_qr_url=None,
+            recovery_qr_url=None,
+        )
+
+    try:
+        lead = save_lead(req.model_dump())
+
+        return TotemLeadCaptureResponse(
+            ok=True,
+            message="Cadastro registrado com sucesso.",
+            lead_id=lead["lead_id"],
+            access_qr_url=lead.get("access_qr_url"),
+            recovery_qr_url=lead.get("recovery_qr_url"),
+        )
+    except Exception as exc:
+        return TotemLeadCaptureResponse(
+            ok=False,
+            message=f"lead_capture_error: {type(exc).__name__}: {exc}",
+            lead_id=None,
+            access_qr_url=None,
+            recovery_qr_url=None,
+        )
+
+
+@router.post("/api/mobile-handoff")
+def api_mobile_handoff(payload: Dict[str, Any]):
+    company_id = (payload.get("company_id") or "").strip()
+    session_id = (payload.get("session_id") or "").strip()
+
+    if not company_id or not session_id:
+        return JSONResponse(
+            {"ok": False, "message": "company_id e session_id são obrigatórios"},
+            status_code=400,
+        )
+
+    handoff = save_session_handoff(
+        {
+            "company_id": company_id,
+            "session_id": session_id,
+            "research_summary": payload.get("research_summary") or "",
+            "recommendations_snapshot": payload.get("recommendations_snapshot") or {},
+            "source": payload.get("source") or "totem_live",
+        }
+    )
+
+    mobile_url = f"{_get_public_base_url()}/mobile/start/{session_id}"
+    qr_url = generate_qr_from_text(mobile_url)
+
+    return JSONResponse(
+        {
+            "ok": True,
+            "handoff_id": handoff["handoff_id"],
+            "mobile_url": mobile_url,
+            "qr_url": qr_url,
+        }
+    )
+
+
+@router.post("/api/coupons/redeem")
+def api_redeem_coupon(payload: Dict[str, Any]):
+    coupon_id = (payload.get("coupon_id") or "").strip()
+    store_id = (payload.get("store_id") or "").strip() or None
+    operator_id = (payload.get("operator_id") or "").strip() or None
+
+    if not coupon_id:
+        return JSONResponse(
+            {"ok": False, "message": "coupon_id obrigatório"},
+            status_code=400,
+        )
+
+    coupon = redeem_coupon(
+        coupon_id=coupon_id,
+        store_id=store_id,
+        operator_id=operator_id,
+    )
+
+    if not coupon:
+        return JSONResponse(
+            {"ok": False, "message": "Cupom não encontrado"},
+            status_code=404,
+        )
+
+    return JSONResponse(
+        {
+            "ok": True,
+            "message": coupon.get("validation_message") or "Cupom processado.",
+            "coupon": coupon,
+        }
+    )

@@ -1,15 +1,15 @@
 import json
 import os
-import logging
+from collections import defaultdict
+from typing import Any
 
-logger = logging.getLogger("metrics")
 
 class MetricsLogger:
     def __init__(self, path: str = "data/metrics/metrics.jsonl"):
         self.path = path
-        dir_ = os.path.dirname(self.path)
-        if dir_:
-            os.makedirs(dir_, exist_ok=True)
+        dir_name = os.path.dirname(self.path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
 
     def save(self, metric: dict) -> None:
         with open(self.path, "a", encoding="utf-8") as f:
@@ -21,19 +21,92 @@ class MetricsLogger:
 
         rows: list[dict] = []
         with open(self.path, "r", encoding="utf-8") as f:
-            for i, line in enumerate(f, start=1):
+            for line in f:
                 line = line.strip()
                 if not line:
                     continue
                 try:
                     rows.append(json.loads(line))
-                except json.JSONDecodeError:
-                    logger.warning(
-                        "Linha inválida em %s (linha %d). Ignorando.",
-                        self.path,
-                        i,
-                    )
+                except Exception:
+                    continue
         return rows
+
+    def build_dashboard(self, company_id: str) -> dict[str, Any]:
+        rows = self.load_rows()
+
+        leads = 0
+        issued = 0
+        redeemed = 0
+
+        campaigns = defaultdict(lambda: {
+            "issued": 0,
+            "redeemed": 0,
+        })
+
+        stores = defaultdict(lambda: {
+            "redeemed": 0,
+        })
+
+        for row in rows:
+            if row.get("event") == "lead_capture" and row.get("company_id") == company_id:
+                leads += 1
+
+            elif row.get("event") == "coupon_issued" and row.get("company_id") == company_id:
+                issued += 1
+                campaign_id = row.get("campaign_id")
+                if campaign_id:
+                    campaigns[campaign_id]["issued"] += 1
+
+            elif row.get("event") == "coupon_redeemed" and row.get("company_id") == company_id:
+                redeemed += 1
+
+                campaign_id = row.get("campaign_id")
+                if campaign_id:
+                    campaigns[campaign_id]["redeemed"] += 1
+
+                store_id = row.get("store_id") or "unknown"
+                stores[store_id]["redeemed"] += 1
+
+        conversion = (redeemed / issued * 100) if issued else 0
+
+        campaign_list = []
+        for campaign_id, data in campaigns.items():
+            campaign_conversion = (
+                data["redeemed"] / data["issued"] * 100
+                if data["issued"] else 0
+            )
+            campaign_list.append(
+                {
+                    "campaign_id": campaign_id,
+                    "issued": data["issued"],
+                    "redeemed": data["redeemed"],
+                    "conversion": round(campaign_conversion, 2),
+                }
+            )
+
+        campaign_list.sort(key=lambda item: (-item["conversion"], item["campaign_id"]))
+
+        store_list = []
+        for store_id, data in stores.items():
+            store_list.append(
+                {
+                    "store_id": store_id,
+                    "redeemed": data["redeemed"],
+                }
+            )
+
+        store_list.sort(key=lambda item: (-item["redeemed"], item["store_id"]))
+
+        return {
+            "kpis": {
+                "leads": leads,
+                "issued": issued,
+                "redeemed": redeemed,
+                "conversion": round(conversion, 2),
+            },
+            "campaigns": campaign_list,
+            "stores": store_list,
+        }
 
     def build_report(self, out_path: str = "data/metrics/metrics_report.md") -> None:
         rows = self.load_rows()
@@ -44,75 +117,14 @@ class MetricsLogger:
             os.makedirs(out_dir, exist_ok=True)
 
         if total == 0:
-            content = "# Relatório de Métricas do Totem\n\nNenhuma interação registrada.\n"
+            content = "# Relatório de Métricas do Totem\n\nNenhum evento registrado.\n"
             with open(out_path, "w", encoding="utf-8") as f:
                 f.write(content)
             return
 
-        gen_lat = [
-            r.get("gen_latency_s")
-            for r in rows
-            if isinstance(r.get("gen_latency_s"), (int, float))
-        ]
-
-        tts_lat = [
-            r.get("tts_latency_s")
-            for r in rows
-            if isinstance(r.get("tts_latency_s"), (int, float))
-        ]
-
-        def _avg(xs):
-            return round(sum(xs) / len(xs), 3) if xs else None
-
-        avg_gen = _avg(gen_lat)
-        avg_tts = _avg(tts_lat)
-
-        by_company = {}
-        by_lang = {}
-
-        for r in rows:
-            cid = r.get("company_id") or "unknown"
-            by_company[cid] = by_company.get(cid, 0) + 1
-
-            lang = r.get("language_detected") or "unknown"
-            by_lang[lang] = by_lang.get(lang, 0) + 1
-
         lines = []
         lines.append("# Relatório de Métricas do Totem\n\n")
-        lines.append(f"- Total de interações: **{total}**\n")
-        lines.append(
-            f"- Latência média (geração): **{avg_gen}s**\n"
-            if avg_gen is not None
-            else "- Latência média (geração): **n/a**\n"
-        )
-        lines.append(
-            f"- Latência média (TTS): **{avg_tts}s**\n"
-            if avg_tts is not None
-            else "- Latência média (TTS): **n/a**\n"
-        )
-
-        lines.append("\n## Interações por empresa\n")
-        for cid, n in sorted(by_company.items(), key=lambda x: (-x[1], x[0])):
-            lines.append(f"- {cid}: {n}\n")
-
-        lines.append("\n## Interações por idioma detectado\n")
-        for lang, n in sorted(by_lang.items(), key=lambda x: (-x[1], x[0])):
-            lines.append(f"- {lang}: {n}\n")
-
-        lines.append("\n## Últimas interações\n")
-        for r in rows[-10:]:
-            ts = r.get("timestamp", "")
-            cid = r.get("company_id", "")
-            sid = r.get("session_id", "")
-            q = (r.get("question") or "").strip().replace("\n", " ")
-            resp = (r.get("response") or "").strip().replace("\n", " ")
-
-            if len(resp) > 240:
-                resp = resp[:240] + "…"
-
-            lines.append(f"\n### {ts} — {cid}/{sid}\n")
-            lines.append(f"- Pergunta: {q}\n")
-            lines.append(f"- Resposta: {resp}\n")
+        lines.append(f"- Total de eventos: **{total}**\n")
 
         with open(out_path, "w", encoding="utf-8") as f:
             f.write("".join(lines))

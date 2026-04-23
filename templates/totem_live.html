@@ -1,26 +1,700 @@
-<!doctype html>
-<html lang="pt-br">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>{{ title or "Totem I.A.Gora" }}</title>
-  <link rel="stylesheet" href="/static/css/app.css" />
-</head>
-<body>
-  <header class="topbar">
-    <div class="brand">
-      <div>Totem I.A.Gora</div>
-      <small class="muted">Painel operacional, campanhas e monitoramento</small>
-    </div>
+{% extends "base.html" %}
 
-    <nav class="nav">
-      <a href="/">Início</a>
-      <a href="/admin">Admin</a>
-    </nav>
-  </header>
+{% block content %}
+<style>
+  .totem-shell {
+    max-width: 1180px;
+    margin: 24px auto 40px;
+  }
 
-  <main class="container">
-    {% block content %}{% endblock %}
-  </main>
-</body>
-</html>
+  .totem-screen {
+    min-height: 780px;
+    padding: 28px;
+    border-radius: 28px;
+    background: linear-gradient(180deg, rgba(18,24,33,.96), rgba(10,15,20,.98));
+    border: 1px solid rgba(255,255,255,.06);
+    box-shadow: 0 20px 60px rgba(0,0,0,.35);
+    display: grid;
+    grid-template-rows: auto auto 1fr auto;
+    gap: 18px;
+  }
+
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    text-align: center;
+  }
+
+  .avatar {
+    width: 172px;
+    height: 172px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 70px;
+    background: linear-gradient(135deg, #27e0a1, #19b987);
+    color: #08120e;
+    box-shadow: 0 16px 40px rgba(39,224,161,.22);
+    transition: transform .35s ease, box-shadow .35s ease;
+  }
+
+  .avatar.approaching {
+    transform: scale(1.08) translateY(-6px);
+    box-shadow: 0 22px 54px rgba(39,224,161,.28);
+  }
+
+  .avatar.listening {
+    animation: pulse 1.3s infinite;
+  }
+
+  .avatar.speaking {
+    animation: bob 1.1s infinite;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes bob {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+    100% { transform: translateY(0); }
+  }
+
+  .status {
+    font-size: 18px;
+    color: #9fb0c3;
+  }
+
+  .speech {
+    min-height: 78px;
+    font-size: 27px;
+    line-height: 1.4;
+    color: #eef3f8;
+    max-width: 860px;
+  }
+
+  .panel {
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 20px;
+    padding: 18px;
+  }
+
+  .input-box,
+  .decision-actions,
+  .nps-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .input-box input {
+    flex: 1;
+    min-width: 280px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.08);
+    background: #0e141c;
+    color: #eef3f8;
+    padding: 14px 16px;
+    outline: none;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 18px;
+    border: none;
+    border-radius: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: .2s ease;
+    background: #1d2631;
+    color: #eef3f8;
+  }
+
+  .btn:hover {
+    transform: translateY(-1px);
+  }
+
+  .btn.primary {
+    background: linear-gradient(135deg, #27e0a1, #19b987);
+    color: #07110d;
+  }
+
+  .btn.secondary {
+    background: #202a36;
+  }
+
+  .conversation-layout {
+    display: grid;
+    grid-template-columns: 1.15fr .85fr;
+    gap: 18px;
+  }
+
+  .timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 320px;
+    overflow: auto;
+  }
+
+  .bubble {
+    border-radius: 16px;
+    padding: 14px 16px;
+    border: 1px solid rgba(255,255,255,.06);
+    background: rgba(8,12,17,.45);
+    text-align: left;
+    line-height: 1.5;
+  }
+
+  .bubble.user {
+    border-left: 4px solid #7ee7c6;
+  }
+
+  .bubble.assistant {
+    border-left: 4px solid #27e0a1;
+  }
+
+  .bubble-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: #9fb0c3;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  .summary-box {
+    min-height: 160px;
+    text-align: left;
+    line-height: 1.6;
+    color: #d7e3ef;
+  }
+
+  .recommendation-panel {
+    display: none;
+  }
+
+  .recommendation-panel.active {
+    display: block;
+  }
+
+  .recommendations {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+  }
+
+  .recommendation-card {
+    background: rgba(8,12,17,.45);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 16px;
+    padding: 14px;
+    text-align: left;
+  }
+
+  .recommendation-card img,
+  .handoff-qr img {
+    width: 100%;
+    max-width: 180px;
+    display: block;
+    margin: 12px auto 0;
+    border-radius: 12px;
+    background: #fff;
+    padding: 8px;
+  }
+
+  .decision-box,
+  .handoff-box,
+  .nps-box {
+    display: none;
+    margin-top: 12px;
+    text-align: center;
+  }
+
+  .decision-box.active,
+  .handoff-box.active,
+  .nps-box.active {
+    display: block;
+  }
+
+  .decision-text,
+  .helper-text {
+    color: #9fb0c3;
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+
+  .handoff-link {
+    word-break: break-word;
+    color: #7ee7c6;
+    margin-top: 10px;
+    display: block;
+  }
+
+  .nps-score {
+    min-width: 52px;
+  }
+
+  .empty {
+    color: #9fb0c3;
+  }
+
+  @media (max-width: 900px) {
+    .conversation-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="totem-shell">
+  <div class="totem-screen">
+    <section class="hero">
+      <div id="avatar" class="avatar">🤖</div>
+      <div id="status" class="status">Aguardando presença...</div>
+      <div id="speech" class="speech">Aproxime-se para iniciar o atendimento.</div>
+    </section>
+
+    <section class="panel">
+      <div class="input-box">
+        <input id="messageInput" type="text" placeholder="Digite sua pergunta..." />
+        <button id="sendBtn" class="btn primary" type="button">Enviar</button>
+        <button id="simulatePresenceBtn" class="btn secondary" type="button">Simular presença</button>
+        <button id="activateBtn" class="btn secondary" type="button">Ativar atendimento</button>
+      </div>
+
+      <div id="decisionBox" class="decision-box">
+        <div class="decision-text">
+          Posso ajudar em algo mais, continuar no celular ou encerrar o atendimento.
+        </div>
+
+        <div class="decision-actions">
+          <button id="continueBtn" class="btn secondary" type="button">Tenho mais dúvidas</button>
+          <button id="handoffBtn" class="btn primary" type="button">Continuar no celular</button>
+          <button id="finishBtn" class="btn secondary" type="button">Encerrar atendimento</button>
+        </div>
+      </div>
+
+      <div id="handoffBox" class="handoff-box panel">
+        <h3>Continue no seu celular</h3>
+        <div class="helper-text">
+          Escaneie o QR code para concluir cadastro, informar CPF, aceitar a LGPD,
+          acessar ofertas e liberar seus cupons.
+        </div>
+
+        <div class="handoff-qr">
+          <img id="handoffQr" alt="QR de continuidade mobile" />
+        </div>
+
+        <a id="handoffLink" class="handoff-link" target="_blank" rel="noopener noreferrer"></a>
+      </div>
+
+      <div id="npsBox" class="nps-box panel">
+        <h3>Obrigado pela sua presença</h3>
+        <div class="helper-text">Antes de sair, deixe sua avaliação do atendimento.</div>
+
+        <div class="nps-actions">
+          <button class="btn secondary nps-score" data-score="0">0</button>
+          <button class="btn secondary nps-score" data-score="1">1</button>
+          <button class="btn secondary nps-score" data-score="2">2</button>
+          <button class="btn secondary nps-score" data-score="3">3</button>
+          <button class="btn secondary nps-score" data-score="4">4</button>
+          <button class="btn secondary nps-score" data-score="5">5</button>
+          <button class="btn secondary nps-score" data-score="6">6</button>
+          <button class="btn secondary nps-score" data-score="7">7</button>
+          <button class="btn secondary nps-score" data-score="8">8</button>
+          <button class="btn secondary nps-score" data-score="9">9</button>
+          <button class="btn secondary nps-score" data-score="10">10</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="conversation-layout">
+      <div class="panel">
+        <h2>Conversa</h2>
+        <div id="timeline" class="timeline">
+          <div class="empty">Nenhuma interação ainda.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Resumo da pesquisa</h2>
+        <div id="summaryBox" class="summary-box">
+          O sistema irá consolidar aqui o contexto da conversa para posterior recuperação.
+        </div>
+      </div>
+    </section>
+
+    <section id="recommendationPanel" class="panel recommendation-panel">
+      <h2>Ofertas recomendadas</h2>
+      <div id="recommendations" class="recommendations">
+        <div class="empty">Nenhuma recomendação exibida ainda.</div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+  const companyId = "{{ company_id }}";
+  let sessionId = `live-${Date.now()}`;
+  let isBusy = false;
+  let isActivated = false;
+  let isActivating = false;
+  let latestRecommendations = null;
+  let conversationHistory = [];
+  let currentAudio = null;
+
+  const avatar = document.getElementById("avatar");
+  const statusEl = document.getElementById("status");
+  const speechEl = document.getElementById("speech");
+  const recommendationsEl = document.getElementById("recommendations");
+  const recommendationPanel = document.getElementById("recommendationPanel");
+  const timelineEl = document.getElementById("timeline");
+  const summaryBox = document.getElementById("summaryBox");
+  const messageInput = document.getElementById("messageInput");
+  const sendBtn = document.getElementById("sendBtn");
+  const activateBtn = document.getElementById("activateBtn");
+  const simulatePresenceBtn = document.getElementById("simulatePresenceBtn");
+  const decisionBox = document.getElementById("decisionBox");
+  const continueBtn = document.getElementById("continueBtn");
+  const handoffBtn = document.getElementById("handoffBtn");
+  const finishBtn = document.getElementById("finishBtn");
+  const handoffBox = document.getElementById("handoffBox");
+  const handoffQr = document.getElementById("handoffQr");
+  const handoffLink = document.getElementById("handoffLink");
+  const npsBox = document.getElementById("npsBox");
+
+  function setStatus(text) {
+    statusEl.textContent = text;
+  }
+
+  function setSpeech(text) {
+    speechEl.textContent = text || "";
+  }
+
+  function setAvatarMode(mode) {
+    avatar.classList.remove("approaching", "listening", "speaking");
+    if (mode) {
+      avatar.classList.add(mode);
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function stopCurrentAudio() {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio = null;
+    }
+  }
+
+  async function playAudioFromBase64(audioBase64) {
+    if (!audioBase64) {
+      return;
+    }
+
+    try {
+      stopCurrentAudio();
+      currentAudio = new Audio(`data:audio/mpeg;base64,${audioBase64}`);
+      await currentAudio.play();
+    } catch (error) {
+      console.warn("Falha ao reproduzir áudio", error);
+    }
+  }
+
+  function addBubble(role, text) {
+    conversationHistory.push({ role, text });
+    timelineEl.innerHTML = conversationHistory.map(item => `
+      <div class="bubble ${item.role}">
+        <span class="bubble-label">${item.role === "user" ? "Usuário" : "Totem"}</span>
+        ${escapeHtml(item.text)}
+      </div>
+    `).join("");
+  }
+
+  function updateSummary() {
+    const lastUserMessages = conversationHistory
+      .filter(item => item.role === "user")
+      .slice(-3)
+      .map(item => item.text);
+
+    if (!lastUserMessages.length) {
+      summaryBox.textContent = "O sistema irá consolidar aqui o contexto da conversa para posterior recuperação.";
+      return;
+    }
+
+    summaryBox.innerHTML = `
+      <strong>Temas recentes:</strong><br>
+      ${lastUserMessages.map(item => `• ${escapeHtml(item)}`).join("<br>")}
+    `;
+  }
+
+  function renderRecommendations(recommendations) {
+    const topActions = Array.isArray(recommendations?.top_actions)
+      ? recommendations.top_actions
+      : [];
+
+    recommendationPanel.classList.add("active");
+
+    if (!topActions.length) {
+      recommendationsEl.innerHTML = `<div class="empty">Nenhuma recomendação exibida ainda.</div>`;
+      return;
+    }
+
+    recommendationsEl.innerHTML = topActions.map(item => `
+      <article class="recommendation-card">
+        <strong>${escapeHtml(item.name || item.title || "Oferta")}</strong>
+        <p>${escapeHtml(item.description || "Sem descrição.")}</p>
+        <p><b>CTA:</b> ${escapeHtml(item.cta_label || "Quero meu desconto")}</p>
+        <p><b>Cupom:</b> ${escapeHtml(item.coupon_code || "—")}</p>
+        ${item.media_image ? `<img src="${escapeHtml(item.media_image)}" alt="Imagem da campanha">` : ""}
+      </article>
+    `).join("");
+  }
+
+  function showDecision() {
+    decisionBox.classList.add("active");
+  }
+
+  function hideDecision() {
+    decisionBox.classList.remove("active");
+  }
+
+  function showHandoff(data) {
+    if (!data?.qr_url || !data?.mobile_url) {
+      alert("Não foi possível gerar o QR de continuidade.");
+      return;
+    }
+
+    handoffQr.src = data.qr_url;
+    handoffLink.href = data.mobile_url;
+    handoffLink.textContent = data.mobile_url;
+    handoffBox.classList.add("active");
+    npsBox.classList.remove("active");
+    setStatus("Continue no celular");
+    setSpeech("Escaneie o QR code para continuar no seu celular.");
+  }
+
+  function showNps() {
+    npsBox.classList.add("active");
+    handoffBox.classList.remove("active");
+    hideDecision();
+    setStatus("Atendimento encerrado");
+    setSpeech("Obrigado pela presença. Deixe sua avaliação do atendimento.");
+  }
+
+  async function activateTotem() {
+    if (isActivating || isActivated) {
+      return;
+    }
+
+    isActivating = true;
+    setAvatarMode("approaching");
+    setStatus("Iniciando atendimento...");
+    setSpeech("Olá! Como posso te ajudar hoje?");
+
+    try {
+      const res = await fetch("/totem/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: companyId,
+          session_id: sessionId,
+          prefer_audio: true
+        })
+      });
+
+      const data = await res.json();
+      isActivated = true;
+      sessionId = data.session_id || sessionId;
+      setAvatarMode("listening");
+      setStatus("Pronto para escutar");
+      setSpeech(data.greeting || "Olá! Como posso te ajudar hoje?");
+      addBubble("assistant", data.greeting || "Olá! Como posso te ajudar hoje?");
+      await playAudioFromBase64(data.audio_base64);
+    } catch (error) {
+      console.error(error);
+      setAvatarMode(null);
+      setStatus("Erro ao ativar");
+      setSpeech("Não foi possível iniciar o atendimento.");
+    } finally {
+      isActivating = false;
+    }
+  }
+
+  async function simulatePresence() {
+    try {
+      await fetch("/api/presence/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: companyId,
+          device_id: "SIM-WEB-001",
+          image_base64: null
+        })
+      });
+    } catch (error) {
+      console.warn("presence trigger indisponível, ativando direto", error);
+    }
+
+    setAvatarMode("approaching");
+    setStatus("Presença detectada");
+    setSpeech("Presença detectada. Iniciando atendimento.");
+    await activateTotem();
+  }
+
+  async function sendMessage() {
+    const message = messageInput.value.trim();
+    if (!message || isBusy) {
+      return;
+    }
+
+    if (!isActivated) {
+      await activateTotem();
+    }
+
+    isBusy = true;
+    hideDecision();
+    handoffBox.classList.remove("active");
+    npsBox.classList.remove("active");
+    setAvatarMode("listening");
+    setStatus("Processando pergunta...");
+    addBubble("user", message);
+    updateSummary();
+
+    try {
+      const res = await fetch("/totem/interact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: companyId,
+          session_id: sessionId,
+          message,
+          prefer_audio: true,
+          input_mode: "text"
+        })
+      });
+
+      const data = await res.json();
+      latestRecommendations = data.recommendations || {};
+      setAvatarMode("speaking");
+      setStatus("Respondendo");
+      setSpeech(data.text || "Não encontrei uma resposta agora.");
+      addBubble("assistant", data.text || "Não encontrei uma resposta agora.");
+      updateSummary();
+      renderRecommendations(latestRecommendations);
+      showDecision();
+      messageInput.value = "";
+      await playAudioFromBase64(data.audio_base64);
+    } catch (error) {
+      console.error(error);
+      setAvatarMode(null);
+      setStatus("Erro na interação");
+      setSpeech("Não foi possível concluir sua solicitação.");
+    } finally {
+      isBusy = false;
+    }
+  }
+
+  async function createMobileHandoff() {
+    try {
+      const res = await fetch("/api/mobile-handoff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: companyId,
+          session_id: sessionId,
+          research_summary: summaryBox.innerText,
+          recommendations_snapshot: latestRecommendations || {},
+          source: "totem_live"
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        alert(data.message || "Não foi possível gerar o QR de continuidade.");
+        return;
+      }
+
+      showHandoff(data);
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao gerar QR de continuidade.");
+    }
+  }
+
+  async function sendNps(score) {
+    try {
+      const res = await fetch("/totem/nps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: companyId,
+          session_id: sessionId,
+          score,
+          comment: null
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        alert(data.message || "Não foi possível registrar a avaliação.");
+        return;
+      }
+
+      setSpeech("Obrigado pela avaliação. Tenha um ótimo dia.");
+      setStatus("Avaliação registrada");
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao registrar NPS.");
+    }
+  }
+
+  activateBtn.addEventListener("click", activateTotem);
+  simulatePresenceBtn.addEventListener("click", simulatePresence);
+  sendBtn.addEventListener("click", sendMessage);
+
+  messageInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      sendMessage();
+    }
+  });
+
+  continueBtn.addEventListener("click", () => {
+    hideDecision();
+    handoffBox.classList.remove("active");
+    npsBox.classList.remove("active");
+    setAvatarMode("listening");
+    setStatus("Pronto para continuar");
+    setSpeech("Claro. Qual é a sua próxima dúvida?");
+    messageInput.focus();
+  });
+
+  handoffBtn.addEventListener("click", createMobileHandoff);
+  finishBtn.addEventListener("click", showNps);
+
+  document.querySelectorAll(".nps-score").forEach((button) => {
+    button.addEventListener("click", () => {
+      const score = Number(button.dataset.score || "0");
+      sendNps(score);
+    });
+  });
+</script>
+{% endblock %}

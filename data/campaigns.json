@@ -3,6 +3,7 @@
     {
       "campaign_id": "CAMP-001",
       "name": "Promo Verão",
+      "description": "",
       "channel": "instagram",
       "objective": "leads",
       "status": "active",
@@ -10,20 +11,51 @@
         "18-24",
         "25-34"
       ],
-      "start_date": "2026-02-25"
+      "start_date": "2026-02-25",
+      "cta_label": "Quero meu desconto",
+      "discount_type": "",
+      "discount_value": 0,
+      "coupon_code": "",
+      "landing_url": "",
+      "priority": "normal",
+      "target_intents": [],
+      "qr_mode": "coupon",
+      "media_image": "",
+      "company_id": "FLX-001",
+      "end_date": null,
+      "tags": []
     },
     {
-      "name": "Promo Teste",
-      "status": "active",
       "campaign_id": "CAMP-F53872",
-      "start_date": "2026-02-25"
+      "name": "Promo Teste",
+      "description": "",
+      "channel": "totem",
+      "objective": "conversion",
+      "status": "active",
+      "target_segments": [],
+      "start_date": "2026-02-25",
+      "cta_label": "Quero meu desconto",
+      "discount_type": "",
+      "discount_value": 0,
+      "coupon_code": "",
+      "landing_url": "",
+      "priority": "normal",
+      "target_intents": [],
+      "qr_mode": "coupon",
+      "media_image": "",
+      "company_id": "FLX-001",
+      "end_date": null,
+      "tags": []
     },
     {
+      "campaign_id": "CAMP-DDEBF7",
       "name": "Teste",
       "description": "",
       "channel": "totem",
-      "status": "active",
       "objective": "conversion",
+      "status": "active",
+      "target_segments": [],
+      "start_date": "2026-03-26",
       "cta_label": "Quero meu desconto",
       "discount_type": "percent",
       "discount_value": 45.0,
@@ -32,12 +64,9 @@
       "priority": "normal",
       "target_intents": [],
       "qr_mode": "coupon",
-      "media_image": "/static/uploads/campaigns/FLX-001-e8ec648362694f54a769c24d65134e5d.png",
+      "media_image": "",
       "company_id": "FLX-001",
-      "campaign_id": "CAMP-DDEBF7",
-      "start_date": "2026-03-26",
       "end_date": null,
-      "target_segments": [],
       "tags": []
     }
   ],
@@ -45,6 +74,7 @@
     {
       "campaign_id": "CAMP-001",
       "name": "Promo Verão",
+      "description": "",
       "channel": "instagram",
       "objective": "leads",
       "status": "active",
@@ -52,13 +82,26 @@
         "18-24",
         "25-34"
       ],
-      "start_date": "2026-03-02"
+      "start_date": "2026-03-02",
+      "cta_label": "Quero meu desconto",
+      "discount_type": "",
+      "discount_value": 0,
+      "coupon_code": "",
+      "landing_url": "",
+      "priority": "normal",
+      "target_intents": [],
+      "qr_mode": "coupon",
+      "media_image": "",
+      "company_id": "demo",
+      "end_date": null,
+      "tags": []
     }
   ],
   "ACME-001": [
     {
       "campaign_id": "CAMP-001",
       "name": "Promo Verão",
+      "description": "",
       "channel": "instagram",
       "objective": "leads",
       "status": "active",
@@ -66,13 +109,26 @@
         "18-24",
         "25-34"
       ],
-      "start_date": "2026-03-16"
+      "start_date": "2026-03-16",
+      "cta_label": "Quero meu desconto",
+      "discount_type": "",
+      "discount_value": 0,
+      "coupon_code": "",
+      "landing_url": "",
+      "priority": "normal",
+      "target_intents": [],
+      "qr_mode": "coupon",
+      "media_image": "",
+      "company_id": "ACME-001",
+      "end_date": null,
+      "tags": []
     }
   ],
   "FLEXMEDIA-001": [
     {
       "campaign_id": "CAMP-001",
       "name": "Promo Verão",
+      "description": "",
       "channel": "instagram",
       "objective": "leads",
       "status": "active",
@@ -80,18 +136,45 @@
         "18-24",
         "25-34"
       ],
-      "start_date": "2026-03-26"
+      "start_date": "2026-03-26",
+      "cta_label": "Quero meu desconto",
+      "discount_type": "",
+      "discount_value": 0,
+      "coupon_code": "",
+      "landing_url": "",
+      "priority": "normal",
+      "target_intents": [],
+      "qr_mode": "coupon",
+      "media_image": "",
+      "company_id": "FLEXMEDIA-001",
+      "end_date": null,
+      "tags": []
     },
     {
+      "campaign_id": "CAMP-80A0EB",
       "name": "verao",
+      "description": "",
       "channel": "totem",
-      "status": "active",
       "objective": "desconto",
+      "status": "active",
+      "target_segments": [],
+      "start_date": "2026-03-26",
+      "cta_label": "Quero meu desconto",
+      "discount_type": "",
+      "discount_value": 0,
+      "coupon_code": "",
+      "landing_url": "",
+      "priority": "normal",
       "target_intents": [
         "roupa"
       ],
-      "campaign_id": "CAMP-80A0EB",
-      "start_date": "2026-03-26"
+      "qr_mode": "coupon",
+      "media_image": "",
+      "company_id": "FLEXMEDIA-001",
+      "end_date": null,
+      "tags": [
+        "roupa"
+      ]
     }
   ]
 }

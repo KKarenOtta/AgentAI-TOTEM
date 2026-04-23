@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{{ title or "Recuperação" }}</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+  <style>
+    body {
+      margin: 0;
+      background: #0b0f14;
+      color: #eef3f8;
+      font-family: Inter, Arial, sans-serif;
+    }
+
+    .page {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(24,33,44,.92), rgba(18,24,33,.96));
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 20px;
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+
+    .offer-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .offer-item {
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 16px;
+      padding: 14px;
+      background: rgba(8,12,17,.35);
+    }
+
+    .offer-item img {
+      width: 100%;
+      max-width: 220px;
+      border-radius: 12px;
+      margin-top: 10px;
+      display: block;
+    }
+
+    .coupon-box {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(39,224,161,.08);
+      border: 1px solid rgba(39,224,161,.2);
+    }
+
+    .pill {
+      display: inline-flex;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(39,224,161,.12);
+      color: #7ee7c6;
+      font-size: 12px;
+      font-weight: 700;
+      margin-right: 6px;
+      margin-top: 6px;
+    }
+
+    .muted {
+      color: #9fb0c3;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    {% if mode == "missing" %}
+      <section class="card">
+        <h1>Conteúdo não encontrado</h1>
+        <p class="muted">O link informado não está mais disponível ou não foi encontrado.</p>
+      </section>
+    {% else %}
+      <section class="card">
+        <h1>{{ title or "Recuperação" }}</h1>
+        <p class="muted">
+          {% if mode == "recovery" %}
+            Recuperamos o resumo da sua pesquisa e as ofertas relacionadas.
+          {% else %}
+            Aqui estão seus dados de acesso, preferências e ofertas disponíveis.
+          {% endif %}
+        </p>
+      </section>
+
+      {% if lead %}
+        <section class="card">
+          <h2>Cadastro</h2>
+          <p><strong>Nome:</strong> {{ lead.full_name }}</p>
+          <p><strong>E-mail:</strong> {{ lead.email }}</p>
+          <p><strong>Idade:</strong> {{ lead.age }}</p>
+          <p><strong>Gênero:</strong> {{ lead.gender }}</p>
+
+          <div style="margin-top: 12px;">
+            <strong>Marcas favoritas</strong><br>
+            {% if lead.favorite_brands %}
+              {% for brand in lead.favorite_brands %}
+                <span class="pill">{{ brand }}</span>
+              {% endfor %}
+            {% else %}
+              <p class="muted">Nenhuma marca favorita informada.</p>
+            {% endif %}
+          </div>
+        </section>
+      {% endif %}
+
+      {% if memory %}
+        <section class="card">
+          <h2>Resumo da pesquisa</h2>
+          <p>{{ memory.research_summary or "Nenhum resumo textual foi salvo." }}</p>
+        </section>
+      {% endif %}
+
+      <section class="card">
+        <h2>Cupons</h2>
+        {% if coupons %}
+          {% for coupon in coupons %}
+            <div class="coupon-box">
+              <div><strong>Campanha:</strong> {{ coupon.title }}</div>
+              <div><strong>Código:</strong> {{ coupon.code }}</div>
+              <div><strong>Status:</strong> {{ coupon.status }}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="muted">Nenhum cupom disponível.</p>
+        {% endif %}
+      </section>
+
+      <section class="card">
+        <h2>Ofertas e recomendações</h2>
+        {% if recommendations %}
+          <div class="offer-list">
+            {% for item in recommendations %}
+              <article class="offer-item">
+                <strong>{{ item.title or item.name or "Oferta" }}</strong>
+
+                {% if item.description %}
+                  <p>{{ item.description }}</p>
+                {% endif %}
+
+                {% if item.coupon_code %}
+                  <div class="coupon-box">
+                    <div><strong>Cupom:</strong> {{ item.coupon_code }}</div>
+
+                    {% if item.discount_value %}
+                      <div>
+                        <strong>Desconto:</strong>
+                        {% if item.discount_type == "percent" %}
+                          {{ item.discount_value }}% OFF
+                        {% else %}
+                          {{ item.discount_value }}
+                        {% endif %}
+                      </div>
+                    {% endif %}
+                  </div>
+                {% endif %}
+
+                {% if item.cta_label %}
+                  <p><strong>Ação:</strong> {{ item.cta_label }}</p>
+                {% endif %}
+
+                {% if item.media_image %}
+                  <img src="{{ item.media_image }}" alt="Imagem da campanha" />
+                {% endif %}
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted">Nenhuma oferta recomendada foi encontrada para este registro.</p>
+        {% endif %}
+      </section>
+    {% endif %}
+  </main>
+</body>
+</html>

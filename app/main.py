@@ -1,44 +1,45 @@
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.config import settings
-from app.routes.api import router as api_router
-from app.routes.audio import router as audio_router
 from app.routes.dashboard import router as dashboard_router
-from app.routes.presence import router as presence_router
+from app.routes.api import router as api_router
 from app.routes.totem import router as totem_router
-from app.routes.animals_page import router as animals_page_router
-from core.logging import configure_logging
-
-configure_logging(settings.log_level)
 
 app = FastAPI(
-    title=settings.app_name,
-    version="2.0.0",
+    title="AgentAI-TOTEM",
+    version="1.0.0",
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+BASE_DIR = Path(__file__).resolve().parent.parent
+STATIC_DIR = BASE_DIR / "static"
 
-app.include_router(dashboard_router)
-app.include_router(totem_router, prefix="/totem", tags=["totem"])
-app.include_router(api_router, prefix="/api", tags=["api"])
-app.include_router(presence_router, prefix="/api", tags=["presence"])
-app.include_router(animals_page_router)
-app.include_router(audio_router)
-
-try:
-    from app.routes.test_db import router as test_db_router
-    app.include_router(test_db_router, prefix="/api", tags=["test_db"])
-except Exception as exc:
-    print(f"[WARN] test_db router não carregado: {exc}")
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 @app.get("/health")
-def health() -> dict:
-    return {
-        "status": "ok",
-        "app": settings.app_name,
-        "env": settings.app_env,
-    }
+def health():
+    return JSONResponse(
+        {
+            "status": "ok",
+            "app": "AgentAI-TOTEM",
+            "env": os.getenv("APP_ENV", "development"),
+        }
+    )
+
+
+app.include_router(dashboard_router)
+app.include_router(api_router)
+app.include_router(totem_router)
+
+try:
+    from app.routes.test_db import router as test_db_router
+    app.include_router(test_db_router)
+except Exception as exc:
+    print(f"[WARN] test_db router não carregado: {exc}")

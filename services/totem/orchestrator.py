@@ -6,87 +6,19 @@ import time
 from marketing.campaigns import get_active_campaigns
 from recommender.rules import recommend_actions
 from recommender.scoring import infer_intent
+
 from services.llm_gateway_openai import chatgpt_generate
-from services.realtime.event_bus import publish
+
 from services.totem.language import detect_language
 from services.totem.metrics import MetricsLogger
-from services.totem.qr import generate_campaign_qr
 from services.totem.tts import gerar_audio
-
-
-IDIOMAS = {"pt": "Português", "en": "Inglês", "es": "Espanhol"}
+from services.totem.company_context import load_company_context
 
 
 class TotemOrchestrator:
     def __init__(self, hugging_key: str | None = None):
         self.hugging_key = hugging_key
         self.metrics = MetricsLogger()
-
-    @staticmethod
-    def _normalize_discount_label(action: dict) -> str | None:
-        discount_type = action.get("discount_type")
-        discount_value = action.get("discount_value")
-
-        if discount_value in (None, "", 0, 0.0):
-            return None
-
-        try:
-            numeric_value = float(discount_value)
-        except Exception:
-            return None
-
-        if discount_type == "percent":
-            return f"{int(numeric_value)}% OFF"
-
-        if discount_type == "fixed":
-            return f"R$ {numeric_value:.2f} OFF"
-
-        return None
-
-    def _enrich_recommendations(
-        self,
-        *,
-        recs: dict | None,
-        company_id: str,
-        session_id: str,
-        turn: int,
-    ) -> dict:
-        if not isinstance(recs, dict):
-            return {"top_actions": []}
-
-        top_actions = recs.get("top_actions")
-        if not isinstance(top_actions, list):
-            recs["top_actions"] = []
-            return recs
-
-        enriched = []
-        for action in top_actions:
-            if not isinstance(action, dict):
-                continue
-
-            campaign_id = action.get("campaign_id") or action.get("id") or action.get("code")
-            coupon_code = action.get("coupon_code") or campaign_id
-
-            qr_payload = {
-                "company_id": company_id,
-                "campaign_id": campaign_id,
-                "coupon_code": coupon_code,
-                "session_id": session_id,
-                "turn_index": turn,
-                "ts": int(time.time()),
-            }
-
-            item = dict(action)
-            item["discount_label"] = self._normalize_discount_label(item)
-            item["qr_code_url"] = generate_campaign_qr(qr_payload)
-
-            if not item.get("cta_label"):
-                item["cta_label"] = "Quero meu desconto"
-
-            enriched.append(item)
-
-        recs["top_actions"] = enriched
-        return recs
 
     def interact(
         self,
@@ -101,207 +33,136 @@ class TotemOrchestrator:
         stt_latency_s: float | None = None,
         message_id: str | None = None,
     ):
-        interaction_start = datetime.now()
-        timestamp_iso = interaction_start.isoformat(timespec="seconds")
+        start = datetime.now()
         idioma = detect_language(pergunta or "")
-        data_hora = interaction_start.strftime("%d/%m/%Y (%A), %H:%M")
 
+        context = load_company_context(company_id)
         active_campaigns = get_active_campaigns(company_id)
-
-        campaign_ids = [
-            (c.get("id") or c.get("campaign_id") or c.get("code"))
-            for c in (active_campaigns or [])
-            if (c.get("id") or c.get("campaign_id") or c.get("code"))
-        ]
-
         intent = infer_intent(pergunta or "")
-        recs = recommend_actions(profile, active_campaigns, intent=intent) or {}
-        recs = self._enrich_recommendations(
-            recs=recs,
-            company_id=company_id,
-            session_id=session_id,
-            turn=turn,
-        )
 
+        recs = recommend_actions(profile, active_campaigns, intent=intent) or {}
+
+        # =========================
+        # 1. BUSCA LOCAL FORTE
+        # =========================
+        base_answer, source = self._search_local_context(pergunta, context)
+
+        # =========================
+        # 2. FALLBACK IA (SE NECESSÁRIO)
+        # =========================
+        resposta_final = base_answer
+
+        if source == "none":
+            resposta_final = self._generate_with_ai(pergunta, context, active_campaigns)
+
+        elif source == "partial":
+            complemento = self._generate_with_ai(pergunta, context, active_campaigns)
+            resposta_final = f"{base_answer}\n\n{complemento}"
+
+        # =========================
+        # 3. FINALIZAÇÃO PADRÃO
+        # =========================
+        resposta_final += "\n\nPosso te ajudar com mais alguma coisa?"
+
+        # =========================
+        # 4. TTS
+        # =========================
+        audio_path = None
+        if prefer_audio:
+            audio_path, *_ = gerar_audio(resposta_final, idioma)
+
+        return resposta_final, recs, audio_path, {}, idioma
+
+    # =====================================================
+    # BUSCA LOCAL INTELIGENTE
+    # =====================================================
+    def _search_local_context(self, pergunta: str, context: dict):
+        if not pergunta or not context:
+            return "", "none"
+
+        pergunta = pergunta.lower()
+
+        score = 0
+        resposta = ""
+
+        # -------------------------
+        # FAQ
+        # -------------------------
+        for faq in context.get("faq", []):
+            q = faq.get("question", "").lower()
+            if any(word in pergunta for word in q.split()):
+                return faq.get("answer", ""), "exact"
+
+        # -------------------------
+        # LOCALIZAÇÃO
+        # -------------------------
+        if any(k in pergunta for k in ["onde", "local", "fica", "localização"]):
+            loc = context.get("location", {})
+            if loc:
+                resposta += f"O local está em {loc.get('address', 'endereço não informado')}.\n"
+                score += 1
+
+        # -------------------------
+        # ATRAÇÕES
+        # -------------------------
+        if any(k in pergunta for k in ["atração", "evento", "o que tem", "lazer"]):
+            atracoes = context.get("attractions", [])
+            if atracoes:
+                lista = "\n".join([f"• {a}" for a in atracoes])
+                resposta += f"Aqui você encontra:\n{lista}\n"
+                score += 1
+
+        # -------------------------
+        # LOJAS
+        # -------------------------
+        if any(k in pergunta for k in ["loja", "comprar", "shopping"]):
+            lojas = context.get("stores", [])
+            if lojas:
+                lista = "\n".join([f"• {l}" for l in lojas[:5]])
+                resposta += f"Algumas lojas disponíveis:\n{lista}\n"
+                score += 1
+
+        # -------------------------
+        # SERVIÇOS
+        # -------------------------
+        if any(k in pergunta for k in ["banheiro", "serviço", "atendimento"]):
+            servicos = context.get("services", [])
+            if servicos:
+                lista = "\n".join([f"• {s}" for s in servicos])
+                resposta += f"Serviços disponíveis:\n{lista}\n"
+                score += 1
+
+        # -------------------------
+        # DESCRIÇÃO GERAL
+        # -------------------------
+        if score == 0:
+            return context.get("description", ""), "partial"
+
+        return resposta.strip(), "exact"
+
+    # =====================================================
+    # IA COMPLEMENTAR
+    # =====================================================
+    def _generate_with_ai(self, pergunta: str, context: dict, campaigns: list):
         prompt = f"""
-Agora são {data_hora}.
-Responda em {IDIOMAS.get(idioma, "Português")}.
-Você é um assistente de totem de autoatendimento (rápido, claro, educado).
-Use o perfil e as campanhas ativas para personalizar a conversa.
+Você é um assistente de um totem físico em um ambiente comercial.
+
+CONTEXTO DO LOCAL:
+{context}
 
 PERGUNTA DO USUÁRIO:
 {pergunta}
 
-PERFIL (informado pelo totem):
-{profile}
-
-CAMPANHAS ATIVAS (marketing):
-{active_campaigns}
-
-RECOMENDAÇÕES (estruturadas):
-{recs}
-
-REGRAS DE RESPOSTA:
-- Seja direto e amigável.
-- Faça no máximo 1 pergunta de clarificação (se necessário).
-- Inclua um próximo passo para o usuário.
+REGRAS:
+- Use o contexto acima
+- Não invente informações
+- Seja direto e útil
+- Se não souber algo específico, seja transparente
+- Sugira o que o usuário pode fazer no local
 """.strip()
 
-        llm_meta: dict = {}
-        resposta = ""
-        gen_latency = None
-
         try:
-            resposta, gen_latency = chatgpt_generate(prompt, meta=llm_meta)
-        except Exception as e:
-            llm_meta["llm_provider_used"] = "demo"
-            llm_meta["llm_fallback_chain"] = llm_meta.get("llm_fallback_chain") or ["gateway:fail"]
-            llm_meta["llm_error"] = f"{type(e).__name__}: {e}"
-            gen_latency = None
-            resposta = (
-                "[DEMO/OFFLINE] No momento não consigo acessar o modelo de IA.\n\n"
-                "Ainda assim posso te orientar com base nas campanhas e recomendações.\n"
-                "Toque em “Quero essa oferta” para gerar um QR."
-            )
-
-        llm_provider_used = llm_meta.get("llm_provider_used")
-        llm_fallback_chain = llm_meta.get("llm_fallback_chain")
-        llm_error = llm_meta.get("llm_error")
-
-        audio_path = None
-        voice_source = None
-        hf_status = None
-        hf_err = None
-        tts_latency = None
-        total_audio_latency = None
-
-        if prefer_audio:
-            audio_t0 = time.perf_counter()
-            try:
-                audio_path, voice_source, hf_status, hf_err, tts_latency = gerar_audio(
-                    resposta,
-                    idioma,
-                    hugging_key=self.hugging_key,
-                )
-                audio_t1 = time.perf_counter()
-                total_audio_latency = round((audio_t1 - audio_t0), 3)
-            except Exception as e:
-                audio_t1 = time.perf_counter()
-                total_audio_latency = round((audio_t1 - audio_t0), 3)
-                hf_err = f"{type(e).__name__}: {e}"
-
-        latency_total_s = (
-            (gen_latency or 0.0) +
-            (tts_latency or 0.0) +
-            (stt_latency_s or 0.0)
-        )
-
-        metric = {
-            "timestamp": timestamp_iso,
-            "company_id": company_id,
-            "session_id": session_id,
-            "turn_index": turn,
-            "input_mode": input_mode,
-            "message_id": message_id,
-            "intent": intent,
-            "question": pergunta,
-            "response": resposta,
-            "language_detected": idioma,
-            "language_name": IDIOMAS.get(idioma, "Português"),
-            "profile": profile,
-            "campaigns_active": campaign_ids,
-            "active_campaigns_count": len(active_campaigns or []),
-            "campaign_impressions": campaign_ids,
-            "campaign_impressions_count": len(campaign_ids),
-            "recommendations": recs,
-            "recommendations_top": recs.get("top_actions") if isinstance(recs, dict) else None,
-            "stt_provider": stt_provider,
-            "stt_latency_s": stt_latency_s,
-            "voice_source": voice_source,
-            "audio_file": audio_path,
-            "gen_latency_s": gen_latency,
-            "tts_latency_s": tts_latency,
-            "total_audio_time_s": total_audio_latency,
-            "latency_llm_s": gen_latency,
-            "latency_tts_s": tts_latency,
-            "latency_total_s": latency_total_s,
-            "hf_status_code": hf_status,
-            "hf_error": hf_err,
-            "llm_provider_used": llm_provider_used,
-            "llm_fallback_chain": llm_fallback_chain,
-            "llm_error": llm_error,
-        }
-
-        impression_event = {
-            "event": "campaign_impression",
-            "timestamp": timestamp_iso,
-            "company_id": company_id,
-            "session_id": session_id,
-            "turn_index": turn,
-            "campaign_ids": campaign_ids,
-            "campaign_count": len(campaign_ids),
-            "intent": intent,
-            "language_detected": idioma,
-            "llm_provider_used": llm_provider_used,
-        }
-
-        live_event = {
-            "type": "totem_interaction",
-            "event": "totem_interaction",
-            "timestamp": timestamp_iso,
-            "company_id": company_id,
-            "session_id": session_id,
-            "turn_index": turn,
-            "input_mode": input_mode,
-            "message_id": message_id,
-            "intent": intent,
-            "language": idioma,
-            "question": pergunta,
-            "response": resposta,
-            "profile": profile,
-            "recommendations": recs,
-            "recommendations_top": recs.get("top_actions") if isinstance(recs, dict) else [],
-            "audio_file": audio_path,
-            "voice_source": voice_source,
-            "latency": {
-                "stt": stt_latency_s,
-                "llm": gen_latency,
-                "tts": tts_latency,
-                "total": latency_total_s,
-            },
-            "campaign_ids": campaign_ids,
-            "llm_provider_used": llm_provider_used,
-            "status": {
-                "hf_status_code": hf_status,
-                "hf_error": hf_err,
-                "llm_error": llm_error,
-            },
-        }
-
-        live_impression_event = {
-            "type": "campaign_impression",
-            "event": "campaign_impression",
-            "timestamp": timestamp_iso,
-            "company_id": company_id,
-            "session_id": session_id,
-            "turn_index": turn,
-            "campaign_ids": campaign_ids,
-            "campaign_count": len(campaign_ids),
-            "intent": intent,
-            "language": idioma,
-        }
-
-        try:
-            self.metrics.save(metric)
-            self.metrics.save(impression_event)
-            self.metrics.build_report()
-        except Exception as e:
-            metric["metrics_error"] = f"{type(e).__name__}: {e}"
-
-        try:
-            publish(company_id=company_id, event="totem_interaction", payload=live_event)
-            publish(company_id=company_id, event="campaign_impression", payload=live_impression_event)
-        except Exception as e:
-            metric["publish_error"] = f"{type(e).__name__}: {e}"
-
-        return resposta, recs, audio_path, metric, idioma
+            resposta, _ = chatgpt_generate(prompt)
+            return resposta
+        except Exception:
+            return "Posso te ajudar com informações do local e ofertas disponíveis."

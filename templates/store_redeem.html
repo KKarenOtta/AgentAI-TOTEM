@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Validação de cupom</title>
+  <style>
+    body {
+      margin: 0;
+      background: #0b0f14;
+      color: #eef3f8;
+      font-family: Inter, Arial, sans-serif;
+    }
+
+    .page {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(24,33,44,.92), rgba(18,24,33,.96));
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 20px;
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+
+    input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.08);
+      background: #0e141c;
+      color: #eef3f8;
+      outline: none;
+      margin-bottom: 12px;
+      box-sizing: border-box;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 18px;
+      border: none;
+      border-radius: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(135deg, #27e0a1, #19b987);
+      color: #07110d;
+    }
+
+    .status-ok {
+      color: #7ee7c6;
+      font-weight: 700;
+    }
+
+    .status-used {
+      color: #ffcc66;
+      font-weight: 700;
+    }
+
+    .status-invalid {
+      color: #ff7c7c;
+      font-weight: 700;
+    }
+
+    .muted {
+      color: #9fb0c3;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="card">
+      <h1>Validação de cupom na loja</h1>
+      <p class="muted">Digite ou confirme o identificador do cupom para validar o uso e contabilizar a conversão.</p>
+
+      <form method="post" action="/store/redeem">
+        <input
+          type="text"
+          name="coupon_id"
+          placeholder="coupon_id"
+          value="{{ coupon_id or '' }}"
+          required
+        />
+
+        <input
+          type="text"
+          name="store_id"
+          placeholder="store_id (ex.: LOJA-01)"
+          value="{{ store_id or '' }}"
+        />
+
+        <input
+          type="text"
+          name="operator_id"
+          placeholder="operator_id (ex.: caixa-maria)"
+          value="{{ operator_id or '' }}"
+        />
+
+        <button class="btn" type="submit">Validar cupom</button>
+      </form>
+    </section>
+
+    {% if result %}
+      <section class="card">
+        <h2>Resultado da validação</h2>
+
+        {% if result.status == "redeemed" and just_validated %}
+          <p class="status-ok">{{ result.validation_message }}</p>
+        {% elif result.status == "redeemed" %}
+          <p class="status-used">{{ result.validation_message }}</p>
+        {% elif result.status == "expired" %}
+          <p class="status-invalid">{{ result.validation_message }}</p>
+        {% else %}
+          <p class="status-used">Status atual: {{ result.status }}</p>
+        {% endif %}
+
+        <p><strong>Campanha:</strong> {{ result.title }}</p>
+        <p><strong>Código promocional:</strong> {{ result.code }}</p>
+        <p><strong>Status:</strong> {{ result.status }}</p>
+
+        {% if result.discount_value %}
+          <p>
+            <strong>Desconto:</strong>
+            {% if result.discount_type == "percent" %}
+              {{ result.discount_value }}% OFF
+            {% else %}
+              {{ result.discount_value }}
+            {% endif %}
+          </p>
+        {% endif %}
+
+        <p><strong>Emitido em:</strong> {{ result.issued_at }}</p>
+        <p><strong>Expira em:</strong> {{ result.expires_at or "Não definido" }}</p>
+        <p><strong>Resgatado em:</strong> {{ result.redeemed_at or "Ainda não resgatado" }}</p>
+        <p><strong>Loja:</strong> {{ result.store_id or "Não informada" }}</p>
+        <p><strong>Operador:</strong> {{ result.operator_id or "Não informado" }}</p>
+      </section>
+    {% elif coupon_id %}
+      <section class="card">
+        <h2 class="status-invalid">Cupom não encontrado</h2>
+        <p class="muted">Verifique o identificador informado e tente novamente.</p>
+      </section>
+    {% endif %}
+  </main>
+</body>
+</html>
