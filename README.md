@@ -1,71 +1,5 @@
 <img width="201" height="231" alt="IAgora" src="https://github.com/user-attachments/assets/29dd313b-b9f6-4df1-875f-915245640425" />
 
-# AgentAI-TOTEM
-Desenvolvimento de agentes para um totem interativo com Inteligência Artificial da IA.Gora
-
-###OBS: Modelo arquivo .env
-
-PIR_PIN=17
-PRESENCE_HOLD_SECONDS=5
-COOLDOWN_SECONDS=10
-CAMERA_INDEX=0
-CAMERA_WIDTH=640
-CAMERA_HEIGHT=480
-CAMERA_WARMUP_SECONDS=2.0
-JPEG_QUALITY=95
-PRESENCE_REQUIRE_IMAGE=true
-PRESENCE_REQUIRE_HUMAN_VALIDATION=true
-
-# =========================
-# BACKEND LOCAL DO TOTEM
-# =========================
-TOTEM_ACTIVATE_URL=http://127.0.0.1:8000/totem/activate
-TOTEM_INTERACT_URL=http://127.0.0.1:8000/totem/interact
-AUDIO_TRANSCRIBE_URL=http://127.0.0.1:8000/api/audio/transcribe
-TRACK_API_URL=http://52.201.76.45:8000/api/track
-
-TOTEM_REQUEST_TIMEOUT=30
-REQUEST_TIMEOUT_SECONDS=10
-
-# =========================
-# STT / TRANSCRIÇÃO
-# =========================
-AUDIO_TRANSCRIBE_PROVIDER=openai
-AUDIO_TRANSCRIBE_LANGUAGE=pt
-
-WHISPER_CPP_BIN=
-WHISPER_CPP_MODEL=
-
-LOCAL_WHISPER_MODEL=base
-LOCAL_WHISPER_DEVICE=cpu
-LOCAL_WHISPER_COMPUTE_TYPE=int8
-LOCAL_WHISPER_BEAM_SIZE=1
-LOCAL_WHISPER_CPU_THREADS=4
-
-# =========================
-# LLM
-# =========================
-OPENAI_API_KEY="COLOQUE_AQUI"
-OPENAI_MODEL=gpt-4o-mini
-OPENAI_TIMEOUT_S=45
-
-GEMINI_API_KEY="COLOQUE_AQUI"
-GEMINI_MODEL=gemini-2.5-flash
-
-OPENROUTER_API_KEY="COLOQUE_AQUI"
-OPENROUTER_MODEL=openrouter/free
-
-HUGGING_FACE_API_KEY="COLOQUE_AQUI"
--------------------------------------------------------
-
-		git pull origin main
-
-		source venv/bin/activate
-		
-		./venv/bin/python -m pip install --upgrade pip setuptools wheel
-		./venv/bin/python -m pip install -r requirements.txt
-		./venv/bin/python -m pip install -r requirements-edge.txt
-
 APÓS TRABALHAR NAS SUAS ALTERAÇOES: criar o COMMIT:
 
 		pip freeze > requirements.txt
@@ -131,4 +65,50 @@ Ver campanhas salvas
 Ver empresas salvas
 
 		cat data/companies.json
+
+Guia de Teste da Aplicação AgentAI-TOTEM
+
+Fluxo operacional, URLs de teste e checklist funcional
+Objetivo
+	Este documento serve para testar a aplicação de ponta a ponta: totem, cadastro mobile, cupons, validação na loja, dashboard e NPS.
+	Pré-requisitos
+Servidor FastAPI ativo em http://127.0.0.1:8000 ou http://192.168.15.6:8000.
+Projeto com .env carregado e diretórios app/, services/ e templates/ monitorados no uvicorn.
+Dispositivo móvel na mesma rede local para testar o handoff via QR.
+Endereços para abrir no navegador
+
+Fluxo completo recomendado
+	1. Abrir /totem/live/FLX-001.
+	2. Simular presença ou ativar atendimento.
+	3. Fazer uma pergunta sobre o negócio, por exemplo: "onde fica o banheiro e quais promoções estão ativas?".
+	4. Confirmar resposta textual, resumo da pesquisa e ofertas recomendadas.
+	5. Clicar em "Continuar no celular" e ler o QR gerado.
+	6. No celular, abrir /mobile/start/<session_id>.
+	7. Prosseguir para /mobile/capture/<session_id> e preencher o cadastro completo.
+	8. Confirmar redirecionamento para /mobile/content/<lead_id>.
+	9. Verificar cupom emitido, QR do cupom, expiração e descrição da campanha.
+	10. Abrir /store/redeem no dispositivo da loja e validar o coupon_id.
+	11. Confirmar status redeemed em data/coupons/coupons.jsonl e métrica coupon_redeemed em data/metrics/metrics.jsonl.
+	12. Encerrar o atendimento no totem e registrar uma nota NPS.
+
+Checklist funcional
+Resposta local do negócio antes de fallback para IA.
+Resumo da pesquisa gerado no totem.
+QR de handoff mobile funcional.
+CPF obrigatório no cadastro mobile.
+Cupom emitido com expires_at, qr_url, store_id e operator_id.
+Resgate de cupom altera status para redeemed.
+Métrica coupon_redeemed gravada.
+Nota NPS gravada ao final.
+Teste rápido por terminal
+
+Comandos essenciais:
+		
+		curl http://127.0.0.1:8000/health
+		curl -X POST http://127.0.0.1:8000/totem/activate -H "Content-Type: application/json" -d '{"company_id":"FLX-001","session_id":"fluxo-completo-001"}'
+		curl -X POST http://127.0.0.1:8000/totem/interact -H "Content-Type: application/json" -d '{"company_id":"FLX-001","session_id":"fluxo-completo-001","message":"onde fica o banheiro e quais promoções estão ativas?","prefer_audio":false,"input_mode":"text"}'
+		curl -X POST http://127.0.0.1:8000/api/mobile-handoff -H "Content-Type: application/json" -d '{"company_id":"FLX-001","session_id":"fluxo-completo-001","research_summary":"Pergunta sobre banheiro e promoções","recommendations_snapshot":{},"source":"totem_live"}'
+
+Observações de teste
+Se houver divergência entre o que o totem mostra e o que o terminal retorna, priorize os arquivos JSON e os logs do backend para confirmar o estado real do fluxo.
 	
