@@ -67,15 +67,29 @@ Ver empresas salvas
 		cat data/companies.json
 
 Guia de Teste da Aplicação AgentAI-TOTEM
-
 Fluxo operacional, URLs de teste e checklist funcional
+
 Objetivo
+	
 	Este documento serve para testar a aplicação de ponta a ponta: totem, cadastro mobile, cupons, validação na loja, dashboard e NPS.
-	Pré-requisitos
-Servidor FastAPI ativo em http://127.0.0.1:8000 ou http://192.168.15.6:8000.
-Projeto com .env carregado e diretórios app/, services/ e templates/ monitorados no uvicorn.
-Dispositivo móvel na mesma rede local para testar o handoff via QR.
-Endereços para abrir no navegador
+	
+Pré-requisitos
+
+- Servidor FastAPI ativo em http://127.0.0.1:8000 ou http://192.168.15.6:8000.
+- Projeto com .env carregado e diretórios app/, services/ e templates/ monitorados no uvicorn.
+- Dispositivo móvel na mesma rede local para testar o handoff via QR.
+
+Endereços para abrir no navegador: 
+
+		http://127.0.0.1:8000/health	Saúde da aplicação	Retorno JSON com status ok.
+		http://127.0.0.1:8000/totem/live/FLX-001	Tela principal do totem	Ativação, pergunta, resposta, resumo, recomendações, handoff mobile e NPS.
+		http://127.0.0.1:8000/client/FLX-001	Dashboard da empresa	KPIs de leads, cupons, conversão e lojas.
+		http://127.0.0.1:8000/client/FLX-001/campaigns	Gestão de campanhas	Campanhas ativas, mídia, cupom e desconto.
+		http://127.0.0.1:8000/store/redeem	Validação na loja	Consulta e resgate do cupom com store_id e operator_id.
+		http://192.168.15.6:8000/mobile/start/<session_id>	Início do fluxo mobile	Entrada vinda do QR do totem.
+		http://192.168.15.6:8000/mobile/capture/<session_id>	Cadastro mobile	Nome, idade, gênero, e-mail, CPF obrigatório e LGPD.
+		http://192.168.15.6:8000/mobile/content/<lead_id>	Conteúdo pós-cadastro	Resumo da pesquisa, QR de campanha, cupom e expiração.
+
 
 Fluxo completo recomendado
 	1. Abrir /totem/live/FLX-001.
