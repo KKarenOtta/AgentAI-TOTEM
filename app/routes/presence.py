@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from services.presence.presence_service import PresenceService
+from core.presence.service import PresenceService
 
 
 router = APIRouter()

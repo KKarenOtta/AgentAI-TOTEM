@@ -1,15 +1,17 @@
 {
   "FLX-001": {
     "name": "FLX Demo",
-    "description": "Zoológico de São Paulo é o maior jardim zoológico do Brasil em quantidade de animais. Abriga as nascentes do histórico riacho do Ipiranga, na Zona Sul da cidade de São Paulo, localizado em uma área de 824 529 metros quadrados de Mata Atlântica original, com quatro quilômetros de alamedas, conta com atrações, centro comercial de lojas, praça de alimentação e serviços.",
+    "business_type": "zoologico_com_centro_comercial",
+    "description": "Zoológico de São Paulo é o maior jardim zoológico do Brasil em quantidade de animais. Abriga as nascentes do histórico riacho do Ipiranga, na Zona Sul da cidade de São Paulo, localizado em uma área de Mata Atlântica original, com alamedas, atrações, centro comercial de lojas, praça de alimentação e serviços.",
     "location": {
-      "address": "Av. Miguel Estéfano 4241 - São Paulo/SP",
-      "reference": "Próximo a estação terminal Jabaquara",
-      "map_url": "google.com/maps/place/Zoológico+de+São+Paulo/@-23.651715,-46.618835,17z/data=!4m6!3m5!1s0x94ce5b3001f4883d:0xb7f1ba1b449ce36a!8m2!3d-23.6508651!4d-46.6204576!16s%2Fm%2F0vzsqy6?hl=pt-BR&entry=ttu&g_ep=EgoyMDI2MDQyMC4wIKXMDSoASAFQAw%3D%3D"
+      "address": "Av. Miguel Estéfano, 4241 - Água Funda - São Paulo/SP",
+      "reference": "Próximo ao Terminal Jabaquara",
+      "map_url": "https://www.google.com/maps/search/?api=1&query=Zoologico+de+Sao+Paulo"
     },
     "hours": {
       "monday_to_saturday": "10:00 às 17:00",
-      "sunday": "12:00 às 18:00"
+      "sunday": "12:00 às 18:00",
+      "holidays": "Consultar programação oficial antes da visita."
     },
     "contacts": {
       "phone": "(11) 4934-6804",
@@ -17,34 +19,115 @@
       "site": "https://zoologico.com.br"
     },
     "services": [
-      "banheiros",
-      "fraldário",
-      "caixa eletrônico",
-      "wifi"
+      {
+        "service_id": "SERV-BANHEIRO-01",
+        "name": "Banheiros da praça de alimentação",
+        "category": "banheiro",
+        "floor": "térreo",
+        "zone": "praça de alimentação",
+        "reference": "Próximo aos restaurantes e à área de mesas.",
+        "tags": ["banheiro", "toalete", "wc", "praça de alimentação"]
+      },
+      {
+        "service_id": "SERV-FRALDARIO-01",
+        "name": "Fraldário",
+        "category": "familia",
+        "floor": "térreo",
+        "zone": "área de serviços",
+        "reference": "Próximo aos banheiros principais.",
+        "tags": ["fraldário", "bebê", "familia", "criança"]
+      },
+      {
+        "service_id": "SERV-INFO-01",
+        "name": "Ponto de informações",
+        "category": "atendimento",
+        "floor": "térreo",
+        "zone": "entrada principal",
+        "reference": "Logo após o acesso principal.",
+        "tags": ["informação", "atendimento", "ajuda", "entrada"]
+      }
     ],
     "stores": [
-      "Lembrancinhas & Cia",
-      "Nike Zoo",
-      "Loja do Pinguim",
-      "Livraria Central"
+      {
+        "store_id": "LOJA-LEMB-01",
+        "name": "Lembrancinhas & Cia",
+        "category": "souvenirs",
+        "floor": "térreo",
+        "zone": "saída principal",
+        "reference": "Próxima à saída do circuito principal.",
+        "tags": ["lembrança", "presente", "souvenir"]
+      },
+      {
+        "store_id": "LOJA-ZOO-02",
+        "name": "Loja do Pinguim",
+        "category": "souvenirs",
+        "floor": "térreo",
+        "zone": "área temática",
+        "reference": "Próxima à atração dos pinguins.",
+        "tags": ["pinguim", "brinquedo", "camiseta", "lembrança"]
+      },
+      {
+        "store_id": "LOJA-ALIM-01",
+        "name": "Praça de Alimentação",
+        "category": "alimentacao",
+        "floor": "térreo",
+        "zone": "praça de alimentação",
+        "reference": "Área central de alimentação.",
+        "tags": ["comida", "lanche", "café", "restaurante", "sorvete"]
+      }
     ],
     "attractions": [
-      "praça de alimentação",
-      "cinema",
-      "área kids"
+      {
+        "name": "Alameda dos grandes felinos",
+        "category": "animais",
+        "reference": "Siga pela alameda principal após a entrada.",
+        "tags": ["leão", "leoes", "tigre", "felinos", "animais"]
+      },
+      {
+        "name": "Área dos pinguins",
+        "category": "animais",
+        "reference": "Próxima à Loja do Pinguim.",
+        "tags": ["pinguim", "aves", "animais"]
+      },
+      {
+        "name": "Praça de alimentação",
+        "category": "servico",
+        "reference": "Área central do percurso.",
+        "tags": ["comida", "café", "sorvete", "lanche", "alimentação"]
+      },
+      {
+        "name": "Área kids",
+        "category": "lazer",
+        "reference": "Próxima à praça de alimentação.",
+        "tags": ["criança", "kids", "familia", "lazer"]
+      }
     ],
     "faq": [
       {
         "question": "onde fica o banheiro",
-        "answer": "Os banheiros ficam próximos à praça de alimentação."
+        "answer": "Os banheiros principais ficam no térreo, próximos à praça de alimentação e à área de serviços."
       },
       {
-        "question": "onde fica o cinema",
-        "answer": "O cinema fica no piso superior."
-      }
+        "question": "onde fica a praça de alimentação",
+        "answer": "A praça de alimentação fica na área central do percurso, próxima aos banheiros principais."
+      },
+      {
+        "question": "onde vejo leão",
+        "answer": "A área dos grandes felinos fica na alameda principal. Siga pela entrada principal e procure a sinalização de felinos."
+      },
+      {
+        "question": "qual o horário de funcionamento",
+        "answer": "O funcionamento informado nesta base é de segunda a sábado das 10:00 às 17:00 e domingo das 12:00 às 18:00."
+      }',
+      {
+        "question": "vende roupa",
+        "answer": "No momento, não há loja especializada em roupas, mas a Loja do Pinguim oferece camisetas e lembranças."
+      }',
     ],
     "policies": [
-      "Animais permitidos apenas nas áreas autorizadas."
+      "Animais de visitantes são permitidos apenas nas áreas autorizadas.",
+      "Horários e atrações podem sofrer alteração operacional.",
+      "Promoções e cupons dependem das campanhas ativas no momento da visita."
     ]
   }
 }

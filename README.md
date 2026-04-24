@@ -27,14 +27,14 @@ RECARREGAR VARIAVEIS E REINICIAR BACKEND
 		python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 		
-		http://192.168.15.12:8000/totem/sim/FLX-001
+		http://192.168.15.12:8000/client/FLX-001
 
 Endereços de suporte navegador em: 
 
 		http://127.0.0.1:8000/docs
 		http://127.0.0.1:8000/openapi.json
 		http://127.0.0.1:8000/health
-		http://127.0.0.1:8000/totem/sim/FLX-001
+		http://127.0.0.1:8000/client/FLX-001
 		http://127.0.0.1:8000/admin
 		http://127.0.0.1:8000/client/FLX-001)
 
@@ -82,7 +82,7 @@ Pré-requisitos
 Endereços para abrir no navegador: 
 
 		http://127.0.0.1:8000/health	Saúde da aplicação	Retorno JSON com status ok.
-		http://127.0.0.1:8000/totem/live/FLX-001	Tela principal do totem	Ativação, pergunta, resposta, resumo, recomendações, handoff mobile e NPS.
+		http://127.0.0.1:8000/client/FLX-001	Tela principal do totem	Ativação, pergunta, resposta, resumo, recomendações, handoff mobile e NPS.
 		http://127.0.0.1:8000/client/FLX-001	Dashboard da empresa	KPIs de leads, cupons, conversão e lojas.
 		http://127.0.0.1:8000/client/FLX-001/campaigns	Gestão de campanhas	Campanhas ativas, mídia, cupom e desconto.
 		http://127.0.0.1:8000/store/redeem	Validação na loja	Consulta e resgate do cupom com store_id e operator_id.
@@ -92,8 +92,8 @@ Endereços para abrir no navegador:
 
 
 Fluxo completo recomendado
-	1. Abrir /totem/live/FLX-001.
-	2. Simular presença ou ativar atendimento.
+	1. Abrir /client/FLX-001.
+	2. Dashboard presença ou ativar atendimento.
 	3. Fazer uma pergunta sobre o negócio, por exemplo: "onde fica o banheiro e quais promoções estão ativas?".
 	4. Confirmar resposta textual, resumo da pesquisa e ofertas recomendadas.
 	5. Clicar em "Continuar no celular" e ler o QR gerado.

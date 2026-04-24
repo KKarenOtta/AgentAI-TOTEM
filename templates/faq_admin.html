@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="page-header">
+  <div>
+    <span class="badge">FAQ</span>
+    <h1 class="page-title">Administração da base semântica</h1>
+    <p class="page-subtitle">Aprove candidatos, cadastre respostas e limpe entradas antigas.</p>
+  </div>
+</section>
+
+<div class="grid">
+  <div class="card">
+    <h2>Novo item de FAQ</h2>
+    <div class="form">
+      <label>Pergunta</label>
+      <input id="faqQuestion" placeholder="Ex: vende roupa no zoológico" />
+
+      <label>Resposta</label>
+      <textarea id="faqAnswer" rows="4" placeholder="Resposta objetiva..."></textarea>
+
+      <label>Intent</label>
+      <select id="faqIntent">
+        <option value="geral">geral</option>
+        <option value="compra">compra</option>
+        <option value="horario">horario</option>
+        <option value="localizacao">localizacao</option>
+      </select>
+
+      <div class="actions">
+        <button class="btn primary" onclick="createFaq()">Salvar FAQ</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Busca</h2>
+    <input id="search" placeholder="Filtrar FAQ..." oninput="renderAll()" />
+    <p class="muted">Filtra candidatos e itens já aprovados.</p>
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2>Candidatos pendentes</h2>
+  <div id="candidates"></div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2>FAQ aprovado</h2>
+  <div id="faqItems"></div>
+</div>
+
+<script>
+let FAQ = [];
+let CANDIDATES = [];
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+async function loadData() {
+  const faqRes = await fetch("/admin/faq/items");
+  const candRes = await fetch("/admin/faq/candidates");
+
+  FAQ = (await faqRes.json()).items || [];
+  CANDIDATES = (await candRes.json()).items || [];
+
+  renderAll();
+}
+
+function currentFilter() {
+  return document.getElementById("search").value.trim().toLowerCase();
+}
+
+function matches(item) {
+  const q = currentFilter();
+  if (!q) return true;
+
+  return (
+    String(item.question || "").toLowerCase().includes(q) ||
+    String(item.answer || "").toLowerCase().includes(q) ||
+    String(item.intent || "").toLowerCase().includes(q)
+  );
+}
+
+function renderAll() {
+  renderCandidates();
+  renderFaq();
+}
+
+function renderCandidates() {
+  const list = CANDIDATES.filter(matches);
+  const el = document.getElementById("candidates");
+
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state">Nenhum candidato pendente.</div>`;
+    return;
+  }
+
+  el.innerHTML = list.map((item, index) => `
+    <article class="mini-card">
+      <div class="mini-card-title">${escapeHtml(item.question)}</div>
+      <p>${escapeHtml(item.answer)}</p>
+      <div class="badge">${escapeHtml(item.intent || "geral")}</div>
+      <div class="actions" style="margin-top:10px;">
+        <button class="btn primary" onclick="approveCandidate(${index})">Aprovar</button>
+        <button class="btn danger" onclick="rejectCandidate(${index})">Rejeitar</button>
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderFaq() {
+  const list = FAQ.filter(matches);
+  const el = document.getElementById("faqItems");
+
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state">Nenhum FAQ aprovado encontrado.</div>`;
+    return;
+  }
+
+  el.innerHTML = list.map((item, index) => `
+    <article class="mini-card">
+      <div class="mini-card-title">${escapeHtml(item.question)}</div>
+      <p>${escapeHtml(item.answer)}</p>
+      <div class="badge">${escapeHtml(item.intent || "geral")}</div>
+      <div class="actions" style="margin-top:10px;">
+        <button class="btn danger" onclick="deleteFaq(${index})">Excluir</button>
+      </div>
+    </article>
+  `).join("");
+}
+
+async function createFaq() {
+  const payload = {
+    question: document.getElementById("faqQuestion").value,
+    answer: document.getElementById("faqAnswer").value,
+    intent: document.getElementById("faqIntent").value
+  };
+
+  const res = await fetch("/admin/faq/create", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    alert("Erro ao salvar FAQ.");
+    return;
+  }
+
+  document.getElementById("faqQuestion").value = "";
+  document.getElementById("faqAnswer").value = "";
+
+  await loadData();
+}
+
+async function approveCandidate(index) {
+  const item = CANDIDATES.filter(matches)[index];
+
+  await fetch("/admin/faq/approve", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(item)
+  });
+
+  await loadData();
+}
+
+async function rejectCandidate(index) {
+  const item = CANDIDATES.filter(matches)[index];
+
+  await fetch("/admin/faq/reject", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(item)
+  });
+
+  await loadData();
+}
+
+async function deleteFaq(index) {
+  const item = FAQ.filter(matches)[index];
+
+  if (!confirm(`Excluir FAQ: ${item.question}?`)) return;
+
+  await fetch("/admin/faq/items", {
+    method: "DELETE",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({question: item.question})
+  });
+
+  await loadData();
+}
+
+loadData();
+</script>
+
+{% endblock %}

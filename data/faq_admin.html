@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>FAQ Admin</title>
+</head>
+<body>
+
+<h2>Busca</h2>
+<input id="search" placeholder="Buscar..." onkeyup="filter()" />
+
+<h2>Candidatos</h2>
+<div id="list"></div>
+
+<script>
+let DATA = [];
+
+async function load() {
+  const r = await fetch("/admin/faq/candidates");
+  DATA = await r.json();
+  render(DATA);
+}
+
+function render(data) {
+  document.getElementById("list").innerHTML =
+    data.map(i => `
+      <div>
+        <b>${i.question}</b><br/>
+        ${i.answer}<br/>
+        <button onclick='approve(${JSON.stringify(i)})'>✔</button>
+        <button onclick='reject(${JSON.stringify(i)})'>✖</button>
+      </div>
+    `).join("");
+}
+
+function filter() {
+  const q = document.getElementById("search").value.toLowerCase();
+  render(DATA.filter(i => i.question.includes(q)));
+}
+
+async function approve(item) {
+  await fetch("/admin/faq/approve", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(item)
+  });
+  load();
+}
+
+async function reject(item) {
+  await fetch("/admin/faq/reject", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(item)
+  });
+  load();
+}
+
+load();
+</script>
+
+</body>
+</html>

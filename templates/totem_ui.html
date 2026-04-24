@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Totem • AgentAI</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body class="totem-public-body">
+
+<main class="container">
+  <section class="totem-stage">
+
+    <div class="totem-orb" id="orb"></div>
+
+    <h1 id="title">Aguardando presença...</h1>
+    <p class="muted" id="subtitle">O sistema será ativado automaticamente.</p>
+
+    <div id="marketingOptions" class="quick-row"></div>
+
+    <div class="card" style="margin-top:20px;max-width:900px;margin-left:auto;margin-right:auto;">
+      <textarea id="message" rows="3" placeholder="Digite aqui..." disabled></textarea>
+      <div class="actions">
+        <button class="btn primary" onclick="sendMessage()" disabled id="btnSend">Enviar</button>
+        <button class="btn" onclick="clearInput()">Limpar</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px;max-width:900px;margin-left:auto;margin-right:auto;">
+      <h2>Resposta</h2>
+      <div id="answer" class="answer-box">Aguardando ativação...</div>
+    </div>
+
+  </section>
+</main>
+
+<script>
+const companyId = "{{ company_id }}";
+const sessionId = "totem-ui-" + Date.now();
+
+let currentAudio = null;
+let activated = false;
+
+function stopAudio() {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+}
+
+function enableUI() {
+  document.getElementById("message").disabled = false;
+  document.getElementById("btnSend").disabled = false;
+  document.getElementById("title").textContent = "Como posso ajudar hoje?";
+  document.getElementById("subtitle").textContent = "";
+}
+
+async function activateTotem() {
+  if (activated) return;
+  activated = true;
+
+  const res = await fetch("/totem/activate", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      company_id: companyId,
+      session_id: sessionId,
+      prefer_audio: true
+    })
+  });
+
+  const data = await res.json();
+
+  document.getElementById("answer").textContent = data.greeting || "";
+
+  enableUI();
+
+  if (data.audio_base64) {
+    currentAudio = new Audio("data:audio/mp3;base64," + data.audio_base64);
+    currentAudio.play().catch(() => {});
+  }
+}
+
+function connectSSE() {
+  const eventSource = new EventSource(`/api/events/${companyId}`);
+
+  eventSource.onmessage = function(event) {
+    try {
+      const data = JSON.parse(event.data);
+
+      if (data.type === "presence_triggered") {
+        console.log("Presença detectada");
+        activateTotem();
+      }
+    } catch (e) {}
+  };
+
+  eventSource.onerror = function() {
+    console.warn("Erro SSE, reconectando...");
+  };
+}
+
+async function sendMessage() {
+  stopAudio();
+
+  const message = document.getElementById("message").value.trim();
+  if (!message) return;
+
+  const res = await fetch("/totem/interact", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      company_id: companyId,
+      session_id: sessionId,
+      message,
+      prefer_audio: true
+    })
+  });
+
+  const data = await res.json();
+
+  document.getElementById("answer").textContent = data.text || "";
+
+  if (data.audio_base64) {
+    currentAudio = new Audio("data:audio/mp3;base64," + data.audio_base64);
+    currentAudio.play().catch(() => {});
+  }
+
+  document.getElementById("message").value = "";
+}
+
+function clearInput() {
+  document.getElementById("message").value = "";
+}
+
+connectSSE();
+</script>
+
+</body>
+</html>

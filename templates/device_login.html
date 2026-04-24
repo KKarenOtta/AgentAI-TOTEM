@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="page-header">
+  <div>
+    <span class="badge">Continuidade</span>
+    <h1 class="page-title">Continue no seu celular</h1>
+    <p class="page-subtitle">Faça o cadastro para receber seu resumo, cupom e acompanhamento da campanha.</p>
+  </div>
+</section>
+
+{% if error %}
+  <div class="card" style="border-color:#7f1d1d;">
+    <strong>{{ error }}</strong>
+  </div>
+{% endif %}
+
+<div class="grid">
+  <div class="card">
+    <h2>Resumo da interação</h2>
+    {% if handoff.summary %}
+      <div class="answer-box">{{ handoff.summary }}</div>
+    {% else %}
+      <div class="empty-state">Resumo ainda não disponível.</div>
+    {% endif %}
+
+    {% if handoff.map_url %}
+      <div class="actions" style="margin-top:12px;">
+        <a class="btn primary" href="{{ handoff.map_url }}" target="_blank">Abrir mapa do zoológico</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Cadastro</h2>
+
+    <form method="post" action="/device/{{ company_id }}/{{ session_id }}/register" class="form">
+      <label>Nome</label>
+      <input name="full_name" required />
+
+      <label>E-mail</label>
+      <input name="email" type="email" required />
+
+      <label>Telefone</label>
+      <input name="phone" />
+
+      <label>CPF</label>
+      <input name="cpf" required minlength="11" placeholder="Digite apenas números" />
+
+      <label>
+        <input type="checkbox" name="lgpd_consent" required />
+        Aceito receber meu resumo, ofertas e acompanhamento da campanha.
+      </label>
+
+      <div class="actions">
+        <button class="btn primary" type="submit">Acessar descontos</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

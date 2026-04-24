@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Validação do cupom</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body>
+  <main class="container">
+    <section class="card" style="max-width:640px;margin:40px auto;">
+      {% if coupon %}
+        <h1>{{ coupon.title }}</h1>
+        <p>Código: <strong>{{ coupon.code or "Cupom digital" }}</strong></p>
+        <p>Status: <strong>{{ coupon.status }}</strong></p>
+        <p>{{ coupon.validation_message }}</p>
+      {% else %}
+        <h1>Cupom não encontrado</h1>
+      {% endif %}
+    </section>
+  </main>
+</body>
+</html>

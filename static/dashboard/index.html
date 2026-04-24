@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<h2>Totem Analytics</h2>
+
+<canvas id="scoreChart"></canvas>
+<canvas id="intentChart"></canvas>
+
+<script>
+async function load() {
+  const r = await fetch("/analytics/summary");
+  const data = await r.json();
+
+  new Chart(document.getElementById("scoreChart"), {
+    type: "bar",
+    data: {
+      labels: ["Score Médio"],
+      datasets: [{ data: [data.avg_score] }]
+    }
+  });
+
+  new Chart(document.getElementById("intentChart"), {
+    type: "pie",
+    data: {
+      labels: Object.keys(data.intents),
+      datasets: [{ data: Object.values(data.intents) }]
+    }
+  });
+}
+
+load();
+</script>
+
+</body>
+</html>

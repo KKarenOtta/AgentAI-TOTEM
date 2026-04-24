@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="page-header">
+  <div>
+    <span class="badge">Ofertas liberadas</span>
+    <h1 class="page-title">Descontos, resumo e avaliação</h1>
+    <p class="page-subtitle">Cadastro concluído. Os cupons abaixo são rastreados por sessão e campanha.</p>
+  </div>
+</section>
+
+<div class="card">
+  <h2>Resumo da interação</h2>
+  <div class="answer-box">{{ handoff.summary or "Sem resumo disponível." }}</div>
+
+  {% if handoff.map_url %}
+    <div class="actions" style="margin-top:12px;">
+      <a class="btn" href="{{ handoff.map_url }}" target="_blank">Abrir mapa do zoológico</a>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2>Cadastro</h2>
+  <p>Usuário cadastrado: <strong>{{ lead.full_name }}</strong></p>
+  <p>E-mail: <strong>{{ lead.email }}</strong></p>
+  <p>CPF: <strong>{{ lead.cpf }}</strong></p>
+  <p>Session ID: <strong>{{ session_id }}</strong></p>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2>Campanhas liberadas</h2>
+
+  {% if coupons %}
+    <div class="card-grid">
+      {% for coupon in coupons %}
+        <article class="mini-card">
+          {% if coupon.media_image %}
+            <img src="{{ coupon.media_image }}" class="campaign-thumb" />
+          {% endif %}
+
+          <div class="mini-card-title">{{ coupon.title }}</div>
+          <p>{{ coupon.description or "Cupom disponível para esta campanha." }}</p>
+
+          <div class="stack-list compact">
+            <div class="metric-row">
+              <div class="metric-row-label">Campanha</div>
+              <div class="metric-row-value">{{ coupon.campaign_id }}</div>
+            </div>
+
+            <div class="metric-row">
+              <div class="metric-row-label">Código</div>
+              <div class="metric-row-value">{{ coupon.code or "Cupom digital" }}</div>
+            </div>
+
+            <div class="metric-row">
+              <div class="metric-row-label">Status</div>
+              <div class="metric-row-value">{{ coupon.status }}</div>
+            </div>
+          </div>
+
+          <div class="actions" style="margin-top:12px;">
+            <a class="btn primary" href="/campaign/coupon/{{ coupon.coupon_id }}" target="_blank">Abrir campanha</a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      Nenhum cupom ativo disponível. Verifique se existe campanha ativa com coupon_code ou discount_value.
+    </div>
+  {% endif %}
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2>Avaliação do atendimento</h2>
+  <p class="muted">De 0 a 10, qual nota você dá para esta experiência no totem?</p>
+
+  <div class="form">
+    <label>Nota NPS</label>
+    <select id="npsScore">
+      <option value="">Selecione</option>
+      {% for i in range(0, 11) %}
+        <option value="{{ i }}">{{ i }}</option>
+      {% endfor %}
+    </select>
+
+    <label>Comentário opcional</label>
+    <textarea id="npsComment" rows="3" placeholder="Como podemos melhorar?"></textarea>
+
+    <div class="actions">
+      <button class="btn primary" onclick="submitNps()">Enviar avaliação</button>
+    </div>
+
+    <div id="npsStatus" class="muted" style="margin-top:10px;"></div>
+  </div>
+</div>
+
+<script>
+const companyId = "{{ company_id }}";
+const sessionId = "{{ session_id }}";
+
+async function submitNps() {
+  const score = document.getElementById("npsScore").value;
+  const comment = document.getElementById("npsComment").value.trim();
+  const status = document.getElementById("npsStatus");
+
+  if (score === "") {
+    status.textContent = "Selecione uma nota de 0 a 10.";
+    return;
+  }
+
+  const res = await fetch("/totem/nps", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      company_id: companyId,
+      session_id: sessionId,
+      score: Number(score),
+      comment: comment || null
+    })
+  });
+
+  const data = await res.json();
+
+  if (!res.ok || data.ok === false) {
+    status.textContent = data.message || "Erro ao enviar avaliação.";
+    return;
+  }
+
+  status.textContent = "Avaliação registrada. Obrigado.";
+}
+</script>
+
+{% endblock %}

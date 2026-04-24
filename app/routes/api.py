@@ -18,13 +18,13 @@ from marketing.campaigns import (
     update_campaign,
     delete_campaign,
 )
-from services.realtime.event_bus import get_queue
-from services.totem.coupon_store import redeem_coupon
-from services.totem.lead_store import save_lead
-from services.totem.metrics import MetricsLogger
-from services.totem.qr import generate_qr_from_text
-from services.totem.recovery_store import save_session_handoff
-from services.totem.schemas import (
+from infra.realtime.event_bus import get_queue
+from core.totem.coupon_store import redeem_coupon
+from core.totem.lead_store import save_lead
+from core.totem.metrics import MetricsLogger
+from core.totem.qr import generate_qr_from_text
+from core.totem.recovery_store import save_session_handoff
+from core.totem.schemas import (
     TotemTrackRequest,
     TotemTrackResponse,
     TotemLeadCaptureRequest,
@@ -256,45 +256,15 @@ def api_lead_capture(req: TotemLeadCaptureRequest) -> TotemLeadCaptureResponse:
         )
 
 
-@router.post("/api/mobile-handoff")
-def api_mobile_handoff(payload: Dict[str, Any]):
-    company_id = (payload.get("company_id") or "").strip()
-    session_id = (payload.get("session_id") or "").strip()
+# =========================
+# REDEEM CUPOM (RESTAURADO)
+# =========================
 
-    if not company_id or not session_id:
-        return JSONResponse(
-            {"ok": False, "message": "company_id e session_id são obrigatórios"},
-            status_code=400,
-        )
-
-    handoff = save_session_handoff(
-        {
-            "company_id": company_id,
-            "session_id": session_id,
-            "research_summary": payload.get("research_summary") or "",
-            "recommendations_snapshot": payload.get("recommendations_snapshot") or {},
-            "source": payload.get("source") or "totem_live",
-        }
-    )
-
-    mobile_url = f"{_get_public_base_url()}/mobile/start/{session_id}"
-    qr_url = generate_qr_from_text(mobile_url)
-
-    return JSONResponse(
-        {
-            "ok": True,
-            "handoff_id": handoff["handoff_id"],
-            "mobile_url": mobile_url,
-            "qr_url": qr_url,
-        }
-    )
-
-
-@router.post("/api/coupons/redeem")
+@router.post("/api/coupon/redeem")
 def api_redeem_coupon(payload: Dict[str, Any]):
-    coupon_id = (payload.get("coupon_id") or "").strip()
-    store_id = (payload.get("store_id") or "").strip() or None
-    operator_id = (payload.get("operator_id") or "").strip() or None
+    coupon_id = payload.get("coupon_id")
+    store_id = payload.get("store_id")
+    operator_id = payload.get("operator_id")
 
     if not coupon_id:
         return JSONResponse(

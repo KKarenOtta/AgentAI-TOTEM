@@ -1,0 +1,8 @@
+{
+  "company_id": "FLX-001",
+  "session_id": "totem-ui-1777034495746",
+  "device_link": "http://127.0.0.1:8000/device/FLX-001/totem-ui-1777034495746",
+  "summary": "Usuário: onde posso comer? Totem: As áreas de alimentação podem ser localizadas pelo mapa oficial do zoológico, filtrando por infraestrutura. Mapa: https://zoologico.com.br/sobre/mapa-zoo-sao-paulo Posso ajudar em algo mais? Usuário: não Totem: Obrigado pela visita. Para continuar no seu celular, fazer cadastro, ver o resumo da conversa e acessar descontos, escaneie o QR Code ou abra o link exibido.",
+  "map_url": "https://zoologico.com.br/sobre/mapa-zoo-sao-paulo",
+  "created_at": "2026-04-24T09:41:53"
+}

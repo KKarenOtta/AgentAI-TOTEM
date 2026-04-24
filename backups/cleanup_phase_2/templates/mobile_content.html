@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Conteúdo liberado</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+  <style>
+    body {
+      margin: 0;
+      background: #0b0f14;
+      color: #eef3f8;
+      font-family: Inter, Arial, sans-serif;
+    }
+
+    .page {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(24,33,44,.92), rgba(18,24,33,.96));
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 20px;
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+
+    .coupon-card {
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 18px;
+      background: rgba(8,12,17,.35);
+      overflow: hidden;
+    }
+
+    .coupon-card .media {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+      display: block;
+      background: #111821;
+    }
+
+    .coupon-body {
+      padding: 16px;
+    }
+
+    .discount-badge {
+      display: inline-flex;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(39,224,161,.14);
+      color: #7ee7c6;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .qr-box {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(39,224,161,.08);
+      border: 1px solid rgba(39,224,161,.2);
+      text-align: center;
+    }
+
+    .qr-box img {
+      width: 180px;
+      max-width: 100%;
+      border-radius: 12px;
+      background: #fff;
+      padding: 8px;
+      display: block;
+      margin: 10px auto 0;
+    }
+
+    .steps {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .step {
+      padding: 14px;
+      border-radius: 16px;
+      background: rgba(8,12,17,.35);
+      border: 1px solid rgba(255,255,255,.06);
+    }
+
+    .muted {
+      color: #9fb0c3;
+    }
+
+    .pill {
+      display: inline-flex;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(39,224,161,.12);
+      color: #7ee7c6;
+      font-size: 12px;
+      font-weight: 700;
+      margin-right: 6px;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    {% if lead %}
+      <section class="card">
+        <h1>Olá, {{ lead.full_name }}</h1>
+        <p class="muted">Seu cadastro foi concluído e seus cupons já estão liberados para uso na loja.</p>
+      </section>
+
+      {% if memory %}
+        <section class="card">
+          <h2>Resumo da sua pesquisa</h2>
+          <p>{{ memory.research_summary or "Nenhum resumo textual foi salvo." }}</p>
+        </section>
+      {% endif %}
+
+      <section class="card">
+        <h2>Cupons recomendados</h2>
+
+        {% if recommended_coupons %}
+          <div class="grid">
+            {% for item in recommended_coupons %}
+              <article class="coupon-card">
+                {% set first_coupon = item.issued_coupons[0] if item.issued_coupons else None %}
+
+                {% if item.media_image %}
+                  <img class="media" src="{{ item.media_image }}" alt="Imagem da campanha" />
+                {% endif %}
+
+                <div class="coupon-body">
+                  {% if item.discount_value %}
+                    <div class="discount-badge">
+                      {% if item.discount_type == "percent" %}
+                        {{ item.discount_value }}% OFF
+                      {% else %}
+                        {{ item.discount_value }}
+                      {% endif %}
+                    </div>
+                  {% endif %}
+
+                  <h3 style="margin-top:0;">{{ item.title or item.name or "Oferta" }}</h3>
+
+                  {% if item.description %}
+                    <p>{{ item.description }}</p>
+                  {% endif %}
+
+                  {% if first_coupon %}
+                    <p><strong>Código:</strong> {{ first_coupon.code }}</p>
+                    <p><strong>Status:</strong> {{ first_coupon.status }}</p>
+                    <p><strong>Expira em:</strong> {{ first_coupon.expires_at }}</p>
+
+                    <div class="qr-box">
+                      <strong>QR code da campanha</strong>
+                      <div class="muted">Apresente este QR na loja para validar o cupom e contabilizar a conversão.</div>
+                      <img src="{{ first_coupon.qr_url }}" alt="QR do cupom" />
+                    </div>
+                  {% else %}
+                    <p class="muted">Nenhum cupom emitido para esta campanha.</p>
+                  {% endif %}
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted">Nenhum cupom recomendado foi encontrado.</p>
+        {% endif %}
+      </section>
+
+      <section class="card">
+        <h2>Como usar na loja</h2>
+        <div class="steps">
+          <div class="step">
+            <strong>1. Abra seu cupom</strong>
+            <p class="muted">Escolha a campanha recomendada e deixe o QR code visível.</p>
+          </div>
+          <div class="step">
+            <strong>2. Apresente no caixa</strong>
+            <p class="muted">O atendente valida o QR ou informa o identificador do cupom.</p>
+          </div>
+          <div class="step">
+            <strong>3. Conversão registrada</strong>
+            <p class="muted">Ao validar, o status muda para resgatado e a campanha contabiliza a conversão.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Detalhes do cadastro</h2>
+        <p><strong>E-mail:</strong> {{ lead.email }}</p>
+        <p><strong>CPF:</strong> {{ lead.cpf or "Não informado" }}</p>
+        <p><strong>Idade:</strong> {{ lead.age }}</p>
+        <p><strong>Gênero:</strong> {{ lead.gender }}</p>
+
+        <div style="margin-top: 12px;">
+          <strong>Marcas favoritas</strong><br>
+          {% if lead.favorite_brands %}
+            {% for brand in lead.favorite_brands %}
+              <span class="pill">{{ brand }}</span>
+            {% endfor %}
+          {% else %}
+            <p class="muted">Nenhuma marca favorita informada.</p>
+          {% endif %}
+        </div>
+      </section>
+    {% else %}
+      <section class="card">
+        <h1>Conteúdo não encontrado</h1>
+        <p class="muted">Não foi possível localizar este cadastro.</p>
+      </section>
+    {% endif %}
+  </main>
+</body>
+</html>

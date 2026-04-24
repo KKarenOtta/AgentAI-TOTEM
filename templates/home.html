@@ -19,8 +19,8 @@
       <div class="actions">
         <a class="btn primary" href="/client/{{ featured_company.company_id }}">Abrir dashboard</a>
         <a class="btn" href="/client/{{ featured_company.company_id }}/campaigns">Campanhas</a>
-        <a class="btn" href="/totem/sim/{{ featured_company.company_id }}">Simulador</a>
-        <a class="btn" href="/totem/live/{{ featured_company.company_id }}">Monitor ao vivo</a>
+        <a class="btn" href="/client/{{ featured_company.company_id }}">Dashboard</a>
+        <a class="btn" href="/client/{{ featured_company.company_id }}">Dashboard</a>
       </div>
     {% else %}
       <p>Nenhuma empresa cadastrada.</p>
@@ -34,8 +34,8 @@
     <h2>Acessos rápidos</h2>
     <div class="actions">
       <a class="btn primary" href="/admin">Admin</a>
-      <a class="btn" href="/totem/sim/FLX-001">Simulador padrão</a>
-      <a class="btn" href="/totem/live/FLX-001">Monitor padrão</a>
+      <a class="btn" href="/client/FLX-001">Dashboard padrão</a>
+      <a class="btn" href="/client/FLX-001">Dashboard padrão</a>
       <a class="btn" href="/docs">Swagger</a>
       <a class="btn" href="/health">Health</a>
     </div>
@@ -63,8 +63,8 @@
             <div class="actions">
               <a class="btn" href="/client/{{ company.company_id }}">Dashboard</a>
               <a class="btn" href="/client/{{ company.company_id }}/campaigns">Campanhas</a>
-              <a class="btn" href="/totem/sim/{{ company.company_id }}">Simular</a>
-              <a class="btn" href="/totem/live/{{ company.company_id }}">Live</a>
+              <a class="btn" href="/client/{{ company.company_id }}">Dashboard</a>
+              <a class="btn" href="/client/{{ company.company_id }}">Dashboard</a>
             </div>
           </td>
         </tr>

@@ -1,96 +1,52 @@
 from __future__ import annotations
 
+from collections import defaultdict
+import json
+import os
 
-DEFAULT_WEIGHTS = {
-    "base_priority": 1.0,
-    "intent_match": 2.5,
-    "channel_match": 1.0,
-    "segment_match": 0.8,
-    "age_match": 0.5,
-    "returning_bonus": 0.7,
-}
+METRICS_PATH = "data/metrics/metrics.jsonl"
 
 
-def infer_intent(text: str) -> str:
-    t = (text or "").strip().lower()
+def load_campaign_performance():
+    stats = defaultdict(lambda: {"issued": 0, "redeemed": 0})
 
-    if any(k in t for k in ["promo", "promoção", "promoções", "oferta", "desconto", "cupom"]):
-        return "promotion"
+    if not os.path.exists(METRICS_PATH):
+        return stats
 
-    if any(k in t for k in ["produto", "produtos", "comprar", "item", "recomende"]):
-        return "product"
+    with open(METRICS_PATH, encoding="utf-8") as f:
+        for line in f:
+            try:
+                row = json.loads(line)
+            except Exception:
+                continue
 
-    if any(k in t for k in ["ajuda", "suporte", "atendimento", "problema", "resolver"]):
-        return "support"
+            cid = row.get("campaign_id")
+            if not cid:
+                continue
 
-    if any(k in t for k in ["horário", "aberto", "fecha", "funciona"]):
-        return "hours"
+            if row.get("event") == "coupon_issued":
+                stats[cid]["issued"] += 1
 
-    if any(k in t for k in ["troca", "devolução", "reembolso"]):
-        return "returns"
+            elif row.get("event") == "coupon_redeemed":
+                stats[cid]["redeemed"] += 1
 
-    return "general"
-
-
-def _priority_to_number(priority: object) -> float:
-    if isinstance(priority, (int, float)):
-        return float(priority)
-
-    text = str(priority or "").strip().lower()
-
-    if text == "high":
-        return 2.0
-    if text == "normal":
-        return 1.0
-    if text == "low":
-        return 0.5
-
-    return 1.0
+    return stats
 
 
-def score_campaign(
-    campaign: dict,
-    profile: dict | None,
-    intent: str,
-    weights: dict | None = None,
-) -> tuple[float, str]:
-    w = weights or DEFAULT_WEIGHTS
+PERF = load_campaign_performance()
 
-    score = 0.0
-    why: list[str] = []
 
-    priority = _priority_to_number(campaign.get("priority"))
-    score += w["base_priority"] * priority
-    why.append(f"priority={priority}")
+def score_campaign(campaign, profile, intent):
+    base = 1.0
 
-    tags = set(campaign.get("tags") or [])
-    target_intents = set(campaign.get("target_intents") or [])
-    merged_intents = tags.union(target_intents)
+    cid = campaign.get("campaign_id")
+    perf = PERF.get(cid, {})
 
-    if intent in merged_intents:
-        score += w["intent_match"]
-        why.append("intent_match")
+    issued = perf.get("issued", 0)
+    redeemed = perf.get("redeemed", 0)
 
-    channel = str(campaign.get("channel") or "").strip().lower()
-    if channel in {"totem", "kiosk", "onsite"}:
-        score += w["channel_match"]
-        why.append("channel_match")
+    conversion = (redeemed / issued) if issued else 0
 
-    if profile:
-        user_segment = profile.get("segment") or profile.get("customer_type")
-        target_segments = campaign.get("target_segments") or []
+    score = base + (conversion * 3)
 
-        if user_segment and user_segment in target_segments:
-            score += w["segment_match"]
-            why.append("segment_match")
-
-        user_age_range = profile.get("age_range")
-        if user_age_range and target_segments and user_age_range in target_segments:
-            score += w["age_match"]
-            why.append("age_match")
-
-        if user_segment == "returning" and campaign.get("returning_only") is True:
-            score += w["returning_bonus"]
-            why.append("returning_bonus")
-
-    return round(score, 3), ", ".join(why)
+    return round(score, 3), f"conversion={conversion:.2f}"

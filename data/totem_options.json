@@ -1,0 +1,16 @@
+{
+  "FLX-001": [
+    {
+      "label": "Mapa do zoológico",
+      "message": "Quero ver o mapa do zoológico"
+    },
+    {
+      "label": "Banheiro",
+      "message": "Onde fica o banheiro?"
+    },
+    {
+      "label": "Alimentação",
+      "message": "Onde fica a lanchonete?"
+    }
+  ]
+}

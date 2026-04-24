@@ -10,10 +10,16 @@ from fastapi.staticfiles import StaticFiles
 from app.routes.dashboard import router as dashboard_router
 from app.routes.api import router as api_router
 from app.routes.totem import router as totem_router
+from app.routes.presence import router as presence_router
+from app.routes.analytics import router as analytics_router
+from app.routes.faq_admin import router as faq_admin_router
+from app.routes.semantic_dashboard import router as semantic_router
+from app.routes.device import router as device_router
+from app.routes.totem_options import router as totem_options_router
 
 app = FastAPI(
     title="AgentAI-TOTEM",
-    version="1.0.0",
+    version="2.0.0",
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -29,6 +35,7 @@ def health():
         {
             "status": "ok",
             "app": "AgentAI-TOTEM",
+            "version": "2.0.0",
             "env": os.getenv("APP_ENV", "development"),
         }
     )
@@ -37,9 +44,10 @@ def health():
 app.include_router(dashboard_router)
 app.include_router(api_router)
 app.include_router(totem_router)
+app.include_router(presence_router, prefix="/api")
+app.include_router(analytics_router)
+app.include_router(faq_admin_router)
+app.include_router(semantic_router)
 
-try:
-    from app.routes.test_db import router as test_db_router
-    app.include_router(test_db_router)
-except Exception as exc:
-    print(f"[WARN] test_db router não carregado: {exc}")
+app.include_router(device_router)
+app.include_router(totem_options_router)

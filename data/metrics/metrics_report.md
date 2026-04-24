@@ -1,3 +1,3 @@
 # Relatório de Métricas do Totem
 
-- Total de eventos: **73**
+- Total de eventos: **120**

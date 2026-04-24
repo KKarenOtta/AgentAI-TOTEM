@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>Performance de Marketing • {{ company_id }}</h1>
+
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:20px;">
+  <div class="card">
+    <div>Leads</div>
+    <h2 id="leads">—</h2>
+  </div>
+
+  <div class="card">
+    <div>Cupons emitidos</div>
+    <h2 id="issued">—</h2>
+  </div>
+
+  <div class="card">
+    <div>Cupons resgatados</div>
+    <h2 id="redeemed">—</h2>
+  </div>
+
+  <div class="card">
+    <div>Conversão</div>
+    <h2 id="conversion">—</h2>
+  </div>
+</div>
+
+<div class="card" style="margin-top:30px;">
+  <h2>Campanhas</h2>
+  <div id="campaigns"></div>
+</div>
+
+<div class="card" style="margin-top:30px;">
+  <h2>Resgates por loja</h2>
+  <div id="stores"></div>
+</div>
+
+<script>
+const companyId = "{{ company_id }}";
+
+async function load() {
+  const res = await fetch(`/api/dashboard/${companyId}`);
+  const data = await res.json();
+
+  document.getElementById("leads").textContent = data.kpis.leads;
+  document.getElementById("issued").textContent = data.kpis.issued;
+  document.getElementById("redeemed").textContent = data.kpis.redeemed;
+  document.getElementById("conversion").textContent = data.kpis.conversion + "%";
+
+  const campaigns = document.getElementById("campaigns");
+  campaigns.innerHTML = (data.campaigns || []).map(c => `
+    <div style="padding:12px;border-bottom:1px solid #333;">
+      <strong>${c.campaign_id}</strong><br>
+      Emitidos: ${c.issued} |
+      Resgatados: ${c.redeemed} |
+      Conversão: ${c.conversion}%
+    </div>
+  `).join("") || "<div>Nenhuma campanha encontrada.</div>";
+
+  const stores = document.getElementById("stores");
+  stores.innerHTML = (data.stores || []).map(s => `
+    <div style="padding:12px;border-bottom:1px solid #333;">
+      <strong>${s.store_id}</strong><br>
+      Resgates: ${s.redeemed}
+    </div>
+  `).join("") || "<div>Nenhum resgate por loja encontrado.</div>";
+}
+
+load();
+</script>
+
+{% endblock %}

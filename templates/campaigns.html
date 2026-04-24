@@ -1,84 +1,97 @@
 {% extends "base.html" %}
 {% block content %}
+
 <section class="page-header">
   <div>
     <span class="badge">Campanhas</span>
     <h1 class="page-title">Campanhas • {{ company_id }}</h1>
-    <p class="page-subtitle">
-      Cadastre campanhas com imagem, cupom, desconto e exibição própria para o totem.
-    </p>
+    <p class="page-subtitle">Crie, edite e remova campanhas exibidas no totem.</p>
   </div>
 </section>
 
 <div class="grid">
-  <section class="card">
-    <h2>Nova campanha</h2>
+  <div class="card">
+    <h2>Cadastro / edição</h2>
+
     <div class="form">
-      <input id="name" type="text" placeholder="Nome da campanha" />
-      <textarea id="description" rows="3" placeholder="Descrição curta da campanha"></textarea>
+      <input id="campaignId" type="hidden" />
+
+      <label>Nome</label>
+      <input id="name" placeholder="Ex: Loja do Pinguim" />
+
+      <label>Descrição</label>
+      <textarea id="description" rows="4" placeholder="Descrição curta da campanha"></textarea>
 
       <div class="row">
-        <input id="channel" type="text" placeholder="Canal" value="totem" />
-        <select id="status">
-          <option value="active">active</option>
-          <option value="paused">paused</option>
-          <option value="draft">draft</option>
-        </select>
+        <div>
+          <label>Status</label>
+          <select id="status">
+            <option value="active">active</option>
+            <option value="inactive">inactive</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Prioridade</label>
+          <select id="priority">
+            <option value="normal">normal</option>
+            <option value="high">high</option>
+            <option value="low">low</option>
+          </select>
+        </div>
       </div>
 
       <div class="row">
-        <input id="objective" type="text" placeholder="Objetivo" value="conversion" />
-        <input id="target" type="text" placeholder="Target intents, separados por vírgula" />
+        <div>
+          <label>CTA</label>
+          <input id="ctaLabel" placeholder="Quero saber mais" />
+        </div>
+
+        <div>
+          <label>Cupom</label>
+          <input id="couponCode" placeholder="ZOO10" />
+        </div>
       </div>
 
       <div class="row">
-        <input id="ctaLabel" type="text" placeholder="Texto do botão" value="Quero meu desconto" />
-        <input id="couponCode" type="text" placeholder="Código do cupom" />
+        <div>
+          <label>Desconto (%)</label>
+          <input id="discountValue" type="number" value="0" />
+        </div>
+
+        <div>
+          <label>Landing URL</label>
+          <input id="landingUrl" placeholder="https://zoologico.com.br/" />
+        </div>
       </div>
 
-      <div class="row">
-        <select id="discountType">
-          <option value="percent">percent</option>
-          <option value="fixed">fixed</option>
-        </select>
-        <input id="discountValue" type="number" step="0.01" placeholder="Valor do desconto" />
-      </div>
-
-      <div class="row">
-        <input id="landingUrl" type="text" placeholder="Landing URL (opcional)" />
-        <select id="priority">
-          <option value="normal">normal</option>
-          <option value="high">high</option>
-        </select>
-      </div>
-
-      <input id="image" type="file" accept="image/*" />
+      <label>Intents alvo separados por vírgula</label>
+      <input id="targetIntents" placeholder="compra,loja,presente" />
 
       <div class="actions">
-        <button class="btn primary" type="button" onclick="createCampaign()">Salvar campanha</button>
-        <a class="btn" href="/client/{{ company_id }}">Voltar ao dashboard</a>
+        <button class="btn primary" onclick="saveCampaign()">Salvar</button>
+        <button class="btn" onclick="clearForm()">Limpar</button>
       </div>
     </div>
-  </section>
+  </div>
 
-  <section class="card">
+  <div class="card">
     <h2>Resumo</h2>
-    <div id="campaignSummary" class="stack-list muted">Carregando...</div>
-  </section>
+    <div class="stat">
+      <div class="stat-label">Campanhas carregadas</div>
+      <div class="stat-value" id="totalCampaigns">—</div>
+    </div>
+  </div>
 </div>
 
-<section class="card" style="margin-top:20px;">
-  <div class="section-head">
-    <h2>Lista de campanhas</h2>
-    <button class="btn" type="button" onclick="loadCampaigns()">Atualizar</button>
-  </div>
-  <div id="campaignGrid" class="card-grid">
-    <div class="empty-state">Carregando campanhas...</div>
-  </div>
-</section>
+<div class="card" style="margin-top:20px;">
+  <h2>Campanhas cadastradas</h2>
+  <div id="campaignList" class="card-grid"></div>
+</div>
 
 <script>
 const companyId = "{{ company_id }}";
+let campaigns = [];
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -89,183 +102,158 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function normalizeDiscountLabel(item) {
-  const discountType = item.discount_type;
-  const discountValue = item.discount_value;
+async function loadCampaigns() {
+  const res = await fetch(`/api/campaigns/${companyId}`);
+  const data = await res.json();
 
-  if (discountValue === null || discountValue === undefined || discountValue === "") return "—";
+  campaigns = data.campaigns || [];
+  document.getElementById("totalCampaigns").textContent = campaigns.length;
 
-  const n = Number(discountValue);
-  if (Number.isNaN(n) || n === 0) return "—";
-
-  if (discountType === "percent") return `${Math.trunc(n)}% OFF`;
-  if (discountType === "fixed") return `R$ ${n.toFixed(2)} OFF`;
-  return "—";
+  renderCampaigns();
 }
 
-function normalizeCampaign(raw) {
-  return {
-    campaign_id: raw.campaign_id || raw.id || raw.code || "",
-    name: raw.name || "Sem nome",
-    description: raw.description || "",
-    channel: raw.channel || "—",
-    status: raw.status || "—",
-    objective: raw.objective || "—",
-    target: Array.isArray(raw.target_intents)
-      ? raw.target_intents.join(", ")
-      : (raw.target_segments || raw.target_intents || "—"),
-    media_image: raw.media_image || "",
-    cta_label: raw.cta_label || "Quero meu desconto",
-    coupon_code: raw.coupon_code || "—",
-    discount_type: raw.discount_type || "",
-    discount_value: raw.discount_value ?? "",
-  };
-}
-
-function renderSummary(campaigns) {
-  const summary = document.getElementById("campaignSummary");
-
-  const activeCount = campaigns.filter(item => item.status === "active").length;
-  const imageCount = campaigns.filter(item => !!item.media_image).length;
-  const couponCount = campaigns.filter(item => item.coupon_code && item.coupon_code !== "—").length;
-
-  summary.innerHTML = `
-    <div class="metric-row">
-      <div class="metric-row-label">Total de campanhas</div>
-      <div class="metric-row-value">${campaigns.length}</div>
-    </div>
-    <div class="metric-row">
-      <div class="metric-row-label">Ativas</div>
-      <div class="metric-row-value">${activeCount}</div>
-    </div>
-    <div class="metric-row">
-      <div class="metric-row-label">Com imagem</div>
-      <div class="metric-row-value">${imageCount}</div>
-    </div>
-    <div class="metric-row">
-      <div class="metric-row-label">Com cupom</div>
-      <div class="metric-row-value">${couponCount}</div>
-    </div>
-  `;
-}
-
-function renderCampaigns(campaigns) {
-  const grid = document.getElementById("campaignGrid");
+function renderCampaigns() {
+  const el = document.getElementById("campaignList");
 
   if (!campaigns.length) {
-    grid.innerHTML = `<div class="empty-state">Nenhuma campanha cadastrada.</div>`;
+    el.innerHTML = `<div class="empty-state">Nenhuma campanha cadastrada.</div>`;
     return;
   }
 
-  grid.innerHTML = campaigns.map(item => `
+  el.innerHTML = campaigns.map((c, index) => `
     <article class="mini-card">
-      ${item.media_image ? `<img src="${escapeHtml(item.media_image)}" alt="${escapeHtml(item.name)}" class="campaign-thumb">` : ""}
-      <div class="mini-card-top">
-        <div>
-          <div class="mini-card-title">${escapeHtml(item.name)}</div>
-          <div class="mini-card-subtitle">${escapeHtml(item.campaign_id || "sem-id")}</div>
-        </div>
-        <span class="badge">${escapeHtml(item.status)}</span>
-      </div>
-
-      <p>${escapeHtml(item.description || "Sem descrição.")}</p>
+      ${c.media_image ? `<img src="${escapeHtml(c.media_image)}" class="campaign-thumb" />` : ""}
+      <div class="mini-card-title">${escapeHtml(c.name || c.title || "Campanha")}</div>
+      <div class="mini-card-subtitle">${escapeHtml(c.campaign_id || c.id || "sem-id")}</div>
+      <p>${escapeHtml(c.description || "Sem descrição.")}</p>
 
       <div class="stack-list compact">
         <div class="metric-row">
-          <div class="metric-row-label">Canal</div>
-          <div class="metric-row-value">${escapeHtml(item.channel)}</div>
-        </div>
-        <div class="metric-row">
-          <div class="metric-row-label">Objetivo</div>
-          <div class="metric-row-value">${escapeHtml(item.objective)}</div>
-        </div>
-        <div class="metric-row">
-          <div class="metric-row-label">Target</div>
-          <div class="metric-row-value">${escapeHtml(item.target)}</div>
+          <div class="metric-row-label">Status</div>
+          <div class="metric-row-value">${escapeHtml(c.status || "—")}</div>
         </div>
         <div class="metric-row">
           <div class="metric-row-label">Cupom</div>
-          <div class="metric-row-value">${escapeHtml(item.coupon_code)}</div>
+          <div class="metric-row-value">${escapeHtml(c.coupon_code || "—")}</div>
         </div>
-        <div class="metric-row">
-          <div class="metric-row-label">Desconto</div>
-          <div class="metric-row-value">${escapeHtml(normalizeDiscountLabel(item))}</div>
-        </div>
-        <div class="metric-row">
-          <div class="metric-row-label">CTA</div>
-          <div class="metric-row-value">${escapeHtml(item.cta_label)}</div>
-        </div>
+      </div>
+
+      <div class="actions" style="margin-top:10px;">
+        <button class="btn" onclick="editCampaign(${index})">Editar</button>
+        <button class="btn danger" onclick="deleteCampaign(${index})">Excluir</button>
       </div>
     </article>
   `).join("");
 }
 
-async function loadCampaigns() {
-  const response = await fetch(`/api/campaigns/${companyId}`);
-  const data = await response.json();
-  const campaigns = (data.campaigns || []).map(normalizeCampaign);
-
-  renderSummary(campaigns);
-  renderCampaigns(campaigns);
+function getCampaignId(c) {
+  return c.campaign_id || c.id;
 }
 
-async function createCampaign() {
-  const name = document.getElementById("name").value.trim();
-  if (!name) {
+function clearForm() {
+  document.getElementById("campaignId").value = "";
+  document.getElementById("name").value = "";
+  document.getElementById("description").value = "";
+  document.getElementById("status").value = "active";
+  document.getElementById("priority").value = "normal";
+  document.getElementById("ctaLabel").value = "";
+  document.getElementById("couponCode").value = "";
+  document.getElementById("discountValue").value = 0;
+  document.getElementById("landingUrl").value = "";
+  document.getElementById("targetIntents").value = "";
+}
+
+function editCampaign(index) {
+  const c = campaigns[index];
+
+  document.getElementById("campaignId").value = getCampaignId(c) || "";
+  document.getElementById("name").value = c.name || c.title || "";
+  document.getElementById("description").value = c.description || "";
+  document.getElementById("status").value = c.status || "active";
+  document.getElementById("priority").value = c.priority || "normal";
+  document.getElementById("ctaLabel").value = c.cta_label || "";
+  document.getElementById("couponCode").value = c.coupon_code || "";
+  document.getElementById("discountValue").value = c.discount_value || 0;
+  document.getElementById("landingUrl").value = c.landing_url || "";
+  document.getElementById("targetIntents").value = Array.isArray(c.target_intents) ? c.target_intents.join(",") : "";
+}
+
+function payloadFromForm() {
+  return {
+    name: document.getElementById("name").value.trim(),
+    title: document.getElementById("name").value.trim(),
+    description: document.getElementById("description").value.trim(),
+    status: document.getElementById("status").value,
+    priority: document.getElementById("priority").value,
+    cta_label: document.getElementById("ctaLabel").value.trim() || "Quero saber mais",
+    coupon_code: document.getElementById("couponCode").value.trim(),
+    discount_type: "percent",
+    discount_value: Number(document.getElementById("discountValue").value || 0),
+    landing_url: document.getElementById("landingUrl").value.trim(),
+    channel: "totem",
+    objective: "conversion",
+    qr_mode: "coupon",
+    target_intents: document.getElementById("targetIntents").value
+      .split(",")
+      .map(v => v.trim())
+      .filter(Boolean)
+  };
+}
+
+async function saveCampaign() {
+  const id = document.getElementById("campaignId").value;
+  const payload = payloadFromForm();
+
+  if (!payload.name) {
     alert("Informe o nome da campanha.");
     return;
   }
 
-  const formData = new FormData();
-  formData.append("name", name);
-  formData.append("description", document.getElementById("description").value.trim());
-  formData.append("channel", document.getElementById("channel").value.trim() || "totem");
-  formData.append("status", document.getElementById("status").value);
-  formData.append("objective", document.getElementById("objective").value.trim() || "conversion");
-  formData.append("target", document.getElementById("target").value.trim());
-  formData.append("cta_label", document.getElementById("ctaLabel").value.trim() || "Quero meu desconto");
-  formData.append("coupon_code", document.getElementById("couponCode").value.trim());
-  formData.append("discount_type", document.getElementById("discountType").value);
-  formData.append("discount_value", document.getElementById("discountValue").value || "0");
-  formData.append("landing_url", document.getElementById("landingUrl").value.trim());
-  formData.append("priority", document.getElementById("priority").value);
+  const url = id
+    ? `/api/campaigns/${companyId}/${id}`
+    : `/api/campaigns/${companyId}`;
 
-  const imageInput = document.getElementById("image");
-  if (imageInput.files && imageInput.files.length > 0) {
-    formData.append("image", imageInput.files[0]);
-  }
+  const method = id ? "PATCH" : "POST";
 
-  const response = await fetch(`/api/campaigns/${companyId}/upload`, {
-    method: "POST",
-    body: formData,
+  const res = await fetch(url, {
+    method,
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(payload)
   });
 
-  if (!response.ok) {
-    alert("Falha ao salvar campanha.");
+  if (!res.ok) {
+    alert("Erro ao salvar campanha.");
     return;
   }
 
-  document.getElementById("name").value = "";
-  document.getElementById("description").value = "";
-  document.getElementById("channel").value = "totem";
-  document.getElementById("status").value = "active";
-  document.getElementById("objective").value = "conversion";
-  document.getElementById("target").value = "";
-  document.getElementById("ctaLabel").value = "Quero meu desconto";
-  document.getElementById("couponCode").value = "";
-  document.getElementById("discountType").value = "percent";
-  document.getElementById("discountValue").value = "";
-  document.getElementById("landingUrl").value = "";
-  document.getElementById("priority").value = "normal";
-  document.getElementById("image").value = "";
+  clearForm();
+  await loadCampaigns();
+}
+
+async function deleteCampaign(index) {
+  const c = campaigns[index];
+  const id = getCampaignId(c);
+
+  if (!id) {
+    alert("Campanha sem ID.");
+    return;
+  }
+
+  if (!confirm(`Excluir campanha ${c.name || id}?`)) return;
+
+  const res = await fetch(`/api/campaigns/${companyId}/${id}`, {
+    method: "DELETE"
+  });
+
+  if (!res.ok) {
+    alert("Erro ao excluir campanha.");
+    return;
+  }
 
   await loadCampaigns();
 }
 
-loadCampaigns().catch((error) => {
-  console.error(error);
-  document.getElementById("campaignSummary").innerHTML = `<div class="empty-state">Falha ao carregar resumo.</div>`;
-  document.getElementById("campaignGrid").innerHTML = `<div class="empty-state">Falha ao carregar campanhas.</div>`;
-});
+loadCampaigns();
 </script>
+
 {% endblock %}

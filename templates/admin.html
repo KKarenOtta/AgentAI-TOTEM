@@ -4,14 +4,14 @@
   <div>
     <span class="badge">Admin</span>
     <h1 class="page-title">Empresas e ambientes do totem</h1>
-    <p class="page-subtitle">Cadastre empresas, acesse dashboards e abra rapidamente os modos de simulação e monitoramento.</p>
+    <p class="page-subtitle">Cadastre empresas e acesse dashboards operacionais.</p>
   </div>
 </section>
 
 <div class="grid">
   <div class="card">
     <h2>Cadastrar nova empresa</h2>
-    <p class="muted">Crie uma nova unidade para campanhas, métricas e simulação do totem.</p>
+    <p class="muted">Crie uma nova unidade para campanhas e métricas.</p>
 
     <form method="post" action="/admin/create" class="form">
       <div class="row">
@@ -22,7 +22,7 @@
 
         <div>
           <label>Nome</label>
-          <input name="name" placeholder="Ex: FLX Nova Unidade" required />
+          <input name="name" placeholder="Ex: Nova Unidade" required />
         </div>
       </div>
 
@@ -67,8 +67,6 @@
             <div class="actions">
               <a class="btn" href="/client/{{ c.company_id }}">Dashboard</a>
               <a class="btn" href="/client/{{ c.company_id }}/campaigns">Campanhas</a>
-              <a class="btn" href="/totem/sim/{{ c.company_id }}">Simulador</a>
-              <a class="btn" href="/totem/live/{{ c.company_id }}">Live</a>
 
               <form method="post" action="/admin/delete/{{ c.company_id }}" onsubmit="return confirm('Deletar {{ c.company_id }}?');">
                 <button class="btn danger" type="submit">Excluir</button>

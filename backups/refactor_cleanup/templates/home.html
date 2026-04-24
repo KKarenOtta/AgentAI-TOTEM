@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <span class="badge">Início</span>
+    <h1 class="page-title">Painel inicial do Totem I.A.Gora</h1>
+    <p class="page-subtitle">
+      Ambiente local para administração, simulação do totem, monitoramento ao vivo e gestão de campanhas.
+    </p>
+  </div>
+</section>
+
+<div class="grid">
+  <section class="card">
+    <h2>Empresa em destaque</h2>
+    {% if featured_company %}
+      <p><strong>ID:</strong> {{ featured_company.company_id }}</p>
+      <p><strong>Nome:</strong> {{ featured_company.name }}</p>
+      <div class="actions">
+        <a class="btn primary" href="/client/{{ featured_company.company_id }}">Abrir dashboard</a>
+        <a class="btn" href="/client/{{ featured_company.company_id }}/campaigns">Campanhas</a>
+        <a class="btn" href="/totem/sim/{{ featured_company.company_id }}">Simulador</a>
+        <a class="btn" href="/totem/live/{{ featured_company.company_id }}">Monitor ao vivo</a>
+      </div>
+    {% else %}
+      <p>Nenhuma empresa cadastrada.</p>
+      <div class="actions">
+        <a class="btn primary" href="/admin">Ir para Admin</a>
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Acessos rápidos</h2>
+    <div class="actions">
+      <a class="btn primary" href="/admin">Admin</a>
+      <a class="btn" href="/totem/sim/FLX-001">Simulador padrão</a>
+      <a class="btn" href="/totem/live/FLX-001">Monitor padrão</a>
+      <a class="btn" href="/docs">Swagger</a>
+      <a class="btn" href="/health">Health</a>
+    </div>
+  </section>
+</div>
+
+{% if companies %}
+<section class="card" style="margin-top:20px;">
+  <h2>Empresas cadastradas</h2>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Company ID</th>
+          <th>Nome</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for company in companies %}
+        <tr>
+          <td>{{ company.company_id }}</td>
+          <td>{{ company.name }}</td>
+          <td>
+            <div class="actions">
+              <a class="btn" href="/client/{{ company.company_id }}">Dashboard</a>
+              <a class="btn" href="/client/{{ company.company_id }}/campaigns">Campanhas</a>
+              <a class="btn" href="/totem/sim/{{ company.company_id }}">Simular</a>
+              <a class="btn" href="/totem/live/{{ company.company_id }}">Live</a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,47 +1,45 @@
-import os
+from __future__ import annotations
+
 import base64
 import logging
+import os
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
 
-from services.totem.metrics import MetricsLogger
-from services.totem.schemas import (
-    TotemInteractRequest,
-    TotemInteractResponse,
+from core.totem.metrics import MetricsLogger
+from core.totem.nps import save_nps
+from core.totem.orchestrator import TotemOrchestrator
+from core.totem.schemas import (
     TotemActivateRequest,
     TotemActivateResponse,
+    TotemInteractRequest,
+    TotemInteractResponse,
     TotemNPSRequest,
     TotemNPSResponse,
 )
-from services.totem.orchestrator import TotemOrchestrator
-from services.totem.session_store import get_or_create_session, increment_turn
-from services.totem.stt import stt_from_base64
-from services.totem.nps import save_nps
-from services.totem.tts import gerar_audio
+from core.totem.session_store import get_or_create_session, increment_turn
+from core.totem.stt import stt_from_base64
+from core.totem.tts import gerar_audio
 
 metrics_logger = MetricsLogger(path="data/metrics/metrics.jsonl")
 logger = logging.getLogger("totem")
 
 router = APIRouter(prefix="/totem", tags=["totem"])
-
-orchestrator = TotemOrchestrator(
-    hugging_key=os.getenv("HUGGING_FACE_API_KEY") or os.getenv("HUGGING_FACE")
-)
+orchestrator = TotemOrchestrator()
 
 
 def audio_file_to_base64(audio_path: str | None) -> str | None:
     audio_path = (audio_path or "").strip()
-    if not audio_path:
-        return None
 
-    if not os.path.exists(audio_path):
+    if not audio_path or not os.path.exists(audio_path):
         return None
 
     try:
         with open(audio_path, "rb") as file:
             return base64.b64encode(file.read()).decode("utf-8")
-    except Exception:
+    except Exception as exc:
+        logger.warning("Falha ao converter áudio para base64: %s", exc)
         return None
 
 
@@ -58,19 +56,36 @@ def totem_activate(req: TotemActivateRequest) -> TotemActivateResponse:
     greeting = "Olá! Como posso te ajudar hoje?"
     audio_base64 = None
     audio_provider = None
+    audio_error = None
+    audio_latency_s = None
+    audio_status_code = None
 
     if req.prefer_audio:
-        audio_path, provider, _, _, _ = gerar_audio(greeting, "pt")
+        audio_path, audio_provider, audio_status_code, audio_error, audio_latency_s = gerar_audio(greeting, "pt")
         audio_base64 = audio_file_to_base64(audio_path)
-        audio_provider = provider
+
+    metrics_logger.save(
+        {
+            "event": "totem_activate",
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "company_id": req.company_id,
+            "session_id": st["session_id"] if isinstance(st, dict) else st.session_id,
+            "tts_provider": audio_provider,
+            "tts_status_code": audio_status_code,
+            "tts_error": audio_error,
+            "tts_latency_s": audio_latency_s,
+            "audio_generated": bool(audio_base64),
+        }
+    )
 
     return TotemActivateResponse(
-        session_id=st.session_id,
+        session_id=st["session_id"] if isinstance(st, dict) else st.session_id,
         language="pt",
         greeting=greeting,
         next="listening",
         audio_base64=audio_base64,
         audio_provider=audio_provider,
+        audio_error=audio_error,
     )
 
 
@@ -102,12 +117,16 @@ def totem_interact(req: TotemInteractRequest) -> TotemInteractResponse:
         message_id=req.message_id,
     )
 
+    audio_base64 = audio_file_to_base64(audio_path)
+
     return TotemInteractResponse(
         session_id=req.session_id,
         language=idioma,
         text=text,
         recommendations=recs,
-        audio_base64=audio_file_to_base64(audio_path),
+        audio_base64=audio_base64,
+        audio_provider=metric.get("tts_provider"),
+        response_source=metric.get("response_source") or metric.get("source"),
         metrics=metric,
     )
 
@@ -119,13 +138,15 @@ def totem_nps(req: TotemNPSRequest) -> TotemNPSResponse:
 
     save_nps(req.company_id, req.session_id, req.score, req.comment)
 
-    metrics_logger.save({
-        "event": "nps",
-        "timestamp": datetime.now().isoformat(timespec="seconds"),
-        "company_id": req.company_id,
-        "session_id": req.session_id,
-        "nps_score": req.score,
-        "nps_comment": req.comment,
-    })
+    metrics_logger.save(
+        {
+            "event": "nps_submitted",
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "company_id": req.company_id,
+            "session_id": req.session_id,
+            "nps_score": req.score,
+            "nps_comment": req.comment,
+        }
+    )
 
     return TotemNPSResponse(ok=True, message="Obrigado pela avaliação!")
