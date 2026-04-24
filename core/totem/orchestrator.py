@@ -2,23 +2,19 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import time
-from datetime import datetime
 from pathlib import Path
-
-import requests
 
 from infra.async_tasks.tasks import log_training_task
 
-from ml.semantic.faq_engine import FAQEngine
 from ml.semantic.cache import get as cache_get, set as cache_set
+from ml.semantic.faq_engine import FAQEngine
 
 from core.totem.language import detect_language
 from core.totem.metrics import MetricsLogger
-from core.totem.tts import gerar_audio
-from core.totem.session_store import add_turn, get_context, get_session, set_last_intent
 from core.totem.qr import generate_qr_from_text
+from core.totem.session_store import add_turn, get_session, set_last_intent
+from core.totem.tts import gerar_audio
 
 from marketing.campaigns import get_active_campaigns
 from recommender.rules import recommend_actions
@@ -50,16 +46,38 @@ class TotemOrchestrator:
 
         if last_intent == "awaiting_more_help":
             resposta, source = self._handle_more_help(company_id, session_id, normalize(pergunta))
-            return self._finalize(company_id, session_id, pergunta, resposta, idioma, prefer_audio, started, 1.0, source, profile)
+            return self._finalize(
+                company_id=company_id,
+                session_id=session_id,
+                pergunta=pergunta,
+                resposta=resposta,
+                idioma=idioma,
+                prefer_audio=prefer_audio,
+                started=started,
+                score=1.0,
+                source=source,
+                profile=profile,
+            )
 
-        resposta, score, source = self._answer(company_id, session_id, pergunta)
+        resposta, score, source = self._answer(company_id, pergunta)
 
         set_last_intent(session_id, "awaiting_more_help")
         resposta = f"{resposta}\n\nPosso ajudar em algo mais?"
 
-        return self._finalize(company_id, session_id, pergunta, resposta, idioma, prefer_audio, started, score, source, profile)
+        return self._finalize(
+            company_id=company_id,
+            session_id=session_id,
+            pergunta=pergunta,
+            resposta=resposta,
+            idioma=idioma,
+            prefer_audio=prefer_audio,
+            started=started,
+            score=score,
+            source=source,
+            profile=profile,
+        )
 
-    def _answer(self, company_id, session_id, pergunta):
+    def _answer(self, company_id, pergunta):
         cache_key = f"{company_id}:{normalize(pergunta)}"
 
         cached = cache_get(cache_key)
@@ -72,9 +90,9 @@ class TotemOrchestrator:
             cache_set(cache_key, faq_answer)
             return faq_answer, score, "faq"
 
-        return self._llm_fallback(pergunta), 0.5, "llm"
+        return self._llm_fallback(), 0.5, "llm"
 
-    def _llm_fallback(self, pergunta):
+    def _llm_fallback(self):
         return f"Para mais detalhes, consulte o mapa oficial: {MAP_URL}"
 
     def _handle_more_help(self, company_id, session_id, resposta_usuario):
@@ -84,7 +102,7 @@ class TotemOrchestrator:
 
         if resposta_usuario in NO_WORDS:
             set_last_intent(session_id, None)
-            link = self._save_handoff(company_id, session_id)
+            self._save_handoff(company_id, session_id)
             return "Obrigado pela visita. Continue no seu celular.", "handoff"
 
         return "Responda sim ou não.", "awaiting"
@@ -94,11 +112,26 @@ class TotemOrchestrator:
         link = f"{base_url}/device/{company_id}/{session_id}"
 
         HANDOFF_DIR.mkdir(parents=True, exist_ok=True)
-        (HANDOFF_DIR / f"{session_id}.json").write_text(json.dumps({"link": link}), encoding="utf-8")
+        payload = {"link": link}
+
+        out_path = HANDOFF_DIR / f"{session_id}.json"
+        out_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
         return link
 
-    def _finalize(self, company_id, session_id, pergunta, resposta, idioma, prefer_audio, started, score, source, profile):
+    def _finalize(
+        self,
+        company_id,
+        session_id,
+        pergunta,
+        resposta,
+        idioma,
+        prefer_audio,
+        started,
+        score,
+        source,
+        profile,
+    ):
         add_turn(session_id, pergunta, resposta)
 
         try:
@@ -106,31 +139,57 @@ class TotemOrchestrator:
         except Exception:
             pass
 
-        # =========================
-        # RECOMENDAÇÃO REAL
-        # =========================
-        campaigns = get_active_campaigns(company_id)
+        active_campaigns = get_active_campaigns(company_id)
 
         recommendations = recommend_actions(
             profile=profile or {},
-            campaigns=campaigns,
-            intent=normalize(pergunta)
+            active_campaigns=active_campaigns,
+            intent=normalize(pergunta),
+            top_k=3,
         )
 
-        # =========================
-        # AUDIO
-        # =========================
         audio_path = None
         audio_provider = None
+        audio_status_code = None
+        audio_error = None
+        audio_latency_s = None
 
         if prefer_audio:
-            audio_path, audio_provider, *_ = gerar_audio(resposta, idioma)
+            audio_path, audio_provider, audio_status_code, audio_error, audio_latency_s = gerar_audio(
+                resposta,
+                idioma,
+            )
+
+        top_actions = recommendations.get("top_actions", []) if isinstance(recommendations, dict) else []
 
         metric = {
             "source": source,
+            "response_source": source,
             "score": score,
-            "latency": time.perf_counter() - started,
-            "recommendations_count": len(recommendations),
+            "latency": round(time.perf_counter() - started, 3),
+            "recommendations_count": len(top_actions),
+            "tts_provider": audio_provider,
+            "tts_status_code": audio_status_code,
+            "tts_error": audio_error,
+            "tts_latency_s": audio_latency_s,
         }
+
+        self.metrics.save(
+            {
+                "event": "interaction",
+                "company_id": company_id,
+                "session_id": session_id,
+                "question": pergunta,
+                "source": source,
+                "response_source": source,
+                "score": score,
+                "recommendations_count": len(top_actions),
+                "tts_provider": audio_provider,
+                "tts_status_code": audio_status_code,
+                "tts_error": audio_error,
+                "tts_latency_s": audio_latency_s,
+                "latency": metric["latency"],
+            }
+        )
 
         return resposta, recommendations, audio_path, metric, idioma
