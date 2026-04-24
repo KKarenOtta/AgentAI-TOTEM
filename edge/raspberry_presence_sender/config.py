@@ -15,8 +15,8 @@ PRESENCE_HOLD_SECONDS = float(os.getenv("PRESENCE_HOLD_SECONDS", "5"))
 # câmera
 CAMERA_INDEX = int(os.getenv("CAMERA_INDEX", "0"))
 CAMERA_WARMUP_SECONDS = float(os.getenv("CAMERA_WARMUP_SECONDS", "1.0"))
-CAMERA_WIDTH = int(os.getenv("CAMERA_WIDTH", "640"))
-CAMERA_HEIGHT = int(os.getenv("CAMERA_HEIGHT", "480"))
+CAMERA_WIDTH = int(os.getenv("CAMERA_WIDTH", "1280"))
+CAMERA_HEIGHT = int(os.getenv("CAMERA_HEIGHT", "720"))
 JPEG_QUALITY = int(os.getenv("JPEG_QUALITY", "85"))
 
 # rede
