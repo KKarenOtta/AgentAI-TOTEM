@@ -7,7 +7,7 @@ _company_queues: Dict[str, "queue.Queue[Dict[str, Any]]"] = defaultdict(queue.Qu
 
 def publish(company_id: str, event: str, payload: Dict[str, Any]) -> None:
     data = {
-        "event": event,
+        "type": event,  
         "payload": payload,
     }
     _company_queues[company_id].put(data)
