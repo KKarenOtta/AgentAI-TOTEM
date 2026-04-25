@@ -1,17 +1,46 @@
+from __future__ import annotations
+
 import queue
+import threading
 from collections import defaultdict
-from typing import Dict, Any
+from typing import Any
 
-_company_queues: Dict[str, "queue.Queue[Dict[str, Any]]"] = defaultdict(queue.Queue)
+_SUBSCRIBERS: dict[str, list[queue.Queue[dict[str, Any]]]] = defaultdict(list)
+_LOCK = threading.Lock()
 
 
-def publish(company_id: str, event: str, payload: Dict[str, Any]) -> None:
+def subscribe(company_id: str) -> queue.Queue[dict[str, Any]]:
+    subscriber: queue.Queue[dict[str, Any]] = queue.Queue()
+
+    with _LOCK:
+        _SUBSCRIBERS[company_id].append(subscriber)
+
+    return subscriber
+
+
+def unsubscribe(company_id: str, subscriber: queue.Queue[dict[str, Any]]) -> None:
+    with _LOCK:
+        subscribers = _SUBSCRIBERS.get(company_id, [])
+
+        if subscriber in subscribers:
+            subscribers.remove(subscriber)
+
+        if not subscribers and company_id in _SUBSCRIBERS:
+            del _SUBSCRIBERS[company_id]
+
+
+def publish(company_id: str, event: str, payload: dict[str, Any]) -> None:
     data = {
-        "type": event,  
+        "type": event,
         "payload": payload,
     }
-    _company_queues[company_id].put(data)
+
+    with _LOCK:
+        subscribers = list(_SUBSCRIBERS.get(company_id, []))
+
+    for subscriber in subscribers:
+        subscriber.put(data)
 
 
-def get_queue(company_id: str) -> "queue.Queue[Dict[str, Any]]":
-    return _company_queues[company_id]
+def get_queue(company_id: str) -> queue.Queue[dict[str, Any]]:
+    return subscribe(company_id)

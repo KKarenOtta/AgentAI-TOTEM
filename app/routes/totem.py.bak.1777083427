@@ -1,0 +1,66 @@
+from fastapi import APIRouter
+from pydantic import BaseModel
+from typing import Optional
+
+from core.totem.orchestrator import Orchestrator
+from app.services.aws_db_service import AWSDBService
+
+router = APIRouter()
+
+orchestrator = Orchestrator()
+db = AWSDBService()
+
+
+class ActivateRequest(BaseModel):
+    company_id: str
+    session_id: str
+    prefer_audio: Optional[bool] = False
+
+
+class InteractRequest(BaseModel):
+    company_id: str
+    session_id: str
+    message: str
+    prefer_audio: Optional[bool] = False
+
+
+# ─────────────────────────────────────────
+# ACTIVATE
+# ─────────────────────────────────────────
+@router.post("/totem/activate")
+async def totem_activate(payload: ActivateRequest):
+    result = orchestrator.activate(
+        company_id=payload.company_id,
+        session_id=payload.session_id,
+    )
+
+    # ✅ AGORA CORRETO
+    await db.save_session_start(
+        session_id=payload.session_id,
+        company_id=payload.company_id,
+        device_id=None,
+    )
+
+    return result
+
+
+# ─────────────────────────────────────────
+# INTERACT
+# ─────────────────────────────────────────
+@router.post("/totem/interact")
+async def totem_interact(payload: InteractRequest):
+    result = orchestrator.interact(
+        company_id=payload.company_id,
+        session_id=payload.session_id,
+        message=payload.message,
+    )
+
+    # ✅ AGORA CORRETO
+    await db.save_interaction(
+        session_id=payload.session_id,
+        company_id=payload.company_id,
+        message_user=payload.message,
+        message_bot=result.get("text", ""),
+    )
+
+    return result

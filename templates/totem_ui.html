@@ -39,6 +39,15 @@ const sessionId = "totem-ui-" + Date.now();
 
 let currentAudio = null;
 let activated = false;
+let eventSource = null;
+
+function setStatus(title, subtitle, answer) {
+  document.getElementById("title").textContent = title;
+  document.getElementById("subtitle").textContent = subtitle || "";
+  if (answer !== undefined) {
+    document.getElementById("answer").textContent = answer;
+  }
+}
 
 function stopAudio() {
   if (currentAudio) {
@@ -50,52 +59,68 @@ function stopAudio() {
 function enableUI() {
   document.getElementById("message").disabled = false;
   document.getElementById("btnSend").disabled = false;
-  document.getElementById("title").textContent = "Como posso ajudar hoje?";
-  document.getElementById("subtitle").textContent = "";
+  setStatus("Como posso ajudar hoje?", "", document.getElementById("answer").textContent);
 }
 
 async function activateTotem() {
   if (activated) return;
   activated = true;
 
-  const res = await fetch("/totem/activate", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      company_id: companyId,
-      session_id: sessionId,
-      prefer_audio: true
-    })
-  });
+  setStatus("Presença detectada", "Ativando atendimento...", "Preparando saudação...");
 
-  const data = await res.json();
+  try {
+    const res = await fetch("/totem/activate", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        company_id: companyId,
+        session_id: sessionId,
+        prefer_audio: true
+      })
+    });
 
-  document.getElementById("answer").textContent = data.greeting || "";
+    if (!res.ok) {
+      throw new Error("Falha HTTP em /totem/activate: " + res.status);
+    }
 
-  enableUI();
+    const data = await res.json();
 
-  if (data.audio_base64) {
-    currentAudio = new Audio("data:audio/mp3;base64," + data.audio_base64);
-    currentAudio.play().catch(() => {});
+    document.getElementById("answer").textContent = data.greeting || "Olá! Como posso ajudar hoje?";
+    enableUI();
+
+    if (data.audio_base64) {
+      currentAudio = new Audio("data:audio/mp3;base64," + data.audio_base64);
+      currentAudio.play().catch(() => {});
+    }
+  } catch (error) {
+    console.error("Erro ao ativar totem:", error);
+    document.getElementById("answer").textContent = "Olá! Como posso ajudar hoje?";
+    enableUI();
   }
 }
 
 function connectSSE() {
-  const eventSource = new EventSource(`/api/events/${companyId}`);
+  eventSource = new EventSource(`/api/events/${companyId}`);
+
+  eventSource.onopen = function() {
+    console.log("SSE conectado");
+  };
 
   eventSource.onmessage = function(event) {
     try {
       const data = JSON.parse(event.data);
+      console.log("SSE recebido:", data);
 
       if (data.type === "presence_triggered") {
-        console.log("Presença detectada");
         activateTotem();
       }
-    } catch (e) {}
+    } catch (error) {
+      console.error("Erro ao processar SSE:", error);
+    }
   };
 
-  eventSource.onerror = function() {
-    console.warn("Erro SSE, reconectando...");
+  eventSource.onerror = function(error) {
+    console.warn("Erro SSE:", error);
   };
 }
 
