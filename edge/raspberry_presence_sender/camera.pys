@@ -82,4 +82,4 @@ def capture_image_base64() -> str | None:
 
     finally:
         _release_lock()
-        time.sleep(1.2)
+        time.sleep(1.2)  # evita corrida
