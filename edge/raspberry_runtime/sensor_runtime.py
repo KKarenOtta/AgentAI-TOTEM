@@ -1,23 +1,51 @@
 from __future__ import annotations
 
+import os
 import sys
 import time
 from pathlib import Path
+
+import requests
+from dotenv import load_dotenv
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-import requests
+load_dotenv(ROOT_DIR / ".env")
 
 from alpha_test.sensor_service import update_system_state
-from edge.raspberry_presence_sender.config import (
-    TOTEM_API_URL,
-    COMPANY_ID,
-    DEVICE_ID,
-    REQUEST_TIMEOUT_SECONDS,
-    COOLDOWN_SECONDS,
-)
+
+
+TOTEM_API_URL = os.getenv("TOTEM_API_URL", "").strip()
+COMPANY_ID = os.getenv("COMPANY_ID", "FLX-001").strip()
+DEVICE_ID = os.getenv("DEVICE_ID", "RPI3-SENSORS-001").strip()
+REQUEST_TIMEOUT_SECONDS = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "10"))
+COOLDOWN_SECONDS = float(os.getenv("COOLDOWN_SECONDS", "10"))
+
+
+def best_distance(state: dict) -> float | None:
+    active_sensor = state.get("active_sensor")
+    readings = state.get("ultrassons") or []
+
+    for item in readings:
+        if item.get("sensor") == active_sensor:
+            return item.get("distance_cm")
+
+    distances = [
+        item.get("distance_cm")
+        for item in readings
+        if item.get("distance_cm") is not None
+    ]
+
+    return min(distances) if distances else None
+
+
+def is_approaching(state: dict) -> bool:
+    return any(
+        bool(item.get("approaching"))
+        for item in state.get("ultrassons") or []
+    )
 
 
 def send_presence(state: dict) -> bool:
@@ -29,14 +57,14 @@ def send_presence(state: dict) -> bool:
         "company_id": COMPANY_ID,
         "device_id": DEVICE_ID,
         "present": True,
-        "image_base64": None,
         "source": "raspberry_ultrasonic",
         "active_sensor": state.get("active_sensor"),
-        "distance_cm": _best_distance(state),
-        "approaching": _is_approaching(state),
+        "distance_cm": best_distance(state),
+        "approaching": is_approaching(state),
         "temperature": state.get("temperature"),
         "humidity": state.get("humidity"),
         "sensor_payload": state,
+        "image_base64": None,
     }
 
     try:
@@ -57,30 +85,6 @@ def send_presence(state: dict) -> bool:
     except Exception as exc:
         print(f"[ERRO API]: {exc}")
         return False
-
-
-def _best_distance(state: dict) -> float | None:
-    active_sensor = state.get("active_sensor")
-    readings = state.get("ultrassons") or []
-
-    for item in readings:
-        if item.get("sensor") == active_sensor:
-            return item.get("distance_cm")
-
-    distances = [
-        item.get("distance_cm")
-        for item in readings
-        if item.get("distance_cm") is not None
-    ]
-
-    return min(distances) if distances else None
-
-
-def _is_approaching(state: dict) -> bool:
-    return any(
-        bool(item.get("approaching"))
-        for item in state.get("ultrassons") or []
-    )
 
 
 def main() -> None:
@@ -105,8 +109,8 @@ def main() -> None:
                 print(
                     "Presença real detectada | "
                     f"sensor={state.get('active_sensor')} "
-                    f"distancia={_best_distance(state)}cm "
-                    f"aproximando={_is_approaching(state)}"
+                    f"distancia={best_distance(state)}cm "
+                    f"aproximando={is_approaching(state)}"
                 )
 
                 if send_presence(state):

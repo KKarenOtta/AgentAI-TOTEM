@@ -29,7 +29,6 @@ __pycache__/
 psql
 sed
 
-
 # backups locais
 *.bak
 *.broken.bak
