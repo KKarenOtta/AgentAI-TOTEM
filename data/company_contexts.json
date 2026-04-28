@@ -1,12 +1,13 @@
 {
   "FLX-001": {
-    "name": "FLX Demo",
+    "name": "Zoológico de São Paulo",
     "business_type": "zoologico_com_centro_comercial",
-    "description": "Zoológico de São Paulo é o maior jardim zoológico do Brasil em quantidade de animais. Abriga as nascentes do histórico riacho do Ipiranga, na Zona Sul da cidade de São Paulo, localizado em uma área de Mata Atlântica original, com alamedas, atrações, centro comercial de lojas, praça de alimentação e serviços.",
+    "description": "Zoológico de São Paulo com área de visitação, atrações, lojas, praça de alimentação, serviços, banheiros e informações ao visitante.",
     "location": {
       "address": "Av. Miguel Estéfano, 4241 - Água Funda - São Paulo/SP",
       "reference": "Próximo ao Terminal Jabaquara",
-      "map_url": "https://www.google.com/maps/search/?api=1&query=Zoologico+de+Sao+Paulo"
+      "map_url": "https://www.google.com/maps/search/?api=1&query=Zoologico+de+Sao+Paulo",
+      "official_map_url": "https://zoologico.com.br/sobre/mapa-zoo-sao-paulo"
     },
     "hours": {
       "monday_to_saturday": "10:00 às 17:00",
@@ -20,86 +21,74 @@
     },
     "services": [
       {
-        "service_id": "SERV-BANHEIRO-01",
-        "name": "Banheiros da praça de alimentação",
+        "name": "Banheiros principais",
         "category": "banheiro",
-        "floor": "térreo",
         "zone": "praça de alimentação",
-        "reference": "Próximo aos restaurantes e à área de mesas.",
-        "tags": ["banheiro", "toalete", "wc", "praça de alimentação"]
+        "reference": "Ficam no térreo, próximos à praça de alimentação e à área de mesas.",
+        "tags": ["banheiro", "toalete", "wc", "sanitário"]
       },
       {
-        "service_id": "SERV-FRALDARIO-01",
         "name": "Fraldário",
         "category": "familia",
-        "floor": "térreo",
         "zone": "área de serviços",
-        "reference": "Próximo aos banheiros principais.",
-        "tags": ["fraldário", "bebê", "familia", "criança"]
+        "reference": "Fica próximo aos banheiros principais.",
+        "tags": ["fraldário", "bebê", "criança", "família"]
       },
       {
-        "service_id": "SERV-INFO-01",
         "name": "Ponto de informações",
         "category": "atendimento",
-        "floor": "térreo",
         "zone": "entrada principal",
-        "reference": "Logo após o acesso principal.",
+        "reference": "Fica logo após o acesso principal.",
         "tags": ["informação", "atendimento", "ajuda", "entrada"]
       }
     ],
     "stores": [
       {
-        "store_id": "LOJA-LEMB-01",
         "name": "Lembrancinhas & Cia",
         "category": "souvenirs",
-        "floor": "térreo",
         "zone": "saída principal",
-        "reference": "Próxima à saída do circuito principal.",
-        "tags": ["lembrança", "presente", "souvenir"]
+        "reference": "Fica próxima à saída do circuito principal.",
+        "tags": ["lembrança", "presente", "souvenir", "loja"]
       },
       {
-        "store_id": "LOJA-ZOO-02",
         "name": "Loja do Pinguim",
         "category": "souvenirs",
-        "floor": "térreo",
-        "zone": "área temática",
-        "reference": "Próxima à atração dos pinguins.",
-        "tags": ["pinguim", "brinquedo", "camiseta", "lembrança"]
+        "zone": "área temática dos pinguins",
+        "reference": "Fica próxima à atração dos pinguins.",
+        "tags": ["pinguim", "brinquedo", "camiseta", "lembrança", "roupa"]
       },
       {
-        "store_id": "LOJA-ALIM-01",
         "name": "Praça de Alimentação",
         "category": "alimentacao",
-        "floor": "térreo",
-        "zone": "praça de alimentação",
-        "reference": "Área central de alimentação.",
-        "tags": ["comida", "lanche", "café", "restaurante", "sorvete"]
+        "zone": "área central",
+        "reference": "Fica na área central do percurso, próxima aos banheiros principais.",
+        "tags": ["comida", "lanche", "café", "restaurante", "sorvete", "lanchonete", "salgado"]
       }
     ],
     "attractions": [
       {
         "name": "Alameda dos grandes felinos",
         "category": "animais",
-        "reference": "Siga pela alameda principal após a entrada.",
-        "tags": ["leão", "leoes", "tigre", "felinos", "animais"]
+        "reference": "Siga pela alameda principal após a entrada e procure a sinalização de felinos.",
+        "tags": ["leão", "leoes", "leões", "tigre", "felinos", "animais"]
       },
       {
         "name": "Área dos pinguins",
         "category": "animais",
-        "reference": "Próxima à Loja do Pinguim.",
+        "reference": "Fica próxima à Loja do Pinguim.",
         "tags": ["pinguim", "aves", "animais"]
       },
       {
         "name": "Praça de alimentação",
         "category": "servico",
-        "reference": "Área central do percurso.",
-        "tags": ["comida", "café", "sorvete", "lanche", "alimentação"]
+        "reference": "Fica na área central do percurso.",
+        "tags": ["comida", "café", "sorvete", "lanche", "alimentação", "restaurante"]
       },
       {
         "name": "Área kids",
         "category": "lazer",
-        "reference": "Próxima à praça de alimentação.",
-        "tags": ["criança", "kids", "familia", "lazer"]
+        "reference": "Fica próxima à praça de alimentação.",
+        "tags": ["criança", "kids", "família", "lazer"]
       }
     ],
     "faq": [
@@ -112,22 +101,46 @@
         "answer": "A praça de alimentação fica na área central do percurso, próxima aos banheiros principais."
       },
       {
+        "question": "onde posso comer",
+        "answer": "Você pode comer na praça de alimentação, que fica na área central do percurso, próxima aos banheiros principais."
+      },
+      {
+        "question": "onde comprar salgado",
+        "answer": "Procure a praça de alimentação. Ela fica na área central do percurso e reúne opções de lanches, café, sorvete e refeições rápidas."
+      },
+      {
         "question": "onde vejo leão",
         "answer": "A área dos grandes felinos fica na alameda principal. Siga pela entrada principal e procure a sinalização de felinos."
       },
       {
+        "question": "onde ficam os pinguins",
+        "answer": "A área dos pinguins fica próxima à Loja do Pinguim."
+      },
+      {
+        "question": "qual o endereço",
+        "answer": "O endereço é Av. Miguel Estéfano, 4241 - Água Funda - São Paulo/SP."
+      },
+      {
         "question": "qual o horário de funcionamento",
-        "answer": "O funcionamento informado nesta base é de segunda a sábado das 10:00 às 17:00 e domingo das 12:00 às 18:00."
-      }',
+        "answer": "O funcionamento informado nesta base é de segunda a sábado das 10:00 às 17:00 e domingo das 12:00 às 18:00. Em feriados, consulte a programação oficial."
+      },
       {
         "question": "vende roupa",
-        "answer": "No momento, não há loja especializada em roupas, mas a Loja do Pinguim oferece camisetas e lembranças."
-      }',
+        "answer": "A Loja do Pinguim oferece camisetas, lembranças e produtos temáticos."
+      },
+      {
+        "question": "tem loja",
+        "answer": "Sim. Há lojas de lembranças, como a Lembrancinhas & Cia e a Loja do Pinguim."
+      },
+      {
+        "question": "tem promoção",
+        "answer": "As campanhas promocionais são liberadas após o cadastro no celular, ao final do atendimento no totem."
+      }
     ],
     "policies": [
-      "Animais de visitantes são permitidos apenas nas áreas autorizadas.",
       "Horários e atrações podem sofrer alteração operacional.",
-      "Promoções e cupons dependem das campanhas ativas no momento da visita."
+      "Promoções e cupons dependem das campanhas ativas no momento da visita.",
+      "Informações não encontradas na base local devem ser confirmadas com a equipe ou no site oficial."
     ]
   }
 }

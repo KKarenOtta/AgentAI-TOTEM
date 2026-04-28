@@ -1,23 +1,32 @@
+
+# ENV
+.env
+.env.*
+
+# VENV
 venv/
+
+# DADOS DINÂMICOS
+data/device_handoffs/
+data/sessions.json
+data/metrics/
+
+# QR CODES
+static/uploads/qrcodes/
+
+# BACKUPS / AUDIT
+backups/
+audit_*/
+
+# CACHE
 __pycache__/
 *.pyc
-*.pyo
+
+# BINÁRIOS
+psql
+sed
+
+
+# backups locais
 *.bak
-.DS_Store
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.env
-venv/
-*.log
-backup_campaign_refactor/
-backup_pre_campaign_refine/
-static/uploads/*
-!static/uploads/.gitkeep
-static/uploads/campaigns/*
-static/uploads/qrcodes/*
-!static/uploads/campaigns/.gitkeep
-!static/uploads/qrcodes/.gitkeep
-data/metrics/metrics.jsonl
-data/metrics/metrics.bak.jsonl
-data/metrics/voz_fallback.mp3
+*.broken.bak

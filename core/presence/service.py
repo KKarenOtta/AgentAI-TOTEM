@@ -5,7 +5,6 @@ import os
 
 from repositories.presence_repository import PresenceRepository
 
-
 _presence_repo = PresenceRepository()
 
 
@@ -21,6 +20,7 @@ class PresenceService:
         company_id: str,
         device_id: str,
         image_base64: str | None = None,
+        sensor_payload: dict | None = None,
     ) -> dict:
         attributes: dict = {
             "validation_engine": "opencv_haar_v2",
@@ -30,6 +30,7 @@ class PresenceService:
             "image_received": bool(image_base64),
             "require_image": self.require_image,
             "require_human_validation": self.require_human_validation,
+            "sensor_payload": sensor_payload or {},
         }
 
         if self.require_image and not image_base64:
@@ -108,19 +109,8 @@ class PresenceService:
             frontal_cascade = cv2.CascadeClassifier(frontal_path)
             profile_cascade = cv2.CascadeClassifier(profile_path)
 
-            faces = frontal_cascade.detectMultiScale(
-                gray,
-                scaleFactor=1.10,
-                minNeighbors=4,
-                minSize=(30, 30),
-            )
-
-            profiles = profile_cascade.detectMultiScale(
-                gray,
-                scaleFactor=1.10,
-                minNeighbors=4,
-                minSize=(30, 30),
-            )
+            faces = frontal_cascade.detectMultiScale(gray, 1.10, 4, minSize=(30, 30))
+            profiles = profile_cascade.detectMultiScale(gray, 1.10, 4, minSize=(30, 30))
 
             faces_detected = len(faces)
             profiles_detected = len(profiles)
@@ -146,7 +136,16 @@ class PresenceService:
     @staticmethod
     def _publish(company_id: str, event: str, payload: dict) -> None:
         try:
-            from infra.realtime.event_bus import publish  # type: ignore
+            from infra.realtime.event_bus import publish
             publish(company_id=company_id, event=event, payload=payload)
+
+            if event == "presence_triggered" and payload.get("present"):
+                try:
+                    from core.totem.orchestrator import TotemOrchestrator
+                    orchestrator = TotemOrchestrator()
+                    orchestrator.handle_presence_event(company_id, payload)
+                except Exception:
+                    pass
+
         except Exception:
             return

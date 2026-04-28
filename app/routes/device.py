@@ -7,8 +7,8 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from core.totem.coupon_store import create_coupon, get_coupon_by_id, list_coupons_by_lead
-from core.totem.lead_store import save_lead
+from core.totem.coupon_store import create_coupon, get_coupon_by_id, list_coupons_by_lead, redeem_coupon
+from core.totem.lead_store import find_existing_lead, save_lead
 from marketing.campaigns import get_active_campaigns
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -20,6 +20,7 @@ router = APIRouter(tags=["device"])
 
 def _load_handoff(session_id: str) -> dict:
     path = HANDOFF_DIR / f"{session_id}.json"
+
     if not path.exists():
         return {}
 
@@ -51,14 +52,26 @@ def _issue_coupons(lead: dict) -> list[dict]:
 
     for campaign in _active_coupon_campaigns(lead["company_id"]):
         coupon = create_coupon(lead, campaign)
+
         if coupon:
             coupons.append(coupon)
 
     return coupons
 
 
+def _find_registered_lead(company_id: str, session_id: str) -> dict | None:
+    return find_existing_lead(
+        company_id=company_id,
+        session_id=session_id,
+        email=None,
+        cpf=None,
+    )
+
+
 @router.get("/device/{company_id}/{session_id}", response_class=HTMLResponse)
 def device_login(company_id: str, session_id: str, request: Request):
+    handoff = _load_handoff(session_id)
+
     return templates.TemplateResponse(
         request=request,
         name="device_login.html",
@@ -66,8 +79,9 @@ def device_login(company_id: str, session_id: str, request: Request):
             "request": request,
             "company_id": company_id,
             "session_id": session_id,
-            "handoff": _load_handoff(session_id),
+            "handoff": handoff,
         },
+        status_code=200 if handoff else 404,
     )
 
 
@@ -82,6 +96,22 @@ def device_register(
     cpf: str = Form(...),
     lgpd_consent: str = Form("off"),
 ):
+    handoff = _load_handoff(session_id)
+
+    if not handoff:
+        return templates.TemplateResponse(
+            request=request,
+            name="device_login.html",
+            context={
+                "request": request,
+                "company_id": company_id,
+                "session_id": session_id,
+                "handoff": {},
+                "error": "Sessão não encontrada. Gere um novo QR Code no totem.",
+            },
+            status_code=404,
+        )
+
     if lgpd_consent != "on":
         return templates.TemplateResponse(
             request=request,
@@ -90,13 +120,11 @@ def device_register(
                 "request": request,
                 "company_id": company_id,
                 "session_id": session_id,
-                "handoff": _load_handoff(session_id),
+                "handoff": handoff,
                 "error": "É necessário aceitar os termos LGPD.",
             },
             status_code=400,
         )
-
-    handoff = _load_handoff(session_id)
 
     lead = save_lead(
         {
@@ -129,24 +157,19 @@ def device_register(
 def device_offers(company_id: str, session_id: str, request: Request):
     handoff = _load_handoff(session_id)
 
-    lead = save_lead(
-        {
-            "company_id": company_id,
-            "session_id": session_id,
-            "full_name": "Visitante",
-            "email": f"{session_id}@local.device",
-            "phone": "",
-            "cpf": "00000000000",
-            "age": 0,
-            "gender": "unknown",
-            "lgpd_consent": True,
-            "source": "device_handoff_recovery",
-            "research_summary": handoff.get("summary") or "",
-            "recommendations_snapshot": {},
-            "ip_address": request.client.host if request.client else None,
-            "user_agent": request.headers.get("user-agent"),
-        }
-    )
+    if not handoff:
+        return RedirectResponse(
+            url=f"/device/{company_id}/{session_id}",
+            status_code=303,
+        )
+
+    lead = _find_registered_lead(company_id, session_id)
+
+    if not lead:
+        return RedirectResponse(
+            url=f"/device/{company_id}/{session_id}",
+            status_code=303,
+        )
 
     _issue_coupons(lead)
     coupons = list_coupons_by_lead(lead["lead_id"])
@@ -182,7 +205,7 @@ def campaign_coupon(coupon_id: str, request: Request):
 
 @router.get("/store/redeem", response_class=HTMLResponse)
 def store_redeem_page(coupon_id: str, request: Request):
-    coupon = get_coupon_by_id(coupon_id)
+    coupon = redeem_coupon(coupon_id=coupon_id)
 
     return templates.TemplateResponse(
         request=request,
