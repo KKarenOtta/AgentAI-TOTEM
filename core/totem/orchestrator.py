@@ -13,8 +13,14 @@ from ml.semantic.faq_engine import FAQEngine
 from core.totem.company_context import answer_from_company_context, load_company_context
 from core.totem.language import detect_language
 from core.totem.metrics import MetricsLogger
-from core.totem.session_store import add_turn
+from core.totem.session_store import add_turn, get_state, set_state, get_or_create_session
 from core.totem.tts import gerar_audio
+
+# NOVOS IMPORTS
+from core.totem.state_machine import State, Event, TRANSITIONS
+from marketing.campaigns import get_active_campaigns
+from recommender.rules import recommend_actions
+
 
 DEFAULT_SITE = "https://zoologico.com.br"
 DEFAULT_MAP_URL = "https://zoologico.com.br/sobre/mapa-zoo-sao-paulo"
@@ -29,7 +35,30 @@ class TotemOrchestrator:
         self.metrics = MetricsLogger()
         self.faq = FAQEngine()
 
-    # NOVO: controle central de presença
+    # =========================
+    # STATE MACHINE CORE
+    # =========================
+    def _transition(self, session_id: str, event: Event):
+        current = State(get_state(session_id))
+        next_state = TRANSITIONS.get((current, event))
+
+        if not next_state:
+            return current
+
+        set_state(session_id, next_state.value)
+
+        print({
+            "session_id": session_id,
+            "from": current.value,
+            "to": next_state.value,
+            "event": event.value,
+        })
+
+        return next_state
+
+    # =========================
+    # PRESENCE ENTRYPOINT
+    # =========================
     def handle_presence_event(self, company_id: str, payload: dict):
 
         if not payload.get("present"):
@@ -37,6 +66,14 @@ class TotemOrchestrator:
 
         session_id = f"totem-{int(time.time()*1000)}"
 
+        # cria sessão no Redis
+        get_or_create_session(company_id, session_id)
+
+        # transições de estado
+        self._transition(session_id, Event.PRESENCE_DETECTED)
+        self._transition(session_id, Event.GREETING_DONE)
+
+        # dispara UI
         publish(
             company_id=company_id,
             event="totem_activated",
@@ -46,6 +83,11 @@ class TotemOrchestrator:
             }
         )
 
+        return session_id
+
+    # =========================
+    # INTERAÇÃO PRINCIPAL
+    # =========================
     def interact(
         self,
         company_id: str,
@@ -56,8 +98,12 @@ class TotemOrchestrator:
         **kwargs: Any,
     ):
         started = time.perf_counter()
+
         pergunta = (pergunta or "").strip()
         idioma = detect_language(pergunta)
+
+        # estado → INTERACTION
+        self._transition(session_id, Event.USER_MESSAGE)
 
         resposta, score, source = self._answer(company_id, pergunta)
 
@@ -74,6 +120,9 @@ class TotemOrchestrator:
             profile or {},
         )
 
+    # =========================
+    # RESPOSTA (FAQ + CACHE + LLM)
+    # =========================
     def _answer(self, company_id: str, pergunta: str):
         if not pergunta:
             return "Pode me dizer o que você procura?", 1.0, "system"
@@ -100,6 +149,9 @@ class TotemOrchestrator:
 
         return self._llm_answer(company_id, pergunta), 0.55, "llm"
 
+    # =========================
+    # LLM
+    # =========================
     def _llm_answer(self, company_id: str, pergunta: str) -> str:
         context = load_company_context(company_id)
 
@@ -126,6 +178,9 @@ class TotemOrchestrator:
         except Exception:
             return "Não consegui responder agora."
 
+    # =========================
+    # FINALIZAÇÃO (RESPOSTA + RECOMMENDER + METRICS)
+    # =========================
     def _finalize(
         self,
         company_id,
@@ -139,30 +194,58 @@ class TotemOrchestrator:
         source,
         profile,
     ):
+        # salva histórico
         add_turn(session_id, pergunta, resposta)
 
+        # treino async
         try:
             log_training_task.delay(session_id, pergunta, resposta, score)
         except Exception:
             pass
 
-        audio_path = None
+        # estado → RECOMMENDATION
+        self._transition(session_id, Event.ANSWER_READY)
 
+        # RECOMMENDER REAL
+        campaigns = get_active_campaigns(company_id)
+
+        recommendations = recommend_actions(
+            profile,
+            campaigns,
+            intent=None,
+        )
+
+        # áudio
+        audio_path = None
         if prefer_audio:
             audio_path, *_ = gerar_audio(resposta, idioma)
 
+        latency = round(time.perf_counter() - started, 3)
+
         metric = {
             "source": source,
-            "latency": round(time.perf_counter() - started, 3),
+            "latency": latency,
         }
 
+        # métricas locais
         self.metrics.save({
             "event": "interaction",
             "company_id": company_id,
             "session_id": session_id,
             "question": pergunta,
             "response": resposta,
-            "latency": metric["latency"],
+            "latency": latency,
         })
 
-        return resposta, {"top_actions": []}, audio_path, metric, idioma
+        # evento realtime
+        publish(
+            company_id=company_id,
+            event="interaction_completed",
+            payload={
+                "session_id": session_id,
+                "response": resposta,
+                "recommendations": recommendations,
+            }
+        )
+
+        return resposta, recommendations, audio_path, metric, idioma

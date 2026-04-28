@@ -111,3 +111,19 @@ def get_context(session_id: str, last_n: int = 3) -> str:
             messages.append(f"Totem: {bot_text}")
 
     return "\n".join(messages)
+
+
+def get_state(session_id: str) -> str:
+    data = get_session(session_id)
+    if not data:
+        return "idle"
+    return data.get("state", "idle")
+
+
+def set_state(session_id: str, state: str) -> None:
+    data = get_session(session_id)
+    if not data:
+        return
+
+    data["state"] = state
+    _save(session_id, data)
