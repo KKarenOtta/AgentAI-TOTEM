@@ -17,6 +17,9 @@ static/uploads/qrcodes/
 # BACKUPS / AUDIT
 backups/
 audit_*/
+*.bak
+*.bak.*
+*.backup
 
 # CACHE
 __pycache__/
