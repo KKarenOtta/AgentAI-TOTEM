@@ -1,24 +1,28 @@
-# env
+
+# ENV
 .env
 .env.*
 
-# dados dinâmicos
+# VENV
+venv/
+
+# DADOS DINÂMICOS
 data/device_handoffs/
 data/sessions.json
+data/metrics/
 
-# backups e auditorias
+# QR CODES
+static/uploads/qrcodes/
+
+# BACKUPS / AUDIT
 backups/
 audit_*/
 
-# caches
+# CACHE
 __pycache__/
 *.pyc
-*.env.bak
-*.bak 
 
-# binários/arquivos indevidos
+# BINÁRIOS
 psql
 sed
 
-# artefatos locais
-*.log
