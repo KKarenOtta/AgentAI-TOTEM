@@ -1,0 +1,14 @@
+[
+  {
+    "username": "admin",
+    "password": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    "role": "admin",
+    "company_id": "*"
+  },
+  {
+    "username": "flx",
+    "password": "b380692dc822781000d87b96044c3dda50c656f8a53d32347e8cd1f6380da8c7",
+    "role": "company",
+    "company_id": "FLX-001"
+  }
+]

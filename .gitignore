@@ -1,23 +1,24 @@
-venv/
+# env
+.env
+.env.*
+
+# dados dinâmicos
+data/device_handoffs/
+data/sessions.json
+
+# backups e auditorias
+backups/
+audit_*/
+
+# caches
 __pycache__/
 *.pyc
-*.pyo
-*.bak
-.DS_Store
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.env
-venv/
+*.env.bak
+*.bak 
+
+# binários/arquivos indevidos
+psql
+sed
+
+# artefatos locais
 *.log
-backup_campaign_refactor/
-backup_pre_campaign_refine/
-static/uploads/*
-!static/uploads/.gitkeep
-static/uploads/campaigns/*
-static/uploads/qrcodes/*
-!static/uploads/campaigns/.gitkeep
-!static/uploads/qrcodes/.gitkeep
-data/metrics/metrics.jsonl
-data/metrics/metrics.bak.jsonl
-data/metrics/voz_fallback.mp3

@@ -4,6 +4,28 @@
   <meta charset="UTF-8" />
   <title>AgentAI-TOTEM</title>
   <link rel="stylesheet" href="/static/css/app.css" />
+  <style>
+    .nav-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .user-badge {
+      font-weight: 600;
+      opacity: 0.8;
+    }
+
+    .logout-btn {
+      background: #ef4444;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 700;
+    }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -12,13 +34,36 @@
     </div>
 
     <nav class="nav">
-      <a href="/admin">Admin</a>
-      <a href="/client/FLX-001">Dashboard</a>
-      <a href="/client/FLX-001/campaigns">Campanhas</a>
-      <a href="/totem/FLX-001">Totem</a>
-      <a href="/admin/faq/">FAQ</a>
-      <a href="/static/dashboard/index.html">Analytics</a>
-      <a href="/docs">Docs</a>
+
+      {% set user = request.state.user if request.state.user is defined else None %}
+
+      {% if user %}
+
+        {% if user.role == "admin" %}
+          <a href="/admin">Admin</a>
+        {% endif %}
+
+        {% if user.company_id and user.company_id != "*" %}
+          <a href="/client/{{ user.company_id }}">Dashboard</a>
+          <a href="/client/{{ user.company_id }}/campaigns">Campanhas</a>
+          <a href="/totem/{{ user.company_id }}">Totem</a>
+        {% endif %}
+
+        <a href="/admin/faq/">FAQ</a>
+        <a href="/static/dashboard/index.html">Analytics</a>
+        <a href="/docs">Docs</a>
+
+        <div class="nav-right">
+          <span class="user-badge">
+            {{ user.username }} ({{ user.role }})
+          </span>
+          <a href="/logout" class="logout-btn">Sair</a>
+        </div>
+
+      {% else %}
+        <a href="/login">Login</a>
+      {% endif %}
+
     </nav>
   </header>
 

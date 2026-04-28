@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-load_dotenv(dotenv_path=os.path.join(os.getcwd(), ".env"))
+load_dotenv()
 
-from app.services.aws_db_service import init_db_pool, close_db_pool
+from core.auth.session_store import get_session
+
 from app.routes.dashboard import router as dashboard_router
 from app.routes.api import router as api_router
 from app.routes.totem import router as totem_router
@@ -20,18 +20,16 @@ from app.routes.faq_admin import router as faq_admin_router
 from app.routes.semantic_dashboard import router as semantic_router
 from app.routes.device import router as device_router
 from app.routes.totem_options import router as totem_options_router
+from app.routes.auth import router as auth_router
 
-app = FastAPI(
-    title="AgentAI-TOTEM",
-    version="2.0.0",
-)
+app = FastAPI()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 
-if STATIC_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(api_router)
 app.include_router(totem_router)
@@ -43,23 +41,40 @@ app.include_router(device_router)
 app.include_router(totem_options_router)
 
 
-@app.get("/health")
-def health():
-    return JSONResponse({
-        "status": "ok",
-        "app": "AgentAI-TOTEM",
-        "version": "2.0.0",
-        "env": os.getenv("APP_ENV", "development"),
-    })
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
 
+    path = request.url.path
 
-@app.on_event("startup")
-async def startup():
-    print("Inicializando aplicação...")
-    await init_db_pool()
+    # rotas públicas
+    public = ["/login", "/device", "/totem", "/api", "/static"]
 
+    if any(path.startswith(p) for p in public):
+        return await call_next(request)
 
-@app.on_event("shutdown")
-async def shutdown():
-    print("Encerrando aplicação...")
-    await close_db_pool()
+    session_id = request.cookies.get("session_id")
+
+    if not session_id:
+        return RedirectResponse("/login")
+
+    session = get_session(session_id)
+
+    if not session:
+        return RedirectResponse("/login")
+
+    user = session["user"]
+    request.state.user = user
+
+    # 🔒 regra ADMIN
+    if path.startswith("/admin") and user["role"] != "admin":
+        return RedirectResponse("/")
+
+    # 🔒 regra COMPANY
+    if path.startswith("/client"):
+        if user["role"] == "company":
+            company_id = path.split("/")[2] if len(path.split("/")) > 2 else None
+
+            if company_id != user["company_id"]:
+                return RedirectResponse("/")
+
+    return await call_next(request)

@@ -4,68 +4,143 @@
   <meta charset="UTF-8" />
   <title>Totem • AgentAI</title>
   <link rel="stylesheet" href="/static/css/app.css" />
+  <style>
+    .hidden { display: none !important; }
+    .qr-image { width: 220px; max-width: 100%; background: #fff; padding: 10px; border-radius: 16px; }
+    .final-link { word-break: break-all; font-weight: 700; }
+  </style>
 </head>
 <body class="totem-public-body">
 
 <main class="container">
   <section class="totem-stage">
-
     <div class="totem-orb" id="orb"></div>
 
     <h1 id="title">Aguardando presença...</h1>
     <p class="muted" id="subtitle">O sistema será ativado automaticamente.</p>
 
-    <div id="marketingOptions" class="quick-row"></div>
-
     <div class="card" style="margin-top:20px;max-width:900px;margin-left:auto;margin-right:auto;">
-      <textarea id="message" rows="3" placeholder="Digite aqui..." disabled></textarea>
+      <h2>Atendimento</h2>
+      <div id="answer" class="answer-box">Aguardando ativação...</div>
+
+      <div class="actions" style="margin-top:16px;">
+        <button class="btn primary hidden" onclick="unlockAudio()" id="btnAudio">Ativar som</button>
+        <button class="btn primary hidden" onclick="focusInput()" id="btnContinue">Continuar interação</button>
+        <button class="btn hidden" onclick="endSession('completed')" id="btnFinish">Encerrar e continuar no celular</button>
+      </div>
+    </div>
+
+    <div class="card hidden" id="interactionCard" style="margin-top:20px;max-width:900px;margin-left:auto;margin-right:auto;">
+      <textarea id="message" rows="3" placeholder="Digite sua pergunta..." disabled></textarea>
       <div class="actions">
         <button class="btn primary" onclick="sendMessage()" disabled id="btnSend">Enviar</button>
         <button class="btn" onclick="clearInput()">Limpar</button>
       </div>
     </div>
 
-    <div class="card" style="margin-top:20px;max-width:900px;margin-left:auto;margin-right:auto;">
-      <h2>Resposta</h2>
-      <div id="answer" class="answer-box">Aguardando ativação...</div>
+    <div class="card hidden" id="finalCard" style="margin-top:20px;max-width:900px;margin-left:auto;margin-right:auto;text-align:center;">
+      <h2>Continue no celular</h2>
+      <p id="finalMessage"></p>
+      <img id="handoffQr" class="qr-image hidden" alt="QR Code para continuar no celular" />
+      <p class="final-link" id="handoffUrl"></p>
+      <p class="muted">No celular: cadastro LGPD → ofertas → QR promocional → NPS.</p>
     </div>
-
   </section>
 </main>
 
 <script>
 const companyId = "{{ company_id }}";
-const sessionId = "totem-ui-" + Date.now();
 
+let sessionId = "totem-ui-" + Date.now();
 let currentAudio = null;
+let pendingAudioBase64 = null;
 let activated = false;
 let eventSource = null;
+let audioUnlocked = false;
+
+function byId(id) {
+  return document.getElementById(id);
+}
+
+function show(id) {
+  byId(id).classList.remove("hidden");
+}
+
+function hide(id) {
+  byId(id).classList.add("hidden");
+}
 
 function setStatus(title, subtitle, answer) {
-  document.getElementById("title").textContent = title;
-  document.getElementById("subtitle").textContent = subtitle || "";
+  byId("title").textContent = title;
+  byId("subtitle").textContent = subtitle || "";
+
   if (answer !== undefined) {
-    document.getElementById("answer").textContent = answer;
+    byId("answer").textContent = answer;
   }
 }
 
 function stopAudio() {
   if (currentAudio) {
     currentAudio.pause();
+    currentAudio.currentTime = 0;
     currentAudio = null;
   }
 }
 
-function enableUI() {
-  document.getElementById("message").disabled = false;
-  document.getElementById("btnSend").disabled = false;
-  setStatus("Como posso ajudar hoje?", "", document.getElementById("answer").textContent);
+function playAudioBase64(audioBase64) {
+  stopAudio();
+
+  if (!audioBase64) {
+    return;
+  }
+
+  pendingAudioBase64 = audioBase64;
+
+  if (!audioUnlocked) {
+    show("btnAudio");
+    return;
+  }
+
+  currentAudio = new Audio("data:audio/mp3;base64," + audioBase64);
+  currentAudio.play().catch(() => {
+    show("btnAudio");
+  });
 }
 
-async function activateTotem() {
+function unlockAudio() {
+  audioUnlocked = true;
+  hide("btnAudio");
+
+  if (pendingAudioBase64) {
+    playAudioBase64(pendingAudioBase64);
+  }
+}
+
+function enableInteraction() {
+  show("interactionCard");
+  show("btnContinue");
+  show("btnFinish");
+
+  byId("message").disabled = false;
+  byId("btnSend").disabled = false;
+}
+
+function focusInput() {
+  enableInteraction();
+  unlockAudio();
+  byId("message").focus();
+}
+
+async function activateTotemFromBackend(payload) {
   if (activated) return;
+
   activated = true;
 
+  if (payload && payload.session_id) {
+    sessionId = payload.session_id;
+  }
+
+  hide("finalCard");
   setStatus("Presença detectada", "Ativando atendimento...", "Preparando saudação...");
 
   try {
@@ -84,35 +159,34 @@ async function activateTotem() {
     }
 
     const data = await res.json();
+    const greeting = data.greeting || (payload && payload.message) || "Olá! Como posso ajudar você hoje?";
 
-    document.getElementById("answer").textContent = data.greeting || "Olá! Como posso ajudar hoje?";
-    enableUI();
+    setStatus("Como posso ajudar hoje?", "Faça uma pergunta ou toque em continuar.", greeting);
+    enableInteraction();
+    playAudioBase64(data.audio_base64);
 
-    if (data.audio_base64) {
-      currentAudio = new Audio("data:audio/mp3;base64," + data.audio_base64);
-      currentAudio.play().catch(() => {});
-    }
   } catch (error) {
     console.error("Erro ao ativar totem:", error);
-    document.getElementById("answer").textContent = "Olá! Como posso ajudar hoje?";
-    enableUI();
+
+    const fallbackGreeting = (payload && payload.message) || "Olá! Como posso ajudar você hoje?";
+    setStatus("Como posso ajudar hoje?", "", fallbackGreeting);
+    enableInteraction();
   }
 }
 
 function connectSSE() {
   eventSource = new EventSource(`/api/events/${companyId}`);
 
-  eventSource.onopen = function() {
-    console.log("SSE conectado");
-  };
-
   eventSource.onmessage = function(event) {
     try {
       const data = JSON.parse(event.data);
-      console.log("SSE recebido:", data);
 
-      if (data.type === "presence_triggered") {
-        activateTotem();
+      if (data.type === "totem_activated") {
+        activateTotemFromBackend(data.payload || {});
+      }
+
+      if (data.type === "presence_cleared") {
+        resetScreen();
       }
     } catch (error) {
       console.error("Erro ao processar SSE:", error);
@@ -125,36 +199,99 @@ function connectSSE() {
 }
 
 async function sendMessage() {
+  unlockAudio();
   stopAudio();
 
-  const message = document.getElementById("message").value.trim();
-  if (!message) return;
+  const message = byId("message").value.trim();
 
-  const res = await fetch("/totem/interact", {
+  if (!message) {
+    return;
+  }
+
+  byId("btnSend").disabled = true;
+  setStatus("Consultando...", "Buscando na FAQ e, se necessário, usando IA.", "Processando sua pergunta...");
+
+  try {
+    const res = await fetch("/totem/interact", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        company_id: companyId,
+        session_id: sessionId,
+        message,
+        prefer_audio: true
+      })
+    });
+
+    const data = await res.json();
+
+    setStatus(
+      "Resposta",
+      "Você pode continuar perguntando ou encerrar para receber o QR no celular.",
+      data.text || "Não encontrei uma resposta objetiva."
+    );
+
+    playAudioBase64(data.audio_base64);
+    byId("message").value = "";
+
+  } catch (error) {
+    console.error("Erro ao enviar mensagem:", error);
+    setStatus("Erro", "", "Não foi possível processar sua pergunta agora.");
+  } finally {
+    byId("btnSend").disabled = false;
+  }
+}
+
+async function endSession(reason) {
+  stopAudio();
+
+  const res = await fetch("/totem/end", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({
       company_id: companyId,
       session_id: sessionId,
-      message,
-      prefer_audio: true
+      reason
     })
   });
 
   const data = await res.json();
 
-  document.getElementById("answer").textContent = data.text || "";
+  hide("interactionCard");
+  hide("btnContinue");
+  hide("btnFinish");
+  hide("btnAudio");
+  show("finalCard");
 
-  if (data.audio_base64) {
-    currentAudio = new Audio("data:audio/mp3;base64," + data.audio_base64);
-    currentAudio.play().catch(() => {});
+  setStatus("Atendimento finalizado", "Continue pelo celular.", data.message || "Atendimento finalizado.");
+  byId("finalMessage").textContent = data.message || "";
+
+  if (data.handoff_qr_url) {
+    byId("handoffQr").src = data.handoff_qr_url;
+    show("handoffQr");
   }
 
-  document.getElementById("message").value = "";
+  byId("handoffUrl").textContent = data.handoff_url || "";
 }
 
 function clearInput() {
-  document.getElementById("message").value = "";
+  byId("message").value = "";
+}
+
+function resetScreen() {
+  activated = false;
+  audioUnlocked = false;
+  pendingAudioBase64 = null;
+  sessionId = "totem-ui-" + Date.now();
+
+  stopAudio();
+  hide("interactionCard");
+  hide("finalCard");
+  hide("btnAudio");
+  hide("btnContinue");
+  hide("btnFinish");
+
+  setStatus("Aguardando presença...", "O sistema será ativado automaticamente.", "Aguardando ativação...");
 }
 
 connectSSE();

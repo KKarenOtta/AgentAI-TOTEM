@@ -1,15 +1,19 @@
+from __future__ import annotations
+
+from typing import Any
+
 import requests
 
 from camera import capture_image_base64
 from config import (
-    TOTEM_API_URL,
     COMPANY_ID,
     DEVICE_ID,
     REQUEST_TIMEOUT_SECONDS,
+    TOTEM_API_URL,
 )
 
 
-def send_trigger() -> bool:
+def send_trigger(sensor_state: dict[str, Any]) -> bool:
     if not TOTEM_API_URL:
         print("Erro: TOTEM_API_URL não configurada")
         return False
@@ -22,6 +26,13 @@ def send_trigger() -> bool:
     payload = {
         "company_id": COMPANY_ID,
         "device_id": DEVICE_ID,
+        "present": True,
+        "source": "ultrasonic_camera",
+        "active_sensor": sensor_state.get("active_sensor"),
+        "distance_cm": sensor_state.get("distance_cm"),
+        "approaching": bool(sensor_state.get("approaching", False)),
+        "confidence": sensor_state.get("confidence"),
+        "sensor_payload": sensor_state,
         "image_base64": image_base64,
     }
 
@@ -43,9 +54,9 @@ def send_trigger() -> bool:
         accepted = bool(state.get("present", False))
 
         if accepted:
-            print("Presença aceita pela AWS")
+            print("Presença aceita pela API")
         else:
-            print("Presença rejeitada pela AWS")
+            print("Presença rejeitada pela API")
 
         return accepted
 

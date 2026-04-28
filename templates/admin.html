@@ -1,17 +1,20 @@
 {% extends "base.html" %}
 {% block content %}
+
 <section class="page-header">
   <div>
     <span class="badge">Admin</span>
-    <h1 class="page-title">Empresas e ambientes do totem</h1>
-    <p class="page-subtitle">Cadastre empresas e acesse dashboards operacionais.</p>
+    <h1 class="page-title">Gestão de empresas e acessos</h1>
+    <p class="page-subtitle">
+      Cadastre empresas, gerencie dashboards e controle logins por empresa.
+    </p>
   </div>
 </section>
 
 <div class="grid">
   <div class="card">
     <h2>Cadastrar nova empresa</h2>
-    <p class="muted">Crie uma nova unidade para campanhas e métricas.</p>
+    <p class="muted">Crie uma nova unidade para campanhas, métricas e totem.</p>
 
     <form method="post" action="/admin/create" class="form">
       <div class="row">
@@ -39,16 +42,92 @@
         <div class="stat-label">Empresas cadastradas</div>
         <div class="stat-value">{{ companies|length }}</div>
       </div>
+
       <div class="stat">
-        <div class="stat-label">Ambiente</div>
-        <div class="stat-value">MVP</div>
+        <div class="stat-label">Usuários empresa</div>
+        <div class="stat-value">
+          {{ users | selectattr("role", "equalto", "company") | list | length }}
+        </div>
       </div>
     </div>
   </div>
 </div>
 
 <div class="card" style="margin-top:20px;">
+  <h2>Criar ou redefinir acesso de empresa</h2>
+  <p class="muted">
+    A senha real não é exibida após salvar. Para alterar, defina uma nova senha.
+  </p>
+
+  <form method="post" action="/admin/users/save" class="form">
+    <div class="row">
+      <div>
+        <label>Usuário</label>
+        <input name="username" placeholder="Ex: flx" required />
+      </div>
+
+      <div>
+        <label>Nova senha</label>
+        <input name="password" type="password" placeholder="Digite uma senha segura" required />
+      </div>
+
+      <div>
+        <label>Empresa vinculada</label>
+        <select name="company_id" required>
+          {% for c in companies %}
+            <option value="{{ c.company_id }}">{{ c.company_id }} — {{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" type="submit">Salvar acesso</button>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2>Acessos cadastrados</h2>
+
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Usuário</th>
+          <th>Tipo</th>
+          <th>Empresa</th>
+          <th>Senha</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td><strong>{{ u.username }}</strong></td>
+          <td>{{ u.role }}</td>
+          <td>{{ u.company_id }}</td>
+          <td>{% if u.has_password %}Configurada{% else %}Pendente{% endif %}</td>
+          <td>
+            {% if u.role != "admin" %}
+              <form method="post" action="/admin/users/delete/{{ u.username }}" onsubmit="return confirm('Excluir usuário {{ u.username }}?');">
+                <button class="btn danger" type="submit">Excluir login</button>
+              </form>
+            {% else %}
+              <span class="muted">Protegido</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
   <h2>Empresas</h2>
+
   <div class="table-wrap">
     <table class="table">
       <thead>
@@ -58,6 +137,7 @@
           <th>Ações</th>
         </tr>
       </thead>
+
       <tbody>
       {% for c in companies %}
         <tr>
@@ -67,9 +147,10 @@
             <div class="actions">
               <a class="btn" href="/client/{{ c.company_id }}">Dashboard</a>
               <a class="btn" href="/client/{{ c.company_id }}/campaigns">Campanhas</a>
+              <a class="btn" href="/totem/{{ c.company_id }}">Totem</a>
 
               <form method="post" action="/admin/delete/{{ c.company_id }}" onsubmit="return confirm('Deletar {{ c.company_id }}?');">
-                <button class="btn danger" type="submit">Excluir</button>
+                <button class="btn danger" type="submit">Excluir empresa</button>
               </form>
             </div>
           </td>
@@ -79,4 +160,5 @@
     </table>
   </div>
 </div>
+
 {% endblock %}
