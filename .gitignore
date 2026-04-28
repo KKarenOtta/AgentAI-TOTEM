@@ -10,6 +10,8 @@ venv/
 data/device_handoffs/
 data/sessions.json
 data/metrics/
+*.wav
+*.log
 
 # QR CODES
 static/uploads/qrcodes/
