@@ -59,7 +59,7 @@ async def auth_middleware(request: Request, call_next):
     path = request.url.path
 
     # rotas públicas
-    public = ["/login", "/device", "/totem", "/api", "/static"]
+    public = ["/login", "/device", "/totem", "/api", "/static", "/rag-test", "/api/rag-test"]
 
     if any(path.startswith(p) for p in public):
         return await call_next(request)
