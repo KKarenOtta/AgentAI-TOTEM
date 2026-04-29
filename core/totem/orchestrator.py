@@ -21,6 +21,7 @@ from core.totem.metrics import MetricsLogger
 from core.totem.session_store import add_turn, get_or_create_session, get_state, set_state
 from core.totem.state_machine import Event, State, TRANSITIONS
 from core.totem.tts import gerar_audio
+from core.sensors.climate_store import answer_climate
 
 
 DEFAULT_GREETING = "Olá! Como posso ajudar você hoje?"
@@ -141,7 +142,15 @@ class TotemOrchestrator:
         if not pergunta:
             return "Pode me dizer o que você procura?", 1.0, "system", None
 
+<<<<<<< HEAD
         cache_key = f"faq:{company_id}:{normalize(pergunta)}"
+=======
+        climate_answer = answer_climate(company_id, pergunta)
+        if climate_answer:
+            return climate_answer
+
+        cache_key = f"{company_id}:{normalize(pergunta)}"
+>>>>>>> 50095310c6794ce1f9ab915a3480eabe21bdae65
         cached = cache_get(cache_key)
 
         if cached:
