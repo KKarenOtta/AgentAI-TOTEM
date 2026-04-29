@@ -24,6 +24,7 @@ from app.routes.auth import router as auth_router
 from app.routes.audio import router as audio_router
 from app.routes.voice_status import router as voice_status_router
 from core.totem.orchestrator import start_presence_listener
+from app.routes.rag_test import router as rag_test_router
 
 app = FastAPI()
 
@@ -44,6 +45,7 @@ app.include_router(faq_admin_router)
 app.include_router(semantic_router)
 app.include_router(device_router)
 app.include_router(totem_options_router)
+app.include_router(rag_test_router)
 
 
 @app.on_event("startup")
