@@ -23,8 +23,8 @@ from app.routes.totem_options import router as totem_options_router
 from app.routes.auth import router as auth_router
 from app.routes.audio import router as audio_router
 from app.routes.voice_status import router as voice_status_router
+
 from core.totem.orchestrator import start_presence_listener
-from app.routes.rag_test import router as rag_test_router
 
 app = FastAPI()
 
@@ -33,6 +33,7 @@ STATIC_DIR = BASE_DIR / "static"
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+# ROUTERS
 app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(api_router)
@@ -45,7 +46,6 @@ app.include_router(faq_admin_router)
 app.include_router(semantic_router)
 app.include_router(device_router)
 app.include_router(totem_options_router)
-app.include_router(rag_test_router)
 
 
 @app.on_event("startup")
@@ -58,7 +58,6 @@ async def auth_middleware(request: Request, call_next):
 
     path = request.url.path
 
-    # rotas públicas
     public = ["/login", "/device", "/totem", "/api", "/static"]
 
     if any(path.startswith(p) for p in public):
@@ -77,14 +76,13 @@ async def auth_middleware(request: Request, call_next):
     user = session["user"]
     request.state.user = user
 
-    # 🔒 regra ADMIN
     if path.startswith("/admin") and user["role"] != "admin":
         return RedirectResponse("/")
 
-    # 🔒 regra COMPANY
     if path.startswith("/client"):
         if user["role"] == "company":
-            company_id = path.split("/")[2] if len(path.split("/")) > 2 else None
+            parts = path.split("/")
+            company_id = parts[2] if len(parts) > 2 else None
 
             if company_id != user["company_id"]:
                 return RedirectResponse("/")

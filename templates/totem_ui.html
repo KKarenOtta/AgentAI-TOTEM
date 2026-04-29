@@ -169,7 +169,9 @@ function connectSSE() {
     try {
       const data = JSON.parse(event.data);
 
-      if (data.type === "totem_activated") {
+      console.log("SSE:", data);
+
+      if (data.type === "presence_detected" || data.type === "session_started") {
         activateTotemFromBackend(data.payload || {});
       }
 
@@ -177,13 +179,14 @@ function connectSSE() {
         const payload = data.payload || {};
         const status = payload.status;
         const text = payload.text || "";
+        const audio = payload.payload?.audio_base64 || payload.audio_base64;
 
         if (status === "listening") {
           setStatus("Estou escutando...", "Fale sua pergunta.", text || "Escutando...");
         }
 
         if (status === "processing") {
-          setStatus("Processando...", "Transcrevendo sua pergunta.", text || "Processando sua pergunta...");
+          setStatus("Processando...", "Transcrevendo sua pergunta.", text || "Processando...");
         }
 
         if (status === "transcribed") {
@@ -192,23 +195,32 @@ function connectSSE() {
 
         if (status === "answer_ready") {
           setStatus("Resposta", "Você pode continuar perguntando.", text);
+
+          if (audio) {
+            playAudioBase64(audio);
+          }
         }
 
         if (status === "error") {
-          setStatus("Erro", "", text || "Não consegui processar a pergunta.");
+          setStatus("Erro", "", text || "Erro ao processar.");
         }
       }
 
       if (data.type === "interaction_completed") {
         const payload = data.payload || {};
         setStatus("Resposta", "Você pode continuar perguntando.", payload.response || "");
+
+        if (payload.audio_base64) {
+          playAudioBase64(payload.audio_base64);
+        }
       }
 
       if (data.type === "presence_cleared") {
         resetScreen();
       }
+
     } catch (error) {
-      console.error("Erro ao processar SSE:", error);
+      console.error("Erro SSE:", error);
     }
   };
 
@@ -216,6 +228,7 @@ function connectSSE() {
     console.warn("Erro SSE:", error);
   };
 }
+         
 
 async function sendMessage() {
   stopAudio();

@@ -58,19 +58,6 @@ def audio_to_base64() -> str:
     return base64.b64encode(Path(AUDIO_PATH).read_bytes()).decode("utf-8")
 
 
-def play_audio_base64(audio_base64: str) -> None:
-    if not audio_base64:
-        return
-
-    Path(RESPONSE_AUDIO_PATH).write_bytes(base64.b64decode(audio_base64))
-
-    subprocess.run(
-        ["mpg123", "-q", RESPONSE_AUDIO_PATH],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-
-
 def transcribe(audio_base64: str) -> str:
     r = requests.post(
         f"{API_URL}/api/audio/transcribe",
@@ -84,7 +71,7 @@ def transcribe(audio_base64: str) -> str:
     return (r.json().get("text") or "").strip()
 
 
-def interact(text: str, session_id: str) -> None:
+def interact(text, session_id):
     r = requests.post(
         f"{API_URL}/totem/interact",
         json={
@@ -97,14 +84,10 @@ def interact(text: str, session_id: str) -> None:
     )
 
     if r.status_code != 200:
-        print("interact_error")
         return
 
     data = r.json()
-
     print("resposta:", data.get("text"))
-
-    play_audio_base64(data.get("audio_base64"))
 
 
 def loop(session_id: str) -> None:
