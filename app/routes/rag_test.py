@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from openai import OpenAI
 
-from app.database.session import SessionLocal
+from DB.session import SessionLocal
 from fastapi.templating import Jinja2Templates
 
 router = APIRouter(tags=["rag-test"])
