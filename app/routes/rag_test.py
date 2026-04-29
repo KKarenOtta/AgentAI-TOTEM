@@ -44,10 +44,14 @@ def perguntar(req: PerguntaRequest):
 
         rows = db.execute(
             text("""
-                SELECT titulo, conteudo, fonte
+                SELECT 
+                    titulo,
+                    conteudo,
+                    fonte,
+                    embedding <-> CAST(:embedding AS vector) AS distancia
                 FROM base_conhecimento
                 WHERE company_id = :company_id
-                ORDER BY embedding <-> CAST(:embedding AS vector)
+                ORDER BY distancia
                 LIMIT 3
             """),
             {
@@ -56,9 +60,9 @@ def perguntar(req: PerguntaRequest):
             },
         ).fetchall()
 
-        if not rows:
+        if not rows or rows[0].distancia > 0.8:
             return {
-                "resposta": "Não encontrei informações suficientes na base de conhecimento.",
+                "resposta": "Não encontrei essa informação na base de conhecimento.",
                 "fontes": [],
                 "contextos_recuperados": [],
                 "status": "sem_contexto",
@@ -79,21 +83,24 @@ def perguntar(req: PerguntaRequest):
                 {
                     "role": "system",
                     "content": (
-                        "Você é um assistente de atendimento da Flex Media. "
-                        "Responda em português do Brasil. "
-                        "Use somente o contexto fornecido. "
-                        "Se não souber, diga que não encontrou a informação na base."
+                        "Você é um assistente de atendimento da Flex Media.\n"
+                        "REGRA OBRIGATÓRIA: responda usando exclusivamente o CONTEXTO fornecido.\n"
+                        "Não use conhecimento externo.\n"
+                        "Não invente telefones, sites, preços, horários, endereços ou informações que não estejam no contexto.\n"
+                        "Se a resposta não estiver claramente no contexto, responda exatamente:\n"
+                        "'Não encontrei essa informação na base de conhecimento.'\n"
+                        "Responda em português do Brasil, de forma curta e objetiva."
                     ),
                 },
                 {
                     "role": "user",
                     "content": (
-                        f"Pergunta do usuário: {req.pergunta}\n\n"
-                        f"Contexto recuperado:\n{contexto}"
+                        f"PERGUNTA:\n{req.pergunta}\n\n"
+                        f"CONTEXTO AUTORIZADO:\n{contexto}"
                     ),
                 },
             ],
-            temperature=0.2,
+            temperature=0,
         )
 
         return {
@@ -104,6 +111,7 @@ def perguntar(req: PerguntaRequest):
                     "titulo": r.titulo,
                     "conteudo": r.conteudo,
                     "fonte": r.fonte,
+                    "distancia": float(r.distancia),
                 }
                 for r in rows
             ],
