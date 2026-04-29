@@ -5,28 +5,17 @@ import os
 
 from infra.realtime.event_bus import publish
 from repositories.presence_repository import PresenceRepository
-<<<<<<< HEAD
-from infra.realtime.event_bus import publish
-
-from core.vision.rekognition_adapter import RekognitionAdapter
-=======
 from core.sensors.climate_store import save_climate
->>>>>>> 50095310c6794ce1f9ab915a3480eabe21bdae65
+from core.vision.rekognition_adapter import RekognitionAdapter
 
 _presence_repo = PresenceRepository()
 
 
 class PresenceService:
     def __init__(self) -> None:
-<<<<<<< HEAD
-        self.require_image = os.getenv("PRESENCE_REQUIRE_IMAGE", "true").lower() == "true"
-        self.require_human_validation = os.getenv("PRESENCE_REQUIRE_HUMAN_VALIDATION", "true").lower() == "true"
-
-        self.rekognition = RekognitionAdapter()
-=======
         self.require_image = os.getenv("PRESENCE_REQUIRE_IMAGE", "true").strip().lower() == "true"
         self.require_human_validation = os.getenv("PRESENCE_REQUIRE_HUMAN_VALIDATION", "true").strip().lower() == "true"
->>>>>>> 50095310c6794ce1f9ab915a3480eabe21bdae65
+        self.rekognition = RekognitionAdapter()
 
     def trigger(
         self,
@@ -35,13 +24,6 @@ class PresenceService:
         image_base64: str | None = None,
         sensor_payload: dict | None = None,
     ) -> dict:
-<<<<<<< HEAD
-
-        validated = False
-
-        if self.require_image and not image_base64:
-            validated = False
-=======
         sensor_payload = sensor_payload or {}
         save_climate(company_id, device_id, sensor_payload)
 
@@ -65,35 +47,31 @@ class PresenceService:
                 "attributes": attributes,
             }
 
-        validated = False
+        validated = not self.require_human_validation
 
         if image_base64:
-            validated, detected_attributes = self._validate_human_with_image(image_base64)
-            attributes.update(detected_attributes)
->>>>>>> 50095310c6794ce1f9ab915a3480eabe21bdae65
+            validated, local_attrs = self._validate_human_with_image(image_base64)
+            attributes.update(local_attrs)
 
-        if image_base64:
-            validated = self._validate_local(image_base64)
+            if self.require_human_validation and not validated:
+                aws_validated, aws_attrs = self.rekognition.detect_human(image_base64)
+                attributes["rekognition"] = aws_attrs
 
-<<<<<<< HEAD
-            # 🔥 fallback AWS
-            if not validated:
-                validated = self.rekognition.detect_human(image_base64)
+                if aws_validated:
+                    validated = True
+                    attributes["human_validated"] = True
+                    attributes["validation_engine"] = "aws_rekognition_fallback"
+                    attributes["reason"] = "ok"
 
-        state = _presence_repo.set_present(company_id, device_id)
-        state["validated"] = validated
-        state["sensor_payload"] = sensor_payload or {}
+        if self.require_human_validation and not validated:
+            return {
+                "company_id": company_id,
+                "device_id": device_id,
+                "present": False,
+                "reason": "human_not_validated",
+                "attributes": attributes,
+            }
 
-        publish(
-            company_id=company_id,
-            event="presence_detected",
-            payload=state
-        )
-
-        return state
-
-    def _validate_local(self, image_base64: str) -> bool:
-=======
         state = _presence_repo.set_present(company_id=company_id, device_id=device_id)
         state["attributes"] = attributes
         state["validated"] = validated
@@ -113,29 +91,35 @@ class PresenceService:
         return state
 
     def _validate_human_with_image(self, image_base64: str) -> tuple[bool, dict]:
->>>>>>> 50095310c6794ce1f9ab915a3480eabe21bdae65
         try:
             import cv2
             import numpy as np
+        except Exception as exc:
+            return False, {
+                "validation_engine": "opencv_haar_v2",
+                "human_validated": False,
+                "faces_detected": 0,
+                "profiles_detected": 0,
+                "reason": f"opencv_unavailable:{type(exc).__name__}",
+            }
 
-            img = base64.b64decode(image_base64)
-            arr = np.frombuffer(img, dtype=np.uint8)
-            image = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        try:
+            image_bytes = base64.b64decode(image_base64, validate=False)
+            image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+            image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
 
             if image is None:
-                return False
+                return False, {
+                    "validation_engine": "opencv_haar_v2",
+                    "human_validated": False,
+                    "faces_detected": 0,
+                    "profiles_detected": 0,
+                    "reason": "invalid_image",
+                }
 
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            face = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+            gray = cv2.equalizeHist(gray)
 
-<<<<<<< HEAD
-            faces = face.detectMultiScale(gray, 1.1, 4)
-
-            return len(faces) > 0
-
-        except Exception:
-            return False
-=======
             frontal = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
             profile = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_profileface.xml")
 
@@ -160,6 +144,5 @@ class PresenceService:
                 "human_validated": False,
                 "faces_detected": 0,
                 "profiles_detected": 0,
-                "reason": f"validation_error: {exc}",
+                "reason": f"validation_error:{type(exc).__name__}",
             }
->>>>>>> 50095310c6794ce1f9ab915a3480eabe21bdae65

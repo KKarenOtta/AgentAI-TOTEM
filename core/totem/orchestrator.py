@@ -15,13 +15,13 @@ from ml.semantic.cache import get as cache_get, set as cache_set
 from ml.semantic.faq_engine import FAQEngine
 
 from core.faq.learning import register_use
+from core.sensors.climate_store import answer_climate
 from core.totem.company_context import answer_from_company_context, load_company_context
 from core.totem.language import detect_language
 from core.totem.metrics import MetricsLogger
 from core.totem.session_store import add_turn, get_or_create_session, get_state, set_state
 from core.totem.state_machine import Event, State, TRANSITIONS
 from core.totem.tts import gerar_audio
-from core.sensors.climate_store import answer_climate
 
 
 DEFAULT_GREETING = "Olá! Como posso ajudar você hoje?"
@@ -102,6 +102,9 @@ class TotemOrchestrator:
 
         return session_id
 
+    def handle_presence_event(self, company_id: str, payload: dict[str, Any]) -> str | None:
+        return self.on_presence_event(company_id, payload)
+
     def interact(
         self,
         company_id: str,
@@ -142,15 +145,12 @@ class TotemOrchestrator:
         if not pergunta:
             return "Pode me dizer o que você procura?", 1.0, "system", None
 
-<<<<<<< HEAD
-        cache_key = f"faq:{company_id}:{normalize(pergunta)}"
-=======
         climate_answer = answer_climate(company_id, pergunta)
         if climate_answer:
-            return climate_answer
+            text, score, source = climate_answer
+            return text, score, source, None
 
-        cache_key = f"{company_id}:{normalize(pergunta)}"
->>>>>>> 50095310c6794ce1f9ab915a3480eabe21bdae65
+        cache_key = f"faq:{company_id}:{normalize(pergunta)}"
         cached = cache_get(cache_key)
 
         if cached:
@@ -298,7 +298,7 @@ def start_presence_listener() -> None:
         while True:
             event = q.get()
 
-            if event.get("type") == "presence_detected":
+            if event.get("type") in ("presence_detected", "presence_triggered"):
                 orchestrator.on_presence_event(company_id, event.get("payload") or {})
 
     thread = threading.Thread(target=loop, daemon=True)
