@@ -7,15 +7,6 @@ from openai import OpenAI
 from pydantic import BaseModel
 from sqlalchemy import text
 
-import os
-
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-from openai import OpenAI
-from pydantic import BaseModel
-from sqlalchemy import text
-
 from DB.session import SessionLocal
 
 
