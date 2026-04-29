@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import audioop
 import base64
 import subprocess
 import time
+import wave
 
 import requests
 
@@ -13,15 +15,23 @@ SESSION_ID = f"voice-{int(time.time())}"
 AUDIO_DEVICE = "plughw:2,0"
 AUDIO_PATH = "/tmp/voice.wav"
 
+RECORD_SECONDS = 4
+MIN_RMS = 350
+MIN_TEXT_CHARS = 8
 
-def record_audio(duration: int = 4) -> bool:
+
+def record_audio(duration: int = RECORD_SECONDS) -> bool:
     result = subprocess.run(
         [
             "arecord",
-            "-D", AUDIO_DEVICE,
-            "-f", "cd",
-            "-t", "wav",
-            "-d", str(duration),
+            "-D",
+            AUDIO_DEVICE,
+            "-f",
+            "cd",
+            "-t",
+            "wav",
+            "-d",
+            str(duration),
             AUDIO_PATH,
         ],
         stdout=subprocess.DEVNULL,
@@ -34,6 +44,17 @@ def record_audio(duration: int = 4) -> bool:
         return False
 
     return True
+
+
+def audio_rms(path: str) -> int:
+    try:
+        with wave.open(path, "rb") as wav:
+            frames = wav.readframes(wav.getnframes())
+            width = wav.getsampwidth()
+            return int(audioop.rms(frames, width))
+    except Exception as exc:
+        print("rms_error:", type(exc).__name__)
+        return 0
 
 
 def audio_to_base64() -> str:
@@ -57,6 +78,25 @@ def transcribe(audio_base64: str) -> str:
     data = response.json()
     print("stt_provider:", data.get("provider"))
     return (data.get("text") or "").strip()
+
+
+def should_ignore_text(text: str) -> bool:
+    cleaned = (text or "").strip()
+
+    if len(cleaned) < MIN_TEXT_CHARS:
+        return True
+
+    lower = cleaned.lower()
+
+    noise_phrases = [
+        "oh, look what",
+        "look what",
+        "legendas",
+        "subtitles",
+        "obrigado por assistir",
+    ]
+
+    return any(phrase in lower for phrase in noise_phrases)
 
 
 def interact(text: str) -> None:
@@ -86,6 +126,7 @@ def loop() -> None:
     print("API_URL:", API_URL)
     print("AUDIO_DEVICE:", AUDIO_DEVICE)
     print("SESSION_ID:", SESSION_ID)
+    print("MIN_RMS:", MIN_RMS)
 
     while True:
         print("ouvindo...")
@@ -94,18 +135,26 @@ def loop() -> None:
             time.sleep(2)
             continue
 
+        rms = audio_rms(AUDIO_PATH)
+        print("audio_rms:", rms)
+
+        if rms < MIN_RMS:
+            print("áudio ignorado: silêncio/ruído baixo")
+            time.sleep(0.5)
+            continue
+
         audio_base64 = audio_to_base64()
         text = transcribe(audio_base64)
 
-        if not text:
-            print("sem transcrição")
-            time.sleep(1)
+        if not text or should_ignore_text(text):
+            print("transcrição ignorada:", text)
+            time.sleep(0.5)
             continue
 
         print("pergunta:", text)
         interact(text)
 
-        time.sleep(1)
+        time.sleep(0.8)
 
 
 if __name__ == "__main__":
