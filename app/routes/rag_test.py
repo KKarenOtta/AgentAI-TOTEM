@@ -24,9 +24,9 @@ class PerguntaRequest(BaseModel):
 @router.get("/rag-test/{company_id}", response_class=HTMLResponse)
 def tela_rag_test(request: Request, company_id: str):
     return templates.TemplateResponse(
-        request,
-        "rag_test.html",
-        {
+        request=request,
+        name="rag_test.html",
+        context={
             "company_id": company_id,
         },
     )
@@ -37,17 +37,23 @@ def perguntar(req: PerguntaRequest):
     db = SessionLocal()
 
     try:
+        # embedding da pergunta
         pergunta_embedding = client.embeddings.create(
             model="text-embedding-3-small",
             input=req.pergunta,
         ).data[0].embedding
 
+        # busca vetorial
         rows = db.execute(
             text("""
-                SELECT titulo, conteudo, fonte
+                SELECT 
+                    titulo,
+                    conteudo,
+                    fonte,
+                    embedding <-> CAST(:embedding AS vector) AS distancia
                 FROM base_conhecimento
                 WHERE company_id = :company_id
-                ORDER BY embedding <-> CAST(:embedding AS vector)
+                ORDER BY distancia
                 LIMIT 3
             """),
             {
@@ -58,12 +64,13 @@ def perguntar(req: PerguntaRequest):
 
         if not rows:
             return {
-                "resposta": "Não encontrei informações suficientes na base de conhecimento.",
+                "resposta": "Não encontrei essa informação na base de conhecimento.",
                 "fontes": [],
                 "contextos_recuperados": [],
                 "status": "sem_contexto",
             }
 
+        # monta contexto
         contexto = "\n\n".join(
             [
                 f"Título: {r.titulo}\nConteúdo: {r.conteudo}\nFonte: {r.fonte}"
@@ -73,23 +80,23 @@ def perguntar(req: PerguntaRequest):
 
         fontes = list(set([r.fonte for r in rows if r.fonte]))
 
+        # chamada da LLM
         resposta_llm = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {
                     "role": "system",
                     "content": (
-                        "Você é um assistente de atendimento da Flex Media. "
-                        "Responda em português do Brasil. "
-                        "Use somente o contexto fornecido. "
-                        "Se não souber, diga que não encontrou a informação na base."
+                        "Você é um assistente de atendimento.\n"
+                        "Responda usando apenas o contexto fornecido.\n"
+                        "Se não souber, diga que não encontrou a informação."
                     ),
                 },
                 {
                     "role": "user",
                     "content": (
-                        f"Pergunta do usuário: {req.pergunta}\n\n"
-                        f"Contexto recuperado:\n{contexto}"
+                        f"Pergunta:\n{req.pergunta}\n\n"
+                        f"Contexto:\n{contexto}"
                     ),
                 },
             ],
@@ -104,6 +111,7 @@ def perguntar(req: PerguntaRequest):
                     "titulo": r.titulo,
                     "conteudo": r.conteudo,
                     "fonte": r.fonte,
+                    "distancia": float(r.distancia),
                 }
                 for r in rows
             ],
