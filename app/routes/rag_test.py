@@ -24,13 +24,12 @@ class PerguntaRequest(BaseModel):
 @router.get("/rag-test/{company_id}", response_class=HTMLResponse)
 def tela_rag_test(request: Request, company_id: str):
     return templates.TemplateResponse(
-        "rag_test.html",
-        {
+        name="rag_test.html",
+        context={
             "request": request,
             "company_id": company_id,
         },
     )
-
 
 @router.post("/api/rag-test/perguntar")
 def perguntar(req: PerguntaRequest):
