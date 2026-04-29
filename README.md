@@ -1,6 +1,6 @@
 <img width="201" height="231" alt="IAgora" src="https://github.com/user-attachments/assets/29dd313b-b9f6-4df1-875f-915245640425" />
 
-# AgentAI-TOTEM — Manual de Execução e Fluxo Completo
+# AgentAI-TOTEM — Manual de Execução 
 
 ## 1. Objetivo
 
