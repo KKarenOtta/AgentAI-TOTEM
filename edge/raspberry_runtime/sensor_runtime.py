@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from edge.voice_agent import loop as voice_loop
+
 import base64
 import os
 import subprocess
 import sys
 import time
+import threading
 from pathlib import Path
 
 import requests
@@ -40,19 +43,9 @@ def endpoint(path: str) -> str:
 
 
 def best_distance(state: dict) -> float | None:
-    active_sensor = state.get("active_sensor")
     readings = state.get("ultrassons") or []
-
-    for item in readings:
-        if item.get("sensor") == active_sensor:
-            return item.get("distance_cm")
-
-    distances = [item.get("distance_cm") for item in readings if item.get("distance_cm") is not None]
+    distances = [i.get("distance_cm") for i in readings if i.get("distance_cm") is not None]
     return min(distances) if distances else None
-
-
-def is_approaching(state: dict) -> bool:
-    return any(bool(item.get("approaching")) for item in state.get("ultrassons") or [])
 
 
 def has_distance_presence(state: dict) -> bool:
@@ -79,12 +72,10 @@ def capture_image_base64() -> str | None:
     )
 
     if result.returncode != 0:
-        print("[CAMERA] erro:", result.stderr.strip())
         return None
 
     path = Path(CAPTURE_PATH)
     if not path.exists():
-        print("[CAMERA] imagem não criada")
         return None
 
     return base64.b64encode(path.read_bytes()).decode("utf-8")
@@ -96,9 +87,7 @@ def base_payload(state: dict) -> dict:
         "device_id": DEVICE_ID,
         "present": True,
         "source": "raspberry_sensors_camera",
-        "active_sensor": state.get("active_sensor"),
         "distance_cm": best_distance(state),
-        "approaching": is_approaching(state),
         "temperature": state.get("temperature"),
         "humidity": state.get("humidity"),
         "sensor_payload": state,
@@ -110,133 +99,115 @@ def send_trigger(state: dict) -> bool:
     payload["image_base64"] = capture_image_base64()
 
     try:
-        response = requests.post(
-            endpoint("trigger"),
-            json=payload,
-            timeout=REQUEST_TIMEOUT_SECONDS,
-        )
-        print(f"[TRIGGER] {response.status_code} | {response.text[:500]}")
-
-        if response.status_code != 200:
-            return False
-
-        data = response.json()
-        return bool(data.get("state", {}).get("present"))
-
-    except Exception as exc:
-        print("[ERRO TRIGGER]:", exc)
+        r = requests.post(endpoint("trigger"), json=payload, timeout=REQUEST_TIMEOUT_SECONDS)
+        return r.status_code == 200 and r.json().get("state", {}).get("present", False)
+    except:
         return False
 
 
-def send_heartbeat(state: dict) -> bool:
-    payload = base_payload(state)
-
+def send_heartbeat(state: dict):
     try:
-        response = requests.post(
-            endpoint("heartbeat"),
-            json=payload,
-            timeout=REQUEST_TIMEOUT_SECONDS,
-        )
-        print(f"[HEARTBEAT] {response.status_code} | distancia={payload.get('distance_cm')} temp={payload.get('temperature')}")
-
-        return response.status_code == 200
-
-    except Exception as exc:
-        print("[ERRO HEARTBEAT]:", exc)
-        return False
+        requests.post(endpoint("heartbeat"), json=base_payload(state), timeout=REQUEST_TIMEOUT_SECONDS)
+    except:
+        pass
 
 
-def send_clear() -> None:
-    payload = {
-        "company_id": COMPANY_ID,
-        "device_id": DEVICE_ID,
-        "present": False,
-        "source": "raspberry_absence",
-    }
-
+def send_clear():
     try:
-        response = requests.post(
+        requests.post(
             endpoint("clear"),
-            json=payload,
+            json={
+                "company_id": COMPANY_ID,
+                "device_id": DEVICE_ID,
+                "present": False,
+            },
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
-        print(f"[CLEAR] {response.status_code} | sessão encerrada por ausência")
-
-    except Exception as exc:
-        print("[ERRO CLEAR]:", exc)
+    except:
+        pass
 
 
-def main() -> None:
+def play_audio_base64(audio_b64: str):
+    if not audio_b64:
+        return
+
+    path = "/tmp/greeting.mp3"
+    Path(path).write_bytes(base64.b64decode(audio_b64))
+    subprocess.run(["mpg123", "-q", path])
+
+
+def start_voice_thread(session_id: str):
+    thread = threading.Thread(target=voice_loop, args=(session_id,), daemon=True)
+    thread.start()
+
+
+def main():
     print("Raspberry Runtime iniciado")
-    print("Modo: busca validação humana → sessão ativa → heartbeat → clear por ausência")
-    print(f"API: {TOTEM_API_URL}")
-    print(f"COMPANY_ID: {COMPANY_ID}")
-    print(f"DEVICE_ID: {DEVICE_ID}")
-    print(f"TRIGGER_COOLDOWN: {TRIGGER_COOLDOWN_SECONDS}s")
-    print(f"HEARTBEAT: {HEARTBEAT_SECONDS}s")
-    print(f"ABSENCE_TIMEOUT: {ABSENCE_TIMEOUT_SECONDS}s")
-    print(f"CAMERA_DEVICE: {CAMERA_DEVICE}")
 
     session_active = False
-    last_trigger = 0.0
-    last_heartbeat = 0.0
-    last_presence = 0.0
+    voice_started = False
+    last_trigger = 0
+    last_heartbeat = 0
+    last_presence = 0
 
     while True:
         try:
             state = update_system_state()
             now = time.time()
 
-            distance_present = has_distance_presence(state)
-            active = bool(state.get("service_session_active"))
-
-            if distance_present:
+            if has_distance_presence(state):
                 last_presence = now
 
-            if not session_active:
-                if distance_present and active and now - last_trigger >= TRIGGER_COOLDOWN_SECONDS:
-                    print(
-                        "Buscando validação humana | "
-                        f"sensor={state.get('active_sensor')} "
-                        f"distancia={best_distance(state)}cm "
-                        f"temp={state.get('temperature')} "
-                        f"umidade={state.get('humidity')}"
-                    )
+            active = bool(state.get("service_session_active"))
 
+            if not session_active:
+                if active and now - last_trigger > TRIGGER_COOLDOWN_SECONDS:
                     accepted = send_trigger(state)
                     last_trigger = now
 
                     if accepted:
+                        print("Sessão ativa")
+
+                        session_id = f"totem-{int(time.time()*1000)}"
                         session_active = True
-                        last_heartbeat = now
-                        print("Sessão ativa: validação humana aceita")
-                    else:
-                        print("Validação rejeitada; continua buscando presença real")
+
+                        # greeting
+                        try:
+                            r = requests.post(
+                                endpoint("activate"),
+                                json={
+                                    "company_id": COMPANY_ID,
+                                    "session_id": session_id,
+                                    "prefer_audio": True,
+                                },
+                                timeout=10,
+                            )
+
+                            if r.status_code == 200:
+                                play_audio_base64(r.json().get("audio_base64"))
+                        except:
+                            pass
+
+                        # voz em paralelo
+                        start_voice_thread(session_id)
+                        voice_started = True
 
             else:
-                absence_time = now - last_presence
-
-                if absence_time >= ABSENCE_TIMEOUT_SECONDS:
-                    print(f"Ausência por {round(absence_time, 1)}s: encerrando sessão")
+                if now - last_presence > ABSENCE_TIMEOUT_SECONDS:
+                    print("Sessão encerrada por ausência")
                     send_clear()
                     session_active = False
-                    last_trigger = 0.0
-                    last_heartbeat = 0.0
+                    voice_started = False
                     continue
 
-                if now - last_heartbeat >= HEARTBEAT_SECONDS:
+                if now - last_heartbeat > HEARTBEAT_SECONDS:
                     send_heartbeat(state)
                     last_heartbeat = now
 
             time.sleep(0.5)
 
         except KeyboardInterrupt:
-            print("Encerrado manualmente")
             break
-
-        except Exception as exc:
-            print("[ERRO LOOP]:", exc)
-            time.sleep(1)
 
 
 if __name__ == "__main__":
