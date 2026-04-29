@@ -23,6 +23,7 @@ from app.routes.totem_options import router as totem_options_router
 from app.routes.auth import router as auth_router
 from app.routes.audio import router as audio_router
 from app.routes.voice_status import router as voice_status_router
+from app.routes.voice_control import router as voice_control_router
 
 from core.totem.orchestrator import start_presence_listener
 
@@ -40,6 +41,7 @@ app.include_router(api_router)
 app.include_router(totem_router)
 app.include_router(audio_router)
 app.include_router(voice_status_router)
+app.include_router(voice_control_router)
 app.include_router(presence_router)
 app.include_router(analytics_router)
 app.include_router(faq_admin_router)
@@ -55,15 +57,17 @@ async def startup_event():
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-
     path = request.url.path
 
-<<<<<<< HEAD
-    public = ["/login", "/device", "/totem", "/api", "/static"]
-=======
-    # rotas públicas
-    public = ["/login", "/device", "/totem", "/api", "/static", "/rag-test", "/api/rag-test"]
->>>>>>> ebb41f420435fa47767de07d2a406b43de416aa5
+    public = [
+        "/login",
+        "/device",
+        "/totem",
+        "/api",
+        "/static",
+        "/rag-test",
+        "/api/rag-test",
+    ]
 
     if any(path.startswith(p) for p in public):
         return await call_next(request)
