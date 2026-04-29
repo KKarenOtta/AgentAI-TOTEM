@@ -15,6 +15,7 @@ from core.totem.language import detect_language
 from core.totem.metrics import MetricsLogger
 from core.totem.session_store import add_turn, get_state, set_state, get_or_create_session
 from core.totem.tts import gerar_audio
+from core.sensors.climate_store import answer_climate
 
 # NOVOS IMPORTS
 from core.totem.state_machine import State, Event, TRANSITIONS
@@ -126,6 +127,10 @@ class TotemOrchestrator:
     def _answer(self, company_id: str, pergunta: str):
         if not pergunta:
             return "Pode me dizer o que você procura?", 1.0, "system"
+
+        climate_answer = answer_climate(company_id, pergunta)
+        if climate_answer:
+            return climate_answer
 
         cache_key = f"{company_id}:{normalize(pergunta)}"
         cached = cache_get(cache_key)

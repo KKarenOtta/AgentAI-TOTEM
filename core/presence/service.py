@@ -3,7 +3,9 @@ from __future__ import annotations
 import base64
 import os
 
+from infra.realtime.event_bus import publish
 from repositories.presence_repository import PresenceRepository
+from core.sensors.climate_store import save_climate
 
 _presence_repo = PresenceRepository()
 
@@ -11,9 +13,7 @@ _presence_repo = PresenceRepository()
 class PresenceService:
     def __init__(self) -> None:
         self.require_image = os.getenv("PRESENCE_REQUIRE_IMAGE", "true").strip().lower() == "true"
-        self.require_human_validation = (
-            os.getenv("PRESENCE_REQUIRE_HUMAN_VALIDATION", "true").strip().lower() == "true"
-        )
+        self.require_human_validation = os.getenv("PRESENCE_REQUIRE_HUMAN_VALIDATION", "true").strip().lower() == "true"
 
     def trigger(
         self,
@@ -22,7 +22,10 @@ class PresenceService:
         image_base64: str | None = None,
         sensor_payload: dict | None = None,
     ) -> dict:
-        attributes: dict = {
+        sensor_payload = sensor_payload or {}
+        save_climate(company_id, device_id, sensor_payload)
+
+        attributes = {
             "validation_engine": "opencv_haar_v2",
             "human_validated": False,
             "faces_detected": 0,
@@ -30,7 +33,7 @@ class PresenceService:
             "image_received": bool(image_base64),
             "require_image": self.require_image,
             "require_human_validation": self.require_human_validation,
-            "sensor_payload": sensor_payload or {},
+            "sensor_payload": sensor_payload,
         }
 
         if self.require_image and not image_base64:
@@ -42,11 +45,11 @@ class PresenceService:
                 "attributes": attributes,
             }
 
+        validated = False
+
         if image_base64:
             validated, detected_attributes = self._validate_human_with_image(image_base64)
             attributes.update(detected_attributes)
-        else:
-            validated = False
 
         if self.require_human_validation and not validated:
             return {
@@ -59,18 +62,20 @@ class PresenceService:
 
         state = _presence_repo.set_present(company_id=company_id, device_id=device_id)
         state["attributes"] = attributes
+        state["validated"] = validated
+        state["sensor_payload"] = sensor_payload
 
-        self._publish(company_id=company_id, event="presence_triggered", payload=state)
+        publish(company_id=company_id, event="presence_detected", payload=state)
         return state
 
     def heartbeat(self, company_id: str, device_id: str) -> dict:
         state = _presence_repo.heartbeat(company_id=company_id, device_id=device_id)
-        self._publish(company_id=company_id, event="presence_heartbeat", payload=state)
+        publish(company_id=company_id, event="presence_heartbeat", payload=state)
         return state
 
     def clear(self, company_id: str, device_id: str) -> dict:
         state = _presence_repo.clear(company_id=company_id, device_id=device_id)
-        self._publish(company_id=company_id, event="presence_cleared", payload=state)
+        publish(company_id=company_id, event="presence_cleared", payload=state)
         return state
 
     def _validate_human_with_image(self, image_base64: str) -> tuple[bool, dict]:
@@ -103,14 +108,11 @@ class PresenceService:
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             gray = cv2.equalizeHist(gray)
 
-            frontal_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-            profile_path = cv2.data.haarcascades + "haarcascade_profileface.xml"
+            frontal = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+            profile = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_profileface.xml")
 
-            frontal_cascade = cv2.CascadeClassifier(frontal_path)
-            profile_cascade = cv2.CascadeClassifier(profile_path)
-
-            faces = frontal_cascade.detectMultiScale(gray, 1.10, 4, minSize=(30, 30))
-            profiles = profile_cascade.detectMultiScale(gray, 1.10, 4, minSize=(30, 30))
+            faces = frontal.detectMultiScale(gray, 1.10, 4, minSize=(30, 30))
+            profiles = profile.detectMultiScale(gray, 1.10, 4, minSize=(30, 30))
 
             faces_detected = len(faces)
             profiles_detected = len(profiles)
@@ -132,20 +134,3 @@ class PresenceService:
                 "profiles_detected": 0,
                 "reason": f"validation_error: {exc}",
             }
-
-    @staticmethod
-    def _publish(company_id: str, event: str, payload: dict) -> None:
-        try:
-            from infra.realtime.event_bus import publish
-            publish(company_id=company_id, event=event, payload=payload)
-
-            if event == "presence_triggered" and payload.get("present"):
-                try:
-                    from core.totem.orchestrator import TotemOrchestrator
-                    orchestrator = TotemOrchestrator()
-                    orchestrator.handle_presence_event(company_id, payload)
-                except Exception:
-                    pass
-
-        except Exception:
-            return

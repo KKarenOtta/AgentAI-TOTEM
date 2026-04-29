@@ -1,25 +1,44 @@
+from __future__ import annotations
+
 import base64
 import os
+import tempfile
 import time
 from typing import Tuple
 
-def stt_from_base64(audio_base64: str, language_hint: str | None = None) -> Tuple[str, float, str]:
-    """
-    Retorna (text, latency_s, provider).
-    Provider pode ser "demo" por enquanto.
-    """
-    t0 = time.perf_counter()
+from openai import OpenAI
 
-    # valida base64
+
+def stt_from_base64(audio_base64: str, language_hint: str | None = "pt") -> Tuple[str, float, str]:
+    started = time.perf_counter()
+
     try:
-        _ = base64.b64decode(audio_base64, validate=True)
+        audio_bytes = base64.b64decode(audio_base64, validate=True)
     except Exception:
-        t1 = time.perf_counter()
-        return ("[STT_DEMO] Áudio inválido (base64).", round(t1 - t0, 3), "demo")
+        return "", round(time.perf_counter() - started, 3), "invalid_base64"
 
-    # TODO: plugar STT real (OpenAI / Whisper local / HF)
-    # Por enquanto: fallback de desenvolvimento
-    t1 = time.perf_counter()
-    return ("[STT_DEMO] (texto reconhecido do áudio) Quais promoções estão ativas para mim hoje?",
-            round(t1 - t0, 3),
-            "demo")
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return "", round(time.perf_counter() - started, 3), "openai_missing_key"
+
+    suffix = ".wav"
+
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as audio_file:
+            audio_file.write(audio_bytes)
+            audio_file.flush()
+
+            client = OpenAI(api_key=api_key)
+
+            with open(audio_file.name, "rb") as file:
+                result = client.audio.transcriptions.create(
+                    model=os.getenv("OPENAI_STT_MODEL", "gpt-4o-mini-transcribe"),
+                    file=file,
+                    language=language_hint or "pt",
+                )
+
+        text = (getattr(result, "text", None) or "").strip()
+        return text, round(time.perf_counter() - started, 3), "openai"
+
+    except Exception as exc:
+        return "", round(time.perf_counter() - started, 3), f"openai_error:{type(exc).__name__}"

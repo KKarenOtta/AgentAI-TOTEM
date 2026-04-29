@@ -1,0 +1,9 @@
+{
+  "FLX-001": {
+    "company_id": "FLX-001",
+    "device_id": "TEST-DHT",
+    "temperature": 27.4,
+    "humidity": 61,
+    "updated_at_ts": 1777460375.9702146
+  }
+}
