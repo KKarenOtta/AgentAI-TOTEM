@@ -1,12 +1,14 @@
 import os
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from openai import OpenAI
 from pydantic import BaseModel
 from sqlalchemy import text
-from openai import OpenAI
 
 from DB.session import SessionLocal
-from fastapi.templating import Jinja2Templates
+
 
 router = APIRouter(tags=["rag-test"])
 
@@ -22,11 +24,11 @@ class PerguntaRequest(BaseModel):
 @router.get("/rag-test/{company_id}", response_class=HTMLResponse)
 def tela_rag_test(request: Request, company_id: str):
     return templates.TemplateResponse(
+        request,
         "rag_test.html",
         {
-            "request": request,
-            "company_id": company_id
-        }
+            "company_id": company_id,
+        },
     )
 
 
@@ -37,7 +39,7 @@ def perguntar(req: PerguntaRequest):
     try:
         pergunta_embedding = client.embeddings.create(
             model="text-embedding-3-small",
-            input=req.pergunta
+            input=req.pergunta,
         ).data[0].embedding
 
         rows = db.execute(
@@ -50,19 +52,23 @@ def perguntar(req: PerguntaRequest):
             """),
             {
                 "company_id": req.company_id,
-                "embedding": str(pergunta_embedding)
-            }
+                "embedding": str(pergunta_embedding),
+            },
         ).fetchall()
 
         if not rows:
             return {
                 "resposta": "Não encontrei informações suficientes na base de conhecimento.",
                 "fontes": [],
-                "status": "sem_contexto"
+                "contextos_recuperados": [],
+                "status": "sem_contexto",
             }
 
         contexto = "\n\n".join(
-            [f"Título: {r.titulo}\nConteúdo: {r.conteudo}\nFonte: {r.fonte}" for r in rows]
+            [
+                f"Título: {r.titulo}\nConteúdo: {r.conteudo}\nFonte: {r.fonte}"
+                for r in rows
+            ]
         )
 
         fontes = list(set([r.fonte for r in rows if r.fonte]))
@@ -77,14 +83,17 @@ def perguntar(req: PerguntaRequest):
                         "Responda em português do Brasil. "
                         "Use somente o contexto fornecido. "
                         "Se não souber, diga que não encontrou a informação na base."
-                    )
+                    ),
                 },
                 {
                     "role": "user",
-                    "content": f"Pergunta do usuário: {req.pergunta}\n\nContexto recuperado:\n{contexto}"
-                }
+                    "content": (
+                        f"Pergunta do usuário: {req.pergunta}\n\n"
+                        f"Contexto recuperado:\n{contexto}"
+                    ),
+                },
             ],
-            temperature=0.2
+            temperature=0.2,
         )
 
         return {
@@ -94,11 +103,11 @@ def perguntar(req: PerguntaRequest):
                 {
                     "titulo": r.titulo,
                     "conteudo": r.conteudo,
-                    "fonte": r.fonte
+                    "fonte": r.fonte,
                 }
                 for r in rows
             ],
-            "status": "ok"
+            "status": "ok",
         }
 
     finally:
