@@ -139,7 +139,7 @@ def device_register(
             "lgpd_consent": True,
             "source": "device_handoff",
             "research_summary": handoff.get("summary") or "",
-            "recommendations_snapshot": {},
+            "recommendations_snapshot": handoff.get("recommendations") or {},
             "ip_address": request.client.host if request.client else None,
             "user_agent": request.headers.get("user-agent"),
         }

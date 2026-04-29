@@ -29,7 +29,11 @@ def page(request: Request):
     if not _allowed(user):
         return RedirectResponse("/")
 
-    return templates.TemplateResponse("faq_admin.html", {"request": request})
+    return templates.TemplateResponse(
+        request=request,
+        name="faq_admin.html",
+        context={"request": request},
+    )
 
 
 @router.get("/items")

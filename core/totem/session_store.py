@@ -38,6 +38,7 @@ def get_or_create_session(company_id: str, session_id: str, profile: dict | None
         "profile": profile,
         "history": [],
         "last_intent": None,
+        "last_recommendations": {},
     }
 
     _save(session_id, data)
@@ -73,6 +74,24 @@ def set_last_intent(session_id: str, intent: str | None) -> None:
 
     data["last_intent"] = intent
     _save(session_id, data)
+
+
+def set_last_recommendations(session_id: str, recommendations: dict[str, Any] | None) -> None:
+    data = get_session(session_id)
+    if not data:
+        return
+
+    data["last_recommendations"] = recommendations or {}
+    _save(session_id, data)
+
+
+def get_last_recommendations(session_id: str) -> dict[str, Any]:
+    data = get_session(session_id)
+    if not data:
+        return {}
+
+    recommendations = data.get("last_recommendations")
+    return recommendations if isinstance(recommendations, dict) else {}
 
 
 def add_turn(session_id: str, user: str, bot: str) -> None:
@@ -117,6 +136,7 @@ def get_state(session_id: str) -> str:
     data = get_session(session_id)
     if not data:
         return "idle"
+
     return data.get("state", "idle")
 
 

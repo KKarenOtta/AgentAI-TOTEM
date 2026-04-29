@@ -4,9 +4,14 @@ import base64
 import os
 import tempfile
 import time
+from pathlib import Path
 from typing import Tuple
 
+from dotenv import load_dotenv
 from openai import OpenAI
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+load_dotenv(ROOT_DIR / ".env", override=True)
 
 
 def stt_from_base64(audio_base64: str, language_hint: str | None = "pt") -> Tuple[str, float, str]:
@@ -17,28 +22,35 @@ def stt_from_base64(audio_base64: str, language_hint: str | None = "pt") -> Tupl
     except Exception:
         return "", round(time.perf_counter() - started, 3), "invalid_base64"
 
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    model = os.getenv("OPENAI_STT_MODEL", "gpt-4o-mini-transcribe").strip()
+
+    print("[STT] env_file:", str(ROOT_DIR / ".env"))
+    print("[STT] key_prefix:", api_key[:10] if api_key else "NONE")
+    print("[STT] model:", model)
+
     if not api_key:
         return "", round(time.perf_counter() - started, 3), "openai_missing_key"
 
-    suffix = ".wav"
-
     try:
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as audio_file:
+        client = OpenAI(api_key=api_key)
+
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as audio_file:
             audio_file.write(audio_bytes)
             audio_file.flush()
 
-            client = OpenAI(api_key=api_key)
-
             with open(audio_file.name, "rb") as file:
                 result = client.audio.transcriptions.create(
-                    model=os.getenv("OPENAI_STT_MODEL", "gpt-4o-mini-transcribe"),
+                    model=model,
                     file=file,
                     language=language_hint or "pt",
                 )
 
         text = (getattr(result, "text", None) or "").strip()
+        print("[STT] text:", text)
+
         return text, round(time.perf_counter() - started, 3), "openai"
 
     except Exception as exc:
+        print("[STT] error:", type(exc).__name__, str(exc)[:300])
         return "", round(time.perf_counter() - started, 3), f"openai_error:{type(exc).__name__}"

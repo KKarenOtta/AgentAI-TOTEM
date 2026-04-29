@@ -62,6 +62,8 @@ async def auth_middleware(request: Request, call_next):
     public = [
         "/login",
         "/device",
+        "/store",
+        "/campaign",
         "/totem",
         "/api",
         "/static",
@@ -85,7 +87,10 @@ async def auth_middleware(request: Request, call_next):
     user = session["user"]
     request.state.user = user
 
-    if path.startswith("/admin") and user["role"] != "admin":
+    if path.startswith("/admin/faq"):
+        if user["role"] not in ("admin", "company"):
+            return RedirectResponse("/")
+    elif path.startswith("/admin") and user["role"] != "admin":
         return RedirectResponse("/")
 
     if path.startswith("/client"):

@@ -14,7 +14,11 @@ from app.services.aws_db_service import AWSDBService
 from core.totem.orchestrator import TotemOrchestrator
 from core.totem.qr import generate_qr_from_text
 from core.totem.recovery_store import save_session_handoff
-from core.totem.session_store import get_session
+from core.totem.session_store import (
+    get_last_recommendations,
+    get_session,
+    set_last_recommendations,
+)
 from core.totem.tts import gerar_audio
 
 logger = logging.getLogger(__name__)
@@ -80,15 +84,16 @@ def _handoff_url(company_id: str, session_id: str) -> str:
 
 def _build_summary(session_id: str) -> str:
     session = get_session(session_id) or {}
-    turns = session.get("turns") or []
+    history = session.get("history") or []
 
-    if not turns:
+    if not history:
         return "Sessão iniciada no totem."
 
     parts = []
-    for item in turns[-5:]:
-        question = item.get("question") or item.get("user") or ""
-        answer = item.get("answer") or item.get("bot") or ""
+
+    for item in history[-5:]:
+        question = (item.get("user") or "").strip()
+        answer = (item.get("bot") or "").strip()
 
         if question:
             parts.append(f"Pergunta: {question}")
@@ -103,11 +108,13 @@ def _save_device_handoff(company_id: str, session_id: str, url: str) -> dict:
     HANDOFF_DIR.mkdir(parents=True, exist_ok=True)
 
     summary = _build_summary(session_id)
+    recommendations = get_last_recommendations(session_id)
 
     payload = {
         "company_id": company_id,
         "session_id": session_id,
         "summary": summary,
+        "recommendations": recommendations,
         "link": url,
         "map_url": "https://zoologico.com.br/sobre/mapa-zoo-sao-paulo",
     }
@@ -120,7 +127,7 @@ def _save_device_handoff(company_id: str, session_id: str, url: str) -> dict:
             "company_id": company_id,
             "session_id": session_id,
             "research_summary": summary,
-            "recommendations_snapshot": {},
+            "recommendations_snapshot": recommendations,
             "source": "totem_device_handoff",
         }
     )
@@ -169,6 +176,8 @@ async def totem_interact(payload: InteractRequest):
         prefer_audio=payload.prefer_audio,
     )
 
+    set_last_recommendations(payload.session_id, recommendations)
+
     await db.save_interaction(
         session_id=payload.session_id,
         company_id=payload.company_id,
@@ -182,7 +191,9 @@ async def totem_interact(payload: InteractRequest):
 
     return {
         "text": resposta,
-        "recommendations": recommendations,
+        "recommendations": {},
+        "marketing_locked": True,
+        "marketing_message": "Ofertas disponíveis após cadastro e aceite LGPD no device.",
         "audio_path": audio_path,
         "audio_base64": _audio_to_base64(audio_path),
         "metric": metric,
@@ -223,6 +234,8 @@ async def totem_end(payload: EndRequest):
             "reason": payload.reason,
             "handoff_url": url,
             "handoff_qr_url": qr_url,
+            "summary": handoff.get("summary"),
+            "recommendations": handoff.get("recommendations"),
         },
     )
 
@@ -232,5 +245,6 @@ async def totem_end(payload: EndRequest):
         "handoff_url": url,
         "handoff_qr_url": qr_url,
         "summary": handoff.get("summary"),
+        "recommendations": handoff.get("recommendations"),
         "message": "Atendimento finalizado. Escaneie o QR Code para continuar no celular, fazer o cadastro e acessar as ofertas.",
     }

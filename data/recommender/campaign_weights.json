@@ -1,0 +1,750 @@
+{
+  "generated_at": "2026-04-29T14:05:56",
+  "company_id": null,
+  "campaign_weights": {
+    "CAMP-001": {
+      "weight": 1.1304,
+      "ctr": 0.1304,
+      "conversion": 0.0,
+      "raw": {
+        "impressions": 23,
+        "issued": 3,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 0
+      }
+    },
+    "CAMP-F53872": {
+      "weight": 1.1304,
+      "ctr": 0.1304,
+      "conversion": 0.0,
+      "raw": {
+        "impressions": 23,
+        "issued": 3,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 0
+      }
+    },
+    "CAMP-DDEBF7": {
+      "weight": 2.1667,
+      "ctr": 0.1667,
+      "conversion": 0.5,
+      "raw": {
+        "impressions": 12,
+        "issued": 2,
+        "redeemed": 1,
+        "leads": 0,
+        "interactions": 0
+      }
+    },
+    "test-123": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 1,
+        "interactions": 0
+      }
+    },
+    "live-1776950110023": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 1,
+        "interactions": 0
+      }
+    },
+    "live-1776950515367": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 1,
+        "interactions": 0
+      }
+    },
+    "debug-manual-001": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 1,
+        "interactions": 0
+      }
+    },
+    "live-1776951737846": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 1,
+        "interactions": 0
+      }
+    },
+    "live-1776953058807": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 2,
+        "interactions": 0
+      }
+    },
+    "live-1776954222270": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 1,
+        "interactions": 0
+      }
+    },
+    "live-1776956191715": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 1,
+        "interactions": 0
+      }
+    },
+    "live-1776957399171": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 1,
+        "interactions": 0
+      }
+    },
+    "live-1776959280159": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 1,
+        "interactions": 0
+      }
+    },
+    "fluxo-completo-001": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 1,
+        "interactions": 0
+      }
+    },
+    "live-1776961530073": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 1,
+        "interactions": 0
+      }
+    },
+    "live-1777024706040": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 2
+      }
+    },
+    "sim-web": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "live-1777026687025": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 1,
+        "interactions": 2
+      }
+    },
+    "_global": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 29
+      }
+    },
+    "totem-ui-1777035813732": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 3,
+        "interactions": 0
+      }
+    },
+    "totem-ui-1777036290020": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 3,
+        "interactions": 0
+      }
+    },
+    "SIM-SESSION-001": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "SIM-SESSION-002": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 2
+      }
+    },
+    "TEST-SESSION": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "RDS-CHECK": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "totem-ui-1777310665721": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 3
+      }
+    },
+    "totem-ui-1777311169050": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 3
+      }
+    },
+    "totem-ui-1777311769586": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "totem-ui-1777316428243": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 2
+      }
+    },
+    "debug-local-knowledge": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 6
+      }
+    },
+    "totem-ui-1777317319298": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 4
+      }
+    },
+    "debug-flow-001": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 2
+      }
+    },
+    "totem-ui-1777329202499": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "totem-ui-1777329414434": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "totem-1777402895630": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 1,
+        "interactions": 1
+      }
+    },
+    "totem-1777403519641": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "totem-1777403983702": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 2
+      }
+    },
+    "totem-1777404460738": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 1,
+        "interactions": 1
+      }
+    },
+    "totem-1777420391543": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "voice-1777459114": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 3
+      }
+    },
+    "voice-1777459910": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "voice-1777461305": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 3
+      }
+    },
+    "totem-1777462244013": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "totem-1777469357045": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 4
+      }
+    },
+    "totem-ui-1777471049880": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "totem-ui-1777474962659": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 2
+      }
+    },
+    "totem-ui-1777475384636": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "totem-ui-1777476017022": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "totem-ui-1777476318609": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 4
+      }
+    },
+    "totem-ui-1777476671276": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 2
+      }
+    },
+    "totem-ui-1777476738246": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "totem-ui-1777476761882": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "totem-ui-1777479804348": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 1,
+        "interactions": 1
+      }
+    },
+    "debug-business": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "teste-handoff-1777480846": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "teste-handoff-1777480850": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "teste-campanha-resposta-1777481210": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "teste-campanha-final-1777481355": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "totem-ui-1777480266951": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "teste-lgpd-marketing-1777481524": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "teste-contrato-lgpd-1777481693": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    },
+    "totem-ui-1777481735399": {
+      "weight": 1.0,
+      "ctr": 0,
+      "conversion": 0,
+      "raw": {
+        "impressions": 0,
+        "issued": 0,
+        "redeemed": 0,
+        "leads": 0,
+        "interactions": 1
+      }
+    }
+  }
+}

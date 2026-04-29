@@ -1,1 +1,20 @@
-[]
+[
+  {
+    "company_id": "FLX-001",
+    "question": "[stt_demo] (texto reconhecido do áudio) quais promoções estão ativas para mim hoje?",
+    "answer": "Funcionamos das 9h às 17h.",
+    "count": 2,
+    "avg_score": 1.0,
+    "source": "continuous_training",
+    "status": "pending_review"
+  },
+  {
+    "company_id": "FLX-001",
+    "question": "quero algo bom para criança pequena hoje.",
+    "answer": "Funcionamos das 9h às 17h.",
+    "count": 2,
+    "avg_score": 0.828,
+    "source": "continuous_training",
+    "status": "pending_review"
+  }
+]

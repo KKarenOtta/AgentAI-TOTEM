@@ -4,7 +4,7 @@ from typing import Any
 
 from core.faq.ranking import rank
 from core.faq.store import load_faq
-from ml.semantic.embeddings import embed, cosine
+from ml.semantic.embeddings import cosine, embed, search_embeddings
 
 
 class FAQEngine:
@@ -20,6 +20,81 @@ class FAQEngine:
         if not company_id or not query:
             return "", 0.0, None
 
+        indexed_answer = self._search_persistent_embeddings(
+            company_id=company_id,
+            query=query,
+            intent=intent,
+            min_score=min_score,
+        )
+
+        if indexed_answer:
+            return indexed_answer
+
+        return self._search_runtime_faq(
+            company_id=company_id,
+            query=query,
+            intent=intent,
+            min_score=min_score,
+        )
+
+    def _search_persistent_embeddings(
+        self,
+        company_id: str,
+        query: str,
+        intent: str | None,
+        min_score: float,
+    ) -> tuple[str, float, str | None] | None:
+        results = search_embeddings(
+            company_id=company_id,
+            namespace="faq",
+            query=query,
+            top_k=5,
+            min_score=max(0.0, min_score - 0.10),
+        )
+
+        best_result: dict[str, Any] | None = None
+        best_score = 0.0
+
+        for result in results:
+            metadata = result.get("metadata") or {}
+            answer = (metadata.get("answer") or "").strip()
+
+            if not answer:
+                continue
+
+            score = float(result.get("score") or 0)
+
+            if intent and metadata.get("intent") == intent:
+                score += 0.05
+
+            uses = float(metadata.get("uses") or 0)
+            quality_score = float(metadata.get("quality_score") or 0)
+
+            score += min(uses * 0.01, 0.15)
+            score += min(quality_score * 0.01, 0.20)
+
+            if score > best_score:
+                best_score = score
+                best_result = result
+
+        if not best_result or best_score < min_score:
+            return None
+
+        metadata = best_result.get("metadata") or {}
+
+        return (
+            (metadata.get("answer") or "").strip(),
+            round(best_score, 4),
+            (best_result.get("text") or "").strip(),
+        )
+
+    def _search_runtime_faq(
+        self,
+        company_id: str,
+        query: str,
+        intent: str | None,
+        min_score: float,
+    ) -> tuple[str, float, str | None]:
         items = rank(load_faq(company_id))
 
         if not items:
@@ -38,6 +113,7 @@ class FAQEngine:
                 continue
 
             item_embedding = item.get("embedding")
+
             if item_embedding is None:
                 item_embedding = embed(question)
 

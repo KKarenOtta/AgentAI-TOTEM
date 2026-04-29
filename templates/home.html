@@ -31,25 +31,6 @@
       {% endif %}
     {% endif %}
   </section>
-
-  <section class="card">
-    <h2>Acessos rápidos</h2>
-
-    <div class="actions">
-
-      {% if is_admin %}
-        <a class="btn primary" href="/admin">Admin</a>
-      {% endif %}
-
-      {% if featured_company %}
-        <a class="btn" href="/client/{{ featured_company.company_id }}">Dashboard</a>
-        <a class="btn" href="/totem/{{ featured_company.company_id }}">Totem</a>
-      {% endif %}
-
-      <a class="btn" href="/docs">Swagger</a>
-
-    </div>
-  </section>
 </div>
 
 {% endblock %}
