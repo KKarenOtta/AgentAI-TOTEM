@@ -20,13 +20,12 @@ class PerguntaRequest(BaseModel):
     company_id: str = "FLX-001"
     pergunta: str
 
-
 @router.get("/rag-test/{company_id}", response_class=HTMLResponse)
 def tela_rag_test(request: Request, company_id: str):
     return templates.TemplateResponse(
+        request=request,
         name="rag_test.html",
         context={
-            "request": request,
             "company_id": company_id,
         },
     )
