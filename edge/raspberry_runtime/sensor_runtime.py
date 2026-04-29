@@ -4,7 +4,6 @@ import base64
 import os
 import subprocess
 import sys
-import threading
 import time
 from pathlib import Path
 
@@ -18,16 +17,15 @@ if str(ROOT_DIR) not in sys.path:
 load_dotenv(ROOT_DIR / ".env")
 
 from alpha_test.sensor_service import update_system_state
-from edge.voice_agent import loop as voice_loop
 
 TOTEM_API_URL = os.getenv("TOTEM_API_URL", "").strip()
 COMPANY_ID = os.getenv("COMPANY_ID", "FLX-001").strip()
 DEVICE_ID = os.getenv("DEVICE_ID", "RPI3-SENSORS-001").strip()
 
 REQUEST_TIMEOUT_SECONDS = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "10"))
-TRIGGER_COOLDOWN_SECONDS = float(os.getenv("COOLDOWN_SECONDS", "10"))
-HEARTBEAT_SECONDS = float(os.getenv("HEARTBEAT_SECONDS", "10"))
+PRESENCE_HOLD_SECONDS = float(os.getenv("PRESENCE_HOLD_SECONDS", "5"))
 ABSENCE_TIMEOUT_SECONDS = float(os.getenv("ABSENCE_TIMEOUT_SECONDS", "10"))
+HEARTBEAT_SECONDS = float(os.getenv("HEARTBEAT_SECONDS", "10"))
 
 CAMERA_DEVICE = os.getenv("CAMERA_DEVICE", "/dev/video0").strip()
 CAPTURE_PATH = os.getenv("CAPTURE_PATH", "/tmp/totem_presence.jpg").strip()
@@ -47,8 +45,9 @@ def best_distance(state: dict) -> float | None:
     return min(distances) if distances else None
 
 
-def has_distance_presence(state: dict) -> bool:
-    return bool(state.get("presence")) and best_distance(state) is not None
+def has_presence_under_1m(state: dict) -> bool:
+    distance = best_distance(state)
+    return bool(state.get("presence")) and distance is not None and distance <= 100
 
 
 def capture_image_base64() -> str | None:
@@ -82,12 +81,13 @@ def capture_image_base64() -> str | None:
     return base64.b64encode(path.read_bytes()).decode("utf-8")
 
 
-def base_payload(state: dict) -> dict:
+def base_payload(state: dict, present: bool) -> dict:
     return {
         "company_id": COMPANY_ID,
         "device_id": DEVICE_ID,
-        "present": True,
+        "present": present,
         "source": "raspberry_sensors_camera",
+        "active_sensor": state.get("active_sensor"),
         "distance_cm": best_distance(state),
         "temperature": state.get("temperature"),
         "humidity": state.get("humidity"),
@@ -95,8 +95,16 @@ def base_payload(state: dict) -> dict:
     }
 
 
-def send_trigger(state: dict) -> tuple[bool, str | None]:
-    payload = base_payload(state)
+def validation_origin(engine: str | None) -> str:
+    if engine and "rekognition" in engine.lower():
+        return "AWS_REKOGNITION"
+    if engine:
+        return "LOCAL_OPENCV"
+    return "DESCONHECIDA"
+
+
+def send_trigger(state: dict) -> bool:
+    payload = base_payload(state, present=True)
     payload["image_base64"] = capture_image_base64()
 
     try:
@@ -109,27 +117,45 @@ def send_trigger(state: dict) -> tuple[bool, str | None]:
         print(f"[TRIGGER] {response.status_code} | {response.text[:300]}")
 
         if response.status_code != 200:
-            return False, None
+            return False
 
         data = response.json()
-        accepted = bool(data.get("state", {}).get("present"))
-        session_id = data.get("session_id") or f"totem-{int(time.time() * 1000)}"
+        state_payload = data.get("state") or data
+        attrs = state_payload.get("attributes") or {}
 
-        return accepted, session_id
+        accepted = bool(state_payload.get("present"))
+        engine = attrs.get("validation_engine")
+        reason = state_payload.get("reason") or attrs.get("reason")
+
+        print(
+            "[VALIDAÇÃO]",
+            {
+                "origem": validation_origin(engine),
+                "engine": engine,
+                "human_validated": attrs.get("human_validated"),
+                "faces": attrs.get("faces_detected"),
+                "profiles": attrs.get("profiles_detected"),
+                "aws": attrs.get("rekognition"),
+                "accepted": accepted,
+                "reason": reason,
+            },
+        )
+
+        return accepted
 
     except Exception as exc:
         print("[ERRO TRIGGER]:", exc)
-        return False, None
+        return False
 
 
 def send_heartbeat(state: dict) -> None:
     try:
         response = requests.post(
             endpoint("heartbeat"),
-            json=base_payload(state),
+            json=base_payload(state, present=True),
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
-        print(f"[HEARTBEAT] {response.status_code}")
+        print(f"[HEARTBEAT] {response.status_code} | distancia={best_distance(state)}")
     except Exception as exc:
         print("[ERRO HEARTBEAT]:", exc)
 
@@ -146,86 +172,86 @@ def send_clear() -> None:
             },
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
-        print(f"[CLEAR] {response.status_code}")
+        print(f"[CLEAR] {response.status_code} | reset por ausência")
     except Exception as exc:
         print("[ERRO CLEAR]:", exc)
 
 
-def start_voice_thread(session_id: str) -> threading.Thread:
-    thread = threading.Thread(target=voice_loop, args=(session_id,), daemon=True)
-    thread.start()
-    return thread
-
-
 def main() -> None:
-    print("Raspberry Runtime iniciado")
-    print("Responsabilidade: sensores + câmera + microfone")
+    print("Runtime sensores iniciado")
+    print("Fluxo: presença <1m por 5s → valida humano → sessão → ausência >10s → reset")
     print(f"API presença: {TOTEM_API_URL}")
-    print(f"COMPANY_ID: {COMPANY_ID}")
-    print(f"DEVICE_ID: {DEVICE_ID}")
 
     session_active = False
-    voice_thread: threading.Thread | None = None
-
-    last_trigger = 0.0
+    presence_started_at: float | None = None
+    absence_started_at: float | None = None
     last_heartbeat = 0.0
-    last_presence = 0.0
 
     while True:
         try:
             state = update_system_state()
             now = time.time()
 
-            distance_present = has_distance_presence(state)
-            active = bool(state.get("service_session_active"))
+            distance = best_distance(state)
+            present = has_presence_under_1m(state)
 
-            if distance_present:
-                last_presence = now
+            print(
+                "[SENSOR]",
+                {
+                    "present_under_1m": present,
+                    "distance_cm": distance,
+                    "temperature": state.get("temperature"),
+                    "humidity": state.get("humidity"),
+                    "active_sensor": state.get("active_sensor"),
+                },
+            )
+
+            if present:
+                absence_started_at = None
+                if presence_started_at is None:
+                    presence_started_at = now
+            else:
+                presence_started_at = None
+                if absence_started_at is None:
+                    absence_started_at = now
 
             if not session_active:
-                if distance_present and active and now - last_trigger >= TRIGGER_COOLDOWN_SECONDS:
-                    print(
-                        "Buscando validação humana | "
-                        f"distancia={best_distance(state)}cm "
-                        f"temp={state.get('temperature')} "
-                        f"umidade={state.get('humidity')}"
-                    )
+                if presence_started_at is not None:
+                    held = now - presence_started_at
+                    print(f"[FLOW] presença contínua: {round(held, 1)}s/{PRESENCE_HOLD_SECONDS}s")
 
-                    accepted, session_id = send_trigger(state)
-                    last_trigger = now
+                    if held >= PRESENCE_HOLD_SECONDS:
+                        print("[FLOW] presença estável; iniciando validação humana")
+                        accepted = send_trigger(state)
 
-                    if accepted:
-                        session_active = True
-                        last_heartbeat = now
+                        if accepted:
+                            session_active = True
+                            last_heartbeat = now
+                            print("[FLOW] sessão ativa; UI deve tocar greeting")
+                        else:
+                            print("[FLOW] humano não validado; aguardando nova presença estável")
 
-                        active_session_id = session_id or f"totem-{int(time.time() * 1000)}"
-
-                        print(f"Sessão ativa: {active_session_id}")
-                        print("Greeting e resposta devem sair pela página do totem, não pelo Raspberry.")
-
-                        if voice_thread is None or not voice_thread.is_alive():
-                            voice_thread = start_voice_thread(active_session_id)
-
-                    else:
-                        print("Validação rejeitada; continua buscando presença real")
+                        presence_started_at = None
 
             else:
-                absence_time = now - last_presence
+                if absence_started_at is not None:
+                    absence = now - absence_started_at
+                    print(f"[FLOW] ausência contínua: {round(absence, 1)}s/{ABSENCE_TIMEOUT_SECONDS}s")
 
-                if absence_time >= ABSENCE_TIMEOUT_SECONDS:
-                    print(f"Ausência por {round(absence_time, 1)}s: encerrando sessão")
-                    send_clear()
-                    session_active = False
-                    voice_thread = None
-                    last_trigger = 0.0
-                    last_heartbeat = 0.0
-                    continue
+                    if absence >= ABSENCE_TIMEOUT_SECONDS:
+                        send_clear()
+                        session_active = False
+                        presence_started_at = None
+                        absence_started_at = None
+                        last_heartbeat = 0.0
+                        print("[FLOW] sessão resetada; UI deve voltar para aguardando presença")
+                        continue
 
                 if now - last_heartbeat >= HEARTBEAT_SECONDS:
                     send_heartbeat(state)
                     last_heartbeat = now
 
-            time.sleep(0.5)
+            time.sleep(1)
 
         except KeyboardInterrupt:
             print("Encerrado manualmente")
