@@ -88,8 +88,11 @@ async function playAudioBase64(audioBase64) {
   stopAudio();
 
   if (!audioBase64) {
+    console.warn("audio_base64 vazio");
     return;
   }
+
+  console.log("audio_base64 recebido:", audioBase64.length);
 
   try {
     currentAudio = new Audio("data:audio/mp3;base64," + audioBase64);
@@ -168,6 +171,37 @@ function connectSSE() {
 
       if (data.type === "totem_activated") {
         activateTotemFromBackend(data.payload || {});
+      }
+
+      if (data.type === "voice_status") {
+        const payload = data.payload || {};
+        const status = payload.status;
+        const text = payload.text || "";
+
+        if (status === "listening") {
+          setStatus("Estou escutando...", "Fale sua pergunta.", text || "Escutando...");
+        }
+
+        if (status === "processing") {
+          setStatus("Processando...", "Transcrevendo sua pergunta.", text || "Processando sua pergunta...");
+        }
+
+        if (status === "transcribed") {
+          setStatus("Pergunta recebida", "Gerando resposta.", text);
+        }
+
+        if (status === "answer_ready") {
+          setStatus("Resposta", "Você pode continuar perguntando.", text);
+        }
+
+        if (status === "error") {
+          setStatus("Erro", "", text || "Não consegui processar a pergunta.");
+        }
+      }
+
+      if (data.type === "interaction_completed") {
+        const payload = data.payload || {};
+        setStatus("Resposta", "Você pode continuar perguntando.", payload.response || "");
       }
 
       if (data.type === "presence_cleared") {

@@ -2,8 +2,8 @@
   "FLX-001": {
     "company_id": "FLX-001",
     "device_id": "RPI3-SENSORS-001",
-    "temperature": 25.4,
-    "humidity": 77.9,
-    "updated_at_ts": 1777461237.106627
+    "temperature": 25.8,
+    "humidity": 77.7,
+    "updated_at_ts": 1777463790.966771
   }
 }
