@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 load_dotenv()
 
 from core.auth.session_store import get_session
-
+from app.routes.rag_test import router as rag_test_router
 from app.routes.dashboard import router as dashboard_router
 from app.routes.api import router as api_router
 from app.routes.totem import router as totem_router
@@ -35,6 +35,7 @@ STATIC_DIR = BASE_DIR / "static"
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # ROUTERS
+app.include_router(rag_test_router)
 app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(api_router)
