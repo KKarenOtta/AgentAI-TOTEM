@@ -21,6 +21,8 @@ from app.routes.semantic_dashboard import router as semantic_router
 from app.routes.device import router as device_router
 from app.routes.totem_options import router as totem_options_router
 from app.routes.auth import router as auth_router
+from app.routes.audio import router as audio_router
+from core.totem.orchestrator import start_presence_listener
 
 app = FastAPI()
 
@@ -33,12 +35,18 @@ app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(api_router)
 app.include_router(totem_router)
+app.include_router(audio_router)
 app.include_router(presence_router)
 app.include_router(analytics_router)
 app.include_router(faq_admin_router)
 app.include_router(semantic_router)
 app.include_router(device_router)
 app.include_router(totem_options_router)
+
+
+@app.on_event("startup")
+async def startup_event():
+    start_presence_listener()
 
 
 @app.middleware("http")

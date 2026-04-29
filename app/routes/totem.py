@@ -182,7 +182,7 @@ async def totem_interact(payload: InteractRequest):
 
     return {
         "text": resposta,
-        "recommendations": {"top_actions": []},
+        "recommendations": recommendations,
         "audio_path": audio_path,
         "audio_base64": _audio_to_base64(audio_path),
         "metric": metric,

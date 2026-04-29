@@ -4,28 +4,6 @@
   <meta charset="UTF-8" />
   <title>AgentAI-TOTEM</title>
   <link rel="stylesheet" href="/static/css/app.css" />
-  <style>
-    .nav-right {
-      margin-left: auto;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .user-badge {
-      font-weight: 600;
-      opacity: 0.8;
-    }
-
-    .logout-btn {
-      background: #ef4444;
-      color: white;
-      padding: 6px 10px;
-      border-radius: 8px;
-      text-decoration: none;
-      font-weight: 700;
-    }
-  </style>
 </head>
 <body>
   <header class="topbar">
@@ -41,24 +19,22 @@
 
         {% if user.role == "admin" %}
           <a href="/admin">Admin</a>
+          <a href="/admin/faq/">FAQ</a>
         {% endif %}
 
-        {% if user.company_id and user.company_id != "*" %}
+        {% if user.role == "company" %}
           <a href="/client/{{ user.company_id }}">Dashboard</a>
           <a href="/client/{{ user.company_id }}/campaigns">Campanhas</a>
           <a href="/totem/{{ user.company_id }}">Totem</a>
+
+          <!-- 🔥 FAQ PARA EMPRESA -->
+          <a href="/admin/faq/">FAQ</a>
         {% endif %}
 
-        <a href="/admin/faq/">FAQ</a>
-        <a href="/static/dashboard/index.html">Analytics</a>
         <a href="/docs">Docs</a>
 
-        <div class="nav-right">
-          <span class="user-badge">
-            {{ user.username }} ({{ user.role }})
-          </span>
-          <a href="/logout" class="logout-btn">Sair</a>
-        </div>
+        <span>{{ user.username }}</span>
+        <a href="/logout">Sair</a>
 
       {% else %}
         <a href="/login">Login</a>

@@ -24,7 +24,6 @@
       <div id="answer" class="answer-box">Aguardando ativação...</div>
 
       <div class="actions" style="margin-top:16px;">
-        <button class="btn primary hidden" onclick="unlockAudio()" id="btnAudio">Ativar som</button>
         <button class="btn primary hidden" onclick="focusInput()" id="btnContinue">Continuar interação</button>
         <button class="btn hidden" onclick="endSession('completed')" id="btnFinish">Encerrar e continuar no celular</button>
       </div>
@@ -53,10 +52,8 @@ const companyId = "{{ company_id }}";
 
 let sessionId = "totem-ui-" + Date.now();
 let currentAudio = null;
-let pendingAudioBase64 = null;
 let activated = false;
 let eventSource = null;
-let audioUnlocked = false;
 
 function byId(id) {
   return document.getElementById(id);
@@ -87,32 +84,20 @@ function stopAudio() {
   }
 }
 
-function playAudioBase64(audioBase64) {
+async function playAudioBase64(audioBase64) {
   stopAudio();
 
   if (!audioBase64) {
     return;
   }
 
-  pendingAudioBase64 = audioBase64;
-
-  if (!audioUnlocked) {
-    show("btnAudio");
-    return;
-  }
-
-  currentAudio = new Audio("data:audio/mp3;base64," + audioBase64);
-  currentAudio.play().catch(() => {
-    show("btnAudio");
-  });
-}
-
-function unlockAudio() {
-  audioUnlocked = true;
-  hide("btnAudio");
-
-  if (pendingAudioBase64) {
-    playAudioBase64(pendingAudioBase64);
+  try {
+    currentAudio = new Audio("data:audio/mp3;base64," + audioBase64);
+    currentAudio.autoplay = true;
+    currentAudio.playsInline = true;
+    await currentAudio.play();
+  } catch (error) {
+    console.warn("Navegador bloqueou autoplay de áudio:", error);
   }
 }
 
@@ -127,7 +112,6 @@ function enableInteraction() {
 
 function focusInput() {
   enableInteraction();
-  unlockAudio();
   byId("message").focus();
 }
 
@@ -163,7 +147,8 @@ async function activateTotemFromBackend(payload) {
 
     setStatus("Como posso ajudar hoje?", "Faça uma pergunta ou toque em continuar.", greeting);
     enableInteraction();
-    playAudioBase64(data.audio_base64);
+
+    await playAudioBase64(data.audio_base64);
 
   } catch (error) {
     console.error("Erro ao ativar totem:", error);
@@ -199,7 +184,6 @@ function connectSSE() {
 }
 
 async function sendMessage() {
-  unlockAudio();
   stopAudio();
 
   const message = byId("message").value.trim();
@@ -231,7 +215,7 @@ async function sendMessage() {
       data.text || "Não encontrei uma resposta objetiva."
     );
 
-    playAudioBase64(data.audio_base64);
+    await playAudioBase64(data.audio_base64);
     byId("message").value = "";
 
   } catch (error) {
@@ -260,7 +244,6 @@ async function endSession(reason) {
   hide("interactionCard");
   hide("btnContinue");
   hide("btnFinish");
-  hide("btnAudio");
   show("finalCard");
 
   setStatus("Atendimento finalizado", "Continue pelo celular.", data.message || "Atendimento finalizado.");
@@ -280,14 +263,11 @@ function clearInput() {
 
 function resetScreen() {
   activated = false;
-  audioUnlocked = false;
-  pendingAudioBase64 = null;
   sessionId = "totem-ui-" + Date.now();
 
   stopAudio();
   hide("interactionCard");
   hide("finalCard");
-  hide("btnAudio");
   hide("btnContinue");
   hide("btnFinish");
 

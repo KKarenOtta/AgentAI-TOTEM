@@ -1,0 +1,9 @@
+[
+  {
+    "question": "qual o hor\u00e1rio de funcionamento",
+    "answer": "Funcionamos das 9h \u00e0s 17h.",
+    "intent": "horario",
+    "score": 1,
+    "uses": 2
+  }
+]

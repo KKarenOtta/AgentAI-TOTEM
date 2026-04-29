@@ -1,57 +1,64 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
+from typing import Any
 
+from core.faq.ranking import rank
+from core.faq.store import load_faq
 from ml.semantic.embeddings import embed, cosine
-
-FAQ_FILE = Path("data/zoo_faq.json")
-HISTORY_FILE = Path("data/conversation_history.jsonl")
 
 
 class FAQEngine:
-    def __init__(self):
-        self.data = []
-        self._load()
+    def search(
+        self,
+        company_id: str,
+        query: str,
+        intent: str | None = None,
+        min_score: float = 0.5,
+    ) -> tuple[str, float, str | None]:
+        query = (query or "").strip()
 
-    def _load(self):
-        if FAQ_FILE.exists():
-            raw = json.loads(FAQ_FILE.read_text())
-            for item in raw:
-                self.data.append({
-                    "question": item["question"],
-                    "answer": item["answer"],
-                    "embedding": embed(item["question"]),
-                    "weight": 1.0
-                })
+        if not company_id or not query:
+            return "", 0.0, None
 
-        # histórico aumenta peso
-        if HISTORY_FILE.exists():
-            for line in HISTORY_FILE.read_text().splitlines():
-                entry = json.loads(line)
-                if entry.get("score", 0) > 0.7:
-                    self.data.append({
-                        "question": entry["question"],
-                        "answer": entry["answer"],
-                        "embedding": embed(entry["question"]),
-                        "weight": 1.5
-                    })
+        items = rank(load_faq(company_id))
 
-    def search(self, query, intent):
-        q_emb = embed(query)
+        if not items:
+            return "", 0.0, None
 
-        best = None
-        best_score = 0
+        query_embedding = embed(query)
 
-        for item in self.data:
-            sim = cosine(q_emb, item["embedding"])
-            score = sim * item["weight"]
+        best_item: dict[str, Any] | None = None
+        best_score = 0.0
 
-            if score > best_score:
-                best_score = score
-                best = item
+        for item in items:
+            question = (item.get("question") or "").strip()
+            answer = (item.get("answer") or "").strip()
 
-        if best and best_score > 0.5:
-            return best["answer"], best_score
+            if not question or not answer:
+                continue
 
-        return "", best_score
+            item_embedding = item.get("embedding")
+            if item_embedding is None:
+                item_embedding = embed(question)
+
+            semantic_score = cosine(query_embedding, item_embedding)
+            usage_weight = min(float(item.get("uses") or 0) * 0.01, 0.15)
+            quality_weight = min(float(item.get("score") or 0) * 0.01, 0.20)
+
+            final_score = semantic_score + usage_weight + quality_weight
+
+            if intent and item.get("intent") == intent:
+                final_score += 0.05
+
+            if final_score > best_score:
+                best_score = final_score
+                best_item = item
+
+        if not best_item or best_score < min_score:
+            return "", round(best_score, 4), None
+
+        return (
+            (best_item.get("answer") or "").strip(),
+            round(best_score, 4),
+            (best_item.get("question") or "").strip(),
+        )
