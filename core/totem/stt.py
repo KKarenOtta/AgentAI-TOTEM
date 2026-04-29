@@ -25,10 +25,6 @@ def stt_from_base64(audio_base64: str, language_hint: str | None = "pt") -> Tupl
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     model = os.getenv("OPENAI_STT_MODEL", "gpt-4o-mini-transcribe").strip()
 
-    print("[STT] env_file:", str(ROOT_DIR / ".env"))
-    print("[STT] key_prefix:", api_key[:10] if api_key else "NONE")
-    print("[STT] model:", model)
-
     if not api_key:
         return "", round(time.perf_counter() - started, 3), "openai_missing_key"
 
@@ -47,10 +43,7 @@ def stt_from_base64(audio_base64: str, language_hint: str | None = "pt") -> Tupl
                 )
 
         text = (getattr(result, "text", None) or "").strip()
-        print("[STT] text:", text)
-
         return text, round(time.perf_counter() - started, 3), "openai"
 
     except Exception as exc:
-        print("[STT] error:", type(exc).__name__, str(exc)[:300])
         return "", round(time.perf_counter() - started, 3), f"openai_error:{type(exc).__name__}"
