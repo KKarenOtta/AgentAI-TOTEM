@@ -115,10 +115,8 @@ O sistema utiliza uma arquitetura híbrida com:
 	Acessos no navegador
 	Usuário (Totem)
 	http://127.0.0.1:8000/totem/FLX-001
-	Interface live
-	http://127.0.0.1:8000/totem/live/FLX-001
 	Admin (FAQ)
-	http://127.0.0.1:8000/admin/faq
+	http://127.0.0.1:8000/login
 
 ### 4.4 Rodar pipeline manual
 	python - <<'PY'
