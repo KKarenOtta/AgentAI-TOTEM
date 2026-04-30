@@ -1,6 +1,6 @@
 <img width="201" height="231" alt="IAgora" src="https://github.com/user-attachments/assets/29dd313b-b9f6-4df1-875f-915245640425" />
 
-#TOTEM I.A.Gora — Plataforma Inteligente de Atendimento com IA Multimodal
+# TOTEM I.A.Gora — Plataforma Inteligente de Atendimento com IA Multimodal
 
 O TOTEM I.A.Gora é uma plataforma de atendimento inteligente baseada em IA, projetada para ambientes físicos (white-label).
 Ele integra visão computacional, voz, linguagem natural e recomendação inteligente, permitindo interação fluida entre usuários e sistemas digitais.
