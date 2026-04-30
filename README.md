@@ -108,25 +108,104 @@ O sistema utiliza uma arquitetura híbrida com:
 
 ### 4.3 Rodar aplicação
 	Terminal 1 — API
-	uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-	Terminal 2 — Worker Celery
-	celery -A infra.async_tasks.celery_app worker --loglevel=info --pool=solo
-	
-	Acessos no navegador
+	cd ~/Desktop/AgentAI-TOTEM
+	source venv/bin/activate
+	uvicorn app.main:app \
+	  --host 0.0.0.0 \
+	  --port 8000 \
+	  --reload \
+	  --reload-dir app \
+	  --reload-dir core \
+	  --reload-dir ml \
+	  --reload-dir templates \
+	  --reload-dir static
+
+	Terminal 2 - Escutar eventos
+		curl -N "http://127.0.0.1:8000/api/events/FLX-001"
+	  
+	Terminal 3 — Ativar REDIS
+		brew services start redis
+		TESTAR: redis-cli ping (resposta esperada: PONG)
+
+	 Terminal 4 - Worker Celery
+	cd ~/Desktop/AgentAI-TOTEM
+	source venv/bin/activate
+	celery -A infra.async_tasks.celery_app worker \
+ 	 --loglevel=info \
+  	 --pool=solo
+
+	 Terminal 5 - Testes ML/RN + Pipeline
+	 	GERAR DATATSET DE INTENÇAO
+			cd ~/Desktop/AgentAI-TOTEM
+			source venv/bin/activate
+			python ml/intent/dataset_builder.py
+			wc -l data/ml/intent/dataset.jsonl
+			head data/ml/intent/dataset.jsonl
+
+		TREINAR MODELO MANUAL
+			python ml/intent/train.py
+		
+		TESTAR INFERENCIA
+			python - <<'PY'
+			from ml.intent.predictor import predict
+			tests = [
+			    "onde ficam os pinguins?",
+			    "que horas fecha?",
+			    "tem desconto hoje?",
+			    "onde comer?",
+			    "tem banheiro?",
+			    "onde ficam as flores?"
+			]
+			for t in tests:
+			    intent, conf = predict(t)
+			    print(t, "=>", intent, conf)
+			PY
+		
+		DISPARAR PIPELINE COMPLETA (CELERY)
+			python - <<'PY'
+			from infra.async_tasks.tasks import full_pipeline
+			result = full_pipeline.delay()
+			print("task_id:", result.id)
+			PY
+
+		VER RELATORIO DO MODELO
+			cat data/ml/intent/reports/training_report.json
+		
+	Abrir acessos no navegador
 	Usuário (Totem)
 	http://127.0.0.1:8000/totem/FLX-001
-	Admin (FAQ)
+	Admin/Empresa
 	http://127.0.0.1:8000/login
+	- acesso: admin | senha: 123456
+			  flx   | senha: flz123
+			  
+	 Terminal 6 - acesso [raspberry]
+			arp -a
+			ssh lostgear@raspberrypi.local
+			Confirmar hostname -I
+			ping 192.168.15.12
+			senha: ****
+			cd AgentAI-TOTEM
+			source venv/bin/activate
 
-### 4.4 Rodar pipeline manual
-	python - <<'PY'
-	from infra.async_tasks.tasks import full_pipeline
-	
-	full_pipeline.delay()
-	PY
-	
-### 4.5 Gerar relatório completo
-	cat data/ml/intent/reports/training_report.json
+	Terminal 7 - [raspberry]
+			SUBIR SERVIDOR DE VOZ:
+				cd ~/AgentAI-TOTEM
+				source venv/bin/activate	
+				python edge/voice_server.py
+
+	Terminal 8 - [raspberry]
+				cd ~/AgentAI-TOTEM
+				source venv/bin/activate
+				which python
+				which python3
+				python -c "import flask; print(flask.__version__)"
+				
+				cd alpha_test
+				python app.py
+
+				Navegador: http://192.168.15.15:5000/
+				
 
 ## 5. Métricas Utilizadas
 	ML (Intent)
