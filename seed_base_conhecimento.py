@@ -8,7 +8,7 @@ from openai import OpenAI
 from sqlalchemy import create_engine, text
 
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
+ROOT_DIR = Path(__file__).resolve().parent
 sys.path.append(str(ROOT_DIR))
 
 load_dotenv(ROOT_DIR / ".env")
