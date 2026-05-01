@@ -8,9 +8,8 @@ from openai import OpenAI
 from sqlalchemy import create_engine, text
 
 
-ROOT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = Path(__file__).resolve().parents
 sys.path.append(str(ROOT_DIR))
-
 load_dotenv(ROOT_DIR / ".env")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -38,7 +37,7 @@ def lista_para_texto(lista):
     if not lista:
         return "não informado"
     if isinstance(lista, list):
-        return ", ".join(lista)
+        return ", ".join(str(item) for item in lista if item)
     return str(lista)
 
 
@@ -66,22 +65,22 @@ def montar_documentos_company_contexts(data: dict):
                 f"Descrição: {descricao}. "
                 f"O local possui atrações, área de visitação, lojas, praça de alimentação, "
                 f"serviços, banheiros e atendimento ao visitante. "
-                f"Este texto responde perguntas sobre estrutura geral, funcionamento do local, "
-                f"o que existe no zoológico, facilidades disponíveis e atendimento ao público."
+                f"Este conteúdo responde perguntas sobre estrutura geral, funcionamento, "
+                f"facilidades, atendimento ao público e o que existe no zoológico."
             ),
             "fonte": "company_contexts.json",
         })
 
         documentos.append({
             "company_id": company_id,
-            "titulo": f"{company_id} - endereço localização e como chegar",
+            "titulo": f"{company_id} - endereço localização e referência",
             "conteudo": (
                 f"O endereço completo do zoológico é {location.get('address', '')}. "
-                f"A referência de localização é: {location.get('reference', '')}. "
+                f"A referência de localização é {location.get('reference', '')}. "
                 f"O link do mapa é {location.get('map_url', '')}. "
                 f"O mapa oficial é {location.get('official_map_url', '')}. "
-                f"Este texto responde perguntas sobre endereço, localização, onde fica, "
-                f"como chegar, ponto de referência, referência próxima e mapa."
+                f"Este conteúdo responde perguntas sobre endereço, onde fica, localização, "
+                f"como chegar, referência próxima, ponto de referência e mapa."
             ),
             "fonte": "company_contexts.json",
         })
@@ -93,8 +92,8 @@ def montar_documentos_company_contexts(data: dict):
                 f"O horário de funcionamento de segunda a sábado é {hours.get('monday_to_saturday', '')}. "
                 f"O horário de funcionamento aos domingos é {hours.get('sunday', '')}. "
                 f"Em feriados: {hours.get('holidays', '')}. "
-                f"Se o visitante perguntar sobre sábado, domingo, dias de semana, entrada, "
-                f"abertura, fechamento ou horário de visita, use estas informações."
+                f"Este conteúdo responde perguntas sobre horário, funcionamento, sábado, domingo, "
+                f"dias de semana, feriados, abertura, fechamento e horário de visita."
             ),
             "fonte": "company_contexts.json",
         })
@@ -106,7 +105,7 @@ def montar_documentos_company_contexts(data: dict):
                 f"O telefone de contato é {contacts.get('phone', '')}. "
                 f"O email de atendimento é {contacts.get('email', '')}. "
                 f"O site oficial é {contacts.get('site', '')}. "
-                f"Este texto responde perguntas sobre telefone, email, site, contato, "
+                f"Este conteúdo responde perguntas sobre telefone, email, site, contato, "
                 f"atendimento e como falar com o zoológico."
             ),
             "fonte": "company_contexts.json",
@@ -118,16 +117,16 @@ def montar_documentos_company_contexts(data: dict):
 
         documentos.append({
             "company_id": company_id,
-            "titulo": f"{company_id} - resumo de serviços lojas atrações e facilidades",
+            "titulo": f"{company_id} - serviços lojas atrações e facilidades",
             "conteudo": (
                 f"As principais facilidades do zoológico incluem serviços, lojas, atrações, "
                 f"praça de alimentação e atendimento ao visitante. "
                 f"Serviços disponíveis: {lista_para_texto(nomes_servicos)}. "
                 f"Lojas e estabelecimentos comerciais: {lista_para_texto(nomes_lojas)}. "
                 f"Atrações e pontos de interesse: {lista_para_texto(nomes_atracoes)}. "
-                f"Este texto responde perguntas sobre estrutura completa, facilidades, "
+                f"Este conteúdo responde perguntas sobre estrutura completa, facilidades, "
                 f"serviços ao visitante, alimentação, descanso, lojas, comércio, atrações "
-                f"e preparo para receber o público."
+                f"e estrutura para receber o público."
             ),
             "fonte": "company_contexts.json",
         })
@@ -142,7 +141,7 @@ def montar_documentos_company_contexts(data: dict):
                     f"Zona ou área: {service.get('zone', '')}. "
                     f"Referência de localização: {service.get('reference', '')}. "
                     f"Tags relacionadas: {lista_para_texto(service.get('tags', []))}. "
-                    f"Este texto responde perguntas sobre serviço, atendimento, ajuda, "
+                    f"Este conteúdo responde perguntas sobre serviços, atendimento, ajuda, "
                     f"banheiro, fraldário, informação, apoio ao visitante e estrutura."
                 ),
                 "fonte": "company_contexts.json",
@@ -158,8 +157,8 @@ def montar_documentos_company_contexts(data: dict):
                     f"Zona ou área interna: {store.get('zone', '')}. "
                     f"Referência de localização: {store.get('reference', '')}. "
                     f"Tags relacionadas: {lista_para_texto(store.get('tags', []))}. "
-                    f"Este texto responde perguntas sobre lojas, comércio, estabelecimentos comerciais, "
-                    f"lembranças, presentes, souvenirs, roupa, camiseta, brinquedo, alimentação, "
+                    f"Este conteúdo responde perguntas sobre lojas, comércio, estabelecimentos comerciais, "
+                    f"lembranças, presentes, souvenirs, roupas, camisetas, brinquedos, alimentação, "
                     f"comida, lanche, café, restaurante e praça de alimentação."
                 ),
                 "fonte": "company_contexts.json",
@@ -174,7 +173,7 @@ def montar_documentos_company_contexts(data: dict):
                     f"Categoria da atração: {attraction.get('category', '')}. "
                     f"Referência de localização: {attraction.get('reference', '')}. "
                     f"Tags relacionadas: {lista_para_texto(attraction.get('tags', []))}. "
-                    f"Este texto responde perguntas sobre atrações, animais, visitação, "
+                    f"Este conteúdo responde perguntas sobre atrações, animais, visitação, "
                     f"áreas do zoológico, espécies, pontos de interesse, leões, felinos, "
                     f"pinguins, área kids, alimentação e lazer."
                 ),
@@ -198,7 +197,7 @@ def montar_documentos_company_contexts(data: dict):
                 "titulo": f"{company_id} - política e observação",
                 "conteudo": (
                     f"Política ou observação importante: {policy}. "
-                    f"Este texto responde perguntas sobre regras, limitações, alterações, "
+                    f"Este conteúdo responde perguntas sobre regras, limitações, alterações, "
                     f"promoções, campanhas e confirmação de informações."
                 ),
                 "fonte": "company_contexts.json",
@@ -244,10 +243,14 @@ def carregar_documentos():
     if company_contexts_path.exists():
         data = json.loads(company_contexts_path.read_text(encoding="utf-8"))
         documentos.extend(montar_documentos_company_contexts(data))
+    else:
+        print(f"Arquivo não encontrado: {company_contexts_path}")
 
     if zoo_faq_path.exists():
         data = json.loads(zoo_faq_path.read_text(encoding="utf-8"))
         documentos.extend(montar_documentos_zoo_faq(data))
+    else:
+        print(f"Arquivo não encontrado: {zoo_faq_path}")
 
     return documentos
 
@@ -281,25 +284,4 @@ def main():
             embedding = gerar_embedding(doc["conteudo"])
 
             conn.execute(
-                text("""
-                    INSERT INTO base_conhecimento
-                    (company_id, titulo, conteudo, fonte, embedding)
-                    VALUES
-                    (:company_id, :titulo, :conteudo, :fonte, :embedding)
-                """),
-                {
-                    "company_id": doc["company_id"],
-                    "titulo": doc["titulo"],
-                    "conteudo": doc["conteudo"],
-                    "fonte": doc["fonte"],
-                    "embedding": str(embedding),
-                },
-            )
-
-            total += 1
-
-        print(f"Base vetorizada com sucesso. {total} documentos inseridos.")
-
-
-if __name__ == "__main__":
-    main()
+     
