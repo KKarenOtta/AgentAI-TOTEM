@@ -8,12 +8,20 @@ from openai import OpenAI
 from sqlalchemy import create_engine, text
 
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
+ROOT_DIR = Path(__file__).resolve().parent
 sys.path.append(str(ROOT_DIR))
-load_dotenv(ROOT_DIR / ".env")
+
+# Carrega todos os lugares possíveis onde seu projeto guarda variáveis
+load_dotenv(ROOT_DIR / ".env", override=True)
+load_dotenv(ROOT_DIR / ".env.prod", override=True)
+load_dotenv("/home/ubuntu/totem.env", override=True)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+print("ROOT_DIR:", ROOT_DIR)
+print("DATABASE_URL carregada:", "SIM" if DATABASE_URL else "NÃO")
+print("OPENAI_API_KEY carregada:", "SIM" if OPENAI_API_KEY else "NÃO")
 
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL não definida.")
@@ -23,7 +31,6 @@ if not OPENAI_API_KEY:
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 engine = create_engine(DATABASE_URL)
-
 
 def gerar_embedding(conteudo: str):
     response = client.embeddings.create(
