@@ -8,7 +8,7 @@ from openai import OpenAI
 from sqlalchemy import create_engine, text
 
 
-ROOT_DIR = Path(__file__).resolve().parents
+ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT_DIR))
 load_dotenv(ROOT_DIR / ".env")
 
@@ -284,4 +284,25 @@ def main():
             embedding = gerar_embedding(doc["conteudo"])
 
             conn.execute(
-     
+                text("""
+                    INSERT INTO base_conhecimento
+                    (company_id, titulo, conteudo, fonte, embedding)
+                    VALUES
+                    (:company_id, :titulo, :conteudo, :fonte, :embedding)
+                """),
+                {
+                    "company_id": doc["company_id"],
+                    "titulo": doc["titulo"],
+                    "conteudo": doc["conteudo"],
+                    "fonte": doc["fonte"],
+                    "embedding": str(embedding),
+                },
+            )
+
+            total += 1
+
+    print(f"Base vetorizada com sucesso. {total} documentos inseridos.")
+
+
+if __name__ == "__main__":
+    main()
