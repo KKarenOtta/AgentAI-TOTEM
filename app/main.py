@@ -26,6 +26,7 @@ from app.routes.voice_status import router as voice_status_router
 from app.routes.voice_control import router as voice_control_router
 
 from core.totem.orchestrator import start_presence_listener
+from app.services.aws_db_service import init_db_pool, close_db_pool
 
 app = FastAPI()
 
@@ -53,8 +54,13 @@ app.include_router(totem_options_router)
 
 @app.on_event("startup")
 async def startup_event():
+    await init_db_pool()
     start_presence_listener()
 
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await close_db_pool()
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
