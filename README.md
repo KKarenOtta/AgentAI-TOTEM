@@ -187,6 +187,7 @@ O sistema utiliza uma arquitetura híbrida com:
 			senha: ****
 			cd AgentAI-TOTEM
 			source venv/bin/activate
+			python edge/raspberry_runtime/sensor_runtime.py
 
 	Terminal 7 - [raspberry]
 			SUBIR SERVIDOR DE VOZ:
@@ -197,8 +198,6 @@ O sistema utiliza uma arquitetura híbrida com:
 	Terminal 8 - [raspberry]
 				cd ~/AgentAI-TOTEM
 				source venv/bin/activate
-				which python
-				which python3
 				python -c "import flask; print(flask.__version__)"
 				
 				cd alpha_test
