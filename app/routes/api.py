@@ -23,6 +23,7 @@ from infra.realtime.event_bus import subscribe, unsubscribe
 from core.totem.coupon_store import redeem_coupon
 from core.totem.lead_store import save_lead
 from core.totem.metrics import MetricsLogger
+from core.dashboard.service import build_company_dashboard
 from core.totem.qr import generate_qr_from_text
 from core.totem.recovery_store import save_session_handoff
 from core.totem.schemas import (
@@ -141,7 +142,7 @@ def get_metrics(company_id: str, days: int = 7):
 
 @router.get("/api/dashboard/{company_id}")
 def get_marketing_dashboard(company_id: str):
-    data = metrics_logger.build_dashboard(company_id)
+    data = build_company_dashboard(company_id)
     return JSONResponse(data)
 
 

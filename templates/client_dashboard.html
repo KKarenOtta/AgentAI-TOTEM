@@ -1,33 +1,50 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h1>Performance de Marketing • {{ company_id }}</h1>
+<h1>Dashboard Enterprise • {{ company_id }}</h1>
+
+<p style="opacity:.75;margin-top:6px;">
+  Métricas operacionais, IA, campanhas, leads, LGPD e sincronização.
+</p>
 
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:20px;">
+  <div class="card"><div>Sessões</div><h2 id="sessions">—</h2></div>
+  <div class="card"><div>Interações</div><h2 id="interactions">—</h2></div>
+  <div class="card"><div>Leads</div><h2 id="leads">—</h2></div>
+  <div class="card"><div>Conversão</div><h2 id="conversion">—</h2></div>
+  <div class="card"><div>Cupons emitidos</div><h2 id="issued">—</h2></div>
+  <div class="card"><div>Cupons resgatados</div><h2 id="redeemed">—</h2></div>
+  <div class="card"><div>NPS médio</div><h2 id="nps">—</h2></div>
+  <div class="card"><div>Latência média</div><h2 id="latency">—</h2></div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:30px;">
   <div class="card">
-    <div>Leads</div>
-    <h2 id="leads">—</h2>
+    <h2>Saúde da sincronização</h2>
+    <div id="sync"></div>
   </div>
 
   <div class="card">
-    <div>Cupons emitidos</div>
-    <h2 id="issued">—</h2>
-  </div>
-
-  <div class="card">
-    <div>Cupons resgatados</div>
-    <h2 id="redeemed">—</h2>
-  </div>
-
-  <div class="card">
-    <div>Conversão</div>
-    <h2 id="conversion">—</h2>
+    <h2>IA operacional</h2>
+    <div id="ai"></div>
   </div>
 </div>
 
 <div class="card" style="margin-top:30px;">
   <h2>Campanhas</h2>
   <div id="campaigns"></div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:30px;">
+  <div class="card">
+    <h2>Intenções detectadas</h2>
+    <div id="intents"></div>
+  </div>
+
+  <div class="card">
+    <h2>Fontes de resposta</h2>
+    <div id="sources"></div>
+  </div>
 </div>
 
 <div class="card" style="margin-top:30px;">
@@ -38,35 +55,76 @@
 <script>
 const companyId = "{{ company_id }}";
 
-async function load() {
+function value(data, path, fallback = 0) {
+  return path.split(".").reduce((acc, key) => acc && acc[key], data) ?? fallback;
+}
+
+function renderList(rows, labelKey = "name", valueKey = "count") {
+  if (!rows || !rows.length) {
+    return "<div style='opacity:.75;'>Nenhum dado encontrado.</div>";
+  }
+
+  return rows.map(row => `
+    <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #333;">
+      <span>${row[labelKey]}</span>
+      <strong>${row[valueKey]}</strong>
+    </div>
+  `).join("");
+}
+
+async function loadDashboard() {
   const res = await fetch(`/api/dashboard/${companyId}`);
   const data = await res.json();
+  const kpis = data.kpis || {};
 
-  document.getElementById("leads").textContent = data.kpis.leads;
-  document.getElementById("issued").textContent = data.kpis.issued;
-  document.getElementById("redeemed").textContent = data.kpis.redeemed;
-  document.getElementById("conversion").textContent = data.kpis.conversion + "%";
+  document.getElementById("sessions").textContent = kpis.sessions ?? 0;
+  document.getElementById("interactions").textContent = kpis.interactions ?? 0;
+  document.getElementById("leads").textContent = kpis.leads ?? 0;
+  document.getElementById("conversion").textContent = `${kpis.conversion ?? 0}%`;
+  document.getElementById("issued").textContent = kpis.issued ?? 0;
+  document.getElementById("redeemed").textContent = kpis.redeemed ?? 0;
+  document.getElementById("nps").textContent = `${kpis.nps_avg ?? 0} (${kpis.nps_count ?? 0})`;
+  document.getElementById("latency").textContent = `${kpis.avg_latency ?? 0}s`;
 
-  const campaigns = document.getElementById("campaigns");
-  campaigns.innerHTML = (data.campaigns || []).map(c => `
-    <div style="padding:12px;border-bottom:1px solid #333;">
+  const sync = data.sync_health || {};
+  document.getElementById("sync").innerHTML = `
+    <div>Pendente: <strong>${sync.pending ?? 0}</strong></div>
+    <div>Falhou: <strong>${sync.failed ?? 0}</strong></div>
+    <div>Sincronizado: <strong>${sync.synced ?? 0}</strong></div>
+    <div>Total: <strong>${sync.total ?? 0}</strong></div>
+  `;
+
+  const ai = data.ai || {};
+  document.getElementById("ai").innerHTML = `
+    <div>Semantic hit rate: <strong>${ai.semantic_hit_rate ?? 0}%</strong></div>
+    <div>Fallback LLM: <strong>${ai.fallback_rate ?? 0}%</strong></div>
+  `;
+
+  document.getElementById("intents").innerHTML = renderList(ai.intents || []);
+  document.getElementById("sources").innerHTML = renderList(ai.response_sources || []);
+
+  const campaigns = data.campaigns || [];
+  document.getElementById("campaigns").innerHTML = campaigns.length ? campaigns.map(c => `
+    <div style="padding:12px 0;border-bottom:1px solid #333;">
       <strong>${c.campaign_id}</strong><br>
-      Emitidos: ${c.issued} |
-      Resgatados: ${c.redeemed} |
-      Conversão: ${c.conversion}%
+      Impressões: ${c.impressions ?? 0} |
+      Emitidos: ${c.issued ?? 0} |
+      Resgatados: ${c.redeemed ?? 0} |
+      CTR: ${c.ctr ?? 0}% |
+      Conversão: ${c.conversion ?? 0}%
     </div>
-  `).join("") || "<div>Nenhuma campanha encontrada.</div>";
+  `).join("") : "<div>Nenhuma campanha encontrada.</div>";
 
-  const stores = document.getElementById("stores");
-  stores.innerHTML = (data.stores || []).map(s => `
-    <div style="padding:12px;border-bottom:1px solid #333;">
+  const stores = data.stores || [];
+  document.getElementById("stores").innerHTML = stores.length ? stores.map(s => `
+    <div style="padding:12px 0;border-bottom:1px solid #333;">
       <strong>${s.store_id}</strong><br>
       Resgates: ${s.redeemed}
     </div>
-  `).join("") || "<div>Nenhum resgate por loja encontrado.</div>";
+  `).join("") : "<div>Nenhum resgate por loja encontrado.</div>";
 }
 
-load();
+loadDashboard();
 </script>
 
 {% endblock %}
