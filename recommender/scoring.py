@@ -4,6 +4,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+from ml.business.predict import predict_conversion_score
+
+
 WEIGHTS_PATH = Path("data/recommender/campaign_weights.json")
 
 
@@ -75,10 +78,26 @@ def _campaign_learning_weight(campaign_id: str | None) -> tuple[float, str]:
     return normalized, f"learning={round(normalized, 2)}"
 
 
+def _ml_conversion_weight(company_id: str | None, campaign: dict[str, Any]) -> tuple[float, str]:
+    if not company_id:
+        return 0.0, "ml_conversion=0.00"
+
+    try:
+        probability = predict_conversion_score(company_id, campaign)
+    except Exception:
+        probability = 0.0
+
+    probability = max(0.0, min(float(probability or 0.0), 1.0))
+    weighted_score = probability * 1.25
+
+    return weighted_score, f"ml_conversion={round(probability, 4)}"
+
+
 def score_campaign(
     campaign: dict[str, Any],
     profile: dict[str, Any] | None,
     intent: str | None = None,
+    company_id: str | None = None,
 ) -> tuple[float, str]:
     profile = profile or {}
     intent = intent or "general"
@@ -134,5 +153,9 @@ def score_campaign(
     learning_score, learning_reason = _campaign_learning_weight(campaign_id)
     score += learning_score
     why.append(learning_reason)
+
+    ml_score, ml_reason = _ml_conversion_weight(company_id, campaign)
+    score += ml_score
+    why.append(ml_reason)
 
     return round(score, 4), ", ".join(why)

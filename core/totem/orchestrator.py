@@ -11,6 +11,7 @@ from infra.realtime.event_bus import publish, subscribe
 from marketing.campaigns import get_active_campaigns
 from recommender.rules import recommend_actions
 
+from ml.intent.predictor import predict as predict_intent
 from ml.semantic.cache import get as cache_get, set as cache_set
 from ml.semantic.faq_engine import FAQEngine
 
@@ -25,10 +26,23 @@ from core.totem.tts import gerar_audio
 
 
 DEFAULT_GREETING = "Olá! Como posso ajudar você hoje?"
+MIN_INTENT_CONFIDENCE = 0.45
 
 
 def normalize(text: str) -> str:
     return (text or "").strip().lower()
+
+
+def detect_intent_safe(text: str) -> tuple[str | None, float]:
+    try:
+        intent, confidence = predict_intent(text)
+    except Exception:
+        return None, 0.0
+
+    if not intent or confidence < MIN_INTENT_CONFIDENCE:
+        return None, float(confidence or 0.0)
+
+    return intent, float(confidence)
 
 
 class TotemOrchestrator:
@@ -118,11 +132,13 @@ class TotemOrchestrator:
 
         pergunta = (pergunta or "").strip()
         idioma = detect_language(pergunta)
+        profile = profile or {}
 
-        get_or_create_session(company_id=company_id, session_id=session_id, profile=profile or {})
+        get_or_create_session(company_id=company_id, session_id=session_id, profile=profile)
         self._transition(session_id, Event.USER_MESSAGE)
 
-        resposta, score, source, matched_question = self._answer(company_id, pergunta)
+        intent, intent_confidence = detect_intent_safe(pergunta)
+        resposta, score, source, matched_question = self._answer(company_id, pergunta, intent)
 
         if source == "faq" and matched_question:
             register_use(company_id, matched_question)
@@ -138,10 +154,17 @@ class TotemOrchestrator:
             score=score,
             source=source,
             matched_question=matched_question,
-            profile=profile or {},
+            profile=profile,
+            intent=intent,
+            intent_confidence=intent_confidence,
         )
 
-    def _answer(self, company_id: str, pergunta: str) -> tuple[str, float, str, str | None]:
+    def _answer(
+        self,
+        company_id: str,
+        pergunta: str,
+        intent: str | None,
+    ) -> tuple[str, float, str, str | None]:
         if not pergunta:
             return "Pode me dizer o que você procura?", 1.0, "system", None
 
@@ -150,7 +173,7 @@ class TotemOrchestrator:
             text, score, source = climate_answer
             return text, score, source, None
 
-        cache_key = f"faq:{company_id}:{normalize(pergunta)}"
+        cache_key = f"faq:{company_id}:{intent or 'general'}:{normalize(pergunta)}"
         cached = cache_get(cache_key)
 
         if cached:
@@ -166,7 +189,7 @@ class TotemOrchestrator:
         faq_answer, faq_score, matched_question = self.faq.search(
             company_id=company_id,
             query=pergunta,
-            intent=None,
+            intent=intent,
             min_score=0.5,
         )
 
@@ -175,9 +198,9 @@ class TotemOrchestrator:
             cache_set(cache_key, answer)
             return answer, faq_score, "faq", matched_question
 
-        return self._llm_answer(company_id, pergunta), 0.55, "llm", None
+        return self._llm_answer(company_id, pergunta, intent), 0.55, "llm", None
 
-    def _llm_answer(self, company_id: str, pergunta: str) -> str:
+    def _llm_answer(self, company_id: str, pergunta: str, intent: str | None = None) -> str:
         context = load_company_context(company_id)
 
         api_key = os.getenv("OPENAI_API_KEY")
@@ -188,6 +211,8 @@ class TotemOrchestrator:
             from openai import OpenAI
 
             client = OpenAI(api_key=api_key)
+
+            intent_context = f"Intenção classificada: {intent}" if intent else "Intenção classificada: não disponível"
 
             response = client.chat.completions.create(
                 model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
@@ -201,7 +226,7 @@ class TotemOrchestrator:
                     },
                     {
                         "role": "system",
-                        "content": f"Contexto da empresa:\n{context}",
+                        "content": f"{intent_context}\n\nContexto da empresa:\n{context}",
                     },
                     {
                         "role": "user",
@@ -230,6 +255,8 @@ class TotemOrchestrator:
         source: str,
         matched_question: str | None,
         profile: dict[str, Any],
+        intent: str | None,
+        intent_confidence: float,
     ):
         add_turn(session_id, pergunta, resposta)
 
@@ -244,7 +271,8 @@ class TotemOrchestrator:
         recommendations = recommend_actions(
             profile=profile,
             active_campaigns=campaigns,
-            intent=None,
+            intent=intent,
+            company_id=company_id,
         )
 
         audio_path = None
@@ -259,6 +287,8 @@ class TotemOrchestrator:
             "score": score,
             "latency": latency,
             "matched_question": matched_question,
+            "intent": intent,
+            "intent_confidence": round(float(intent_confidence or 0.0), 4),
         }
 
         self.metrics.save(
@@ -272,6 +302,8 @@ class TotemOrchestrator:
                 "matched_question": matched_question,
                 "score": score,
                 "latency": latency,
+                "intent": intent,
+                "intent_confidence": round(float(intent_confidence or 0.0), 4),
             }
         )
 
