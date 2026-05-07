@@ -34,3 +34,9 @@ sed
 # backups locais
 *.bak
 *.broken.bak
+
+# TOTEM runtime
+runtime/pids/*
+runtime/logs/*.log
+!runtime/pids/.gitkeep
+!runtime/logs/.gitkeep
