@@ -29,7 +29,6 @@ def _rds_enabled() -> bool:
         "AWS_DB_USER",
         "AWS_DB_PASSWORD",
     ]
-
     return all(_env(name) for name in required)
 
 
@@ -40,8 +39,26 @@ def _build_dsn() -> str:
     )
 
 
+def _json(value: Any) -> str:
+    return json.dumps(value or {}, ensure_ascii=False)
+
+
+def _parse_dt(value: Any) -> datetime | None:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value))
+    except Exception:
+        return None
+
+
 async def init_db_pool() -> None:
     global _pool
+
+    if _pool:
+        return
 
     if not _rds_enabled():
         logger.warning("RDS desativado: variáveis AWS_DB_* incompletas.")
@@ -61,7 +78,6 @@ async def init_db_pool() -> None:
             timeout=timeout,
         )
         logger.info("RDS conectado.")
-
     except Exception as exc:
         logger.warning("RDS indisponível no startup; seguindo sem RDS: %s", type(exc).__name__)
         _pool = None
@@ -86,20 +102,17 @@ class AWSDBService:
             return
 
         async with _pool.acquire() as conn:
-            try:
-                await conn.execute(
-                    """
-                    INSERT INTO sessions (session_id, company_id, device_id, started_at)
-                    VALUES ($1, $2, $3, $4)
-                    ON CONFLICT (session_id) DO NOTHING
-                    """,
-                    session_id,
-                    company_id,
-                    device_id,
-                    _now(),
-                )
-            except Exception as exc:
-                logger.error("RDS session start error: %s", exc)
+            await conn.execute(
+                """
+                INSERT INTO sessions (session_id, company_id, device_id, started_at)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (session_id) DO NOTHING
+                """,
+                session_id,
+                company_id,
+                device_id,
+                _now(),
+            )
 
     async def save_session_end(
         self,
@@ -110,23 +123,20 @@ class AWSDBService:
             return
 
         async with _pool.acquire() as conn:
-            try:
-                await conn.execute(
-                    """
-                    UPDATE sessions
-                    SET ended_at = $2,
-                        total_turns = (
-                            SELECT COUNT(*)
-                            FROM interactions
-                            WHERE interactions.session_id = sessions.session_id
-                        )
-                    WHERE session_id = $1
-                    """,
-                    session_id,
-                    _now(),
-                )
-            except Exception as exc:
-                logger.error("RDS session end error: %s", exc)
+            await conn.execute(
+                """
+                UPDATE sessions
+                SET ended_at = $2,
+                    total_turns = (
+                        SELECT COUNT(*)
+                        FROM interactions
+                        WHERE interactions.session_id = sessions.session_id
+                    )
+                WHERE session_id = $1
+                """,
+                session_id,
+                _now(),
+            )
 
     async def save_interaction(
         self,
@@ -143,53 +153,50 @@ class AWSDBService:
             return
 
         async with _pool.acquire() as conn:
-            try:
-                turn_index = await conn.fetchval(
-                    """
-                    SELECT COALESCE(MAX(turn_index), 0) + 1
-                    FROM interactions
-                    WHERE session_id = $1
-                    """,
-                    session_id,
-                )
+            turn_index = await conn.fetchval(
+                """
+                SELECT COALESCE(MAX(turn_index), 0) + 1
+                FROM interactions
+                WHERE session_id = $1
+                """,
+                session_id,
+            )
 
-                latency_total_s = round((response_time_ms or 0) / 1000, 3)
+            latency_total_s = round((response_time_ms or 0) / 1000, 3)
 
-                await conn.execute(
-                    """
-                    INSERT INTO interactions (
-                        session_id,
-                        company_id,
-                        turn_index,
-                        input_mode,
-                        question,
-                        response,
-                        language_detected,
-                        llm_provider_used,
-                        latency_llm_s,
-                        latency_tts_s,
-                        latency_total_s,
-                        llm_meta,
-                        created_at
-                    )
-                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13)
-                    """,
+            await conn.execute(
+                """
+                INSERT INTO interactions (
                     session_id,
                     company_id,
                     turn_index,
-                    "text",
-                    message_user,
-                    message_bot,
+                    input_mode,
+                    question,
+                    response,
                     language_detected,
-                    response_source,
+                    llm_provider_used,
+                    latency_llm_s,
+                    latency_tts_s,
                     latency_total_s,
-                    None,
-                    latency_total_s,
-                    json.dumps(llm_meta or {}, ensure_ascii=False),
-                    _now(),
+                    llm_meta,
+                    created_at
                 )
-            except Exception as exc:
-                logger.error("RDS interaction error: %s", exc)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13)
+                """,
+                session_id,
+                company_id,
+                turn_index,
+                "text",
+                message_user,
+                message_bot,
+                language_detected,
+                response_source,
+                latency_total_s,
+                None,
+                latency_total_s,
+                _json(llm_meta),
+                _now(),
+            )
 
     async def save_event(
         self,
@@ -202,20 +209,17 @@ class AWSDBService:
             return
 
         async with _pool.acquire() as conn:
-            try:
-                await conn.execute(
-                    """
-                    INSERT INTO events (company_id, session_id, event_type, payload, created_at)
-                    VALUES ($1, $2, $3, $4::jsonb, $5)
-                    """,
-                    company_id,
-                    session_id,
-                    event_type,
-                    json.dumps(payload or {}, ensure_ascii=False),
-                    _now(),
-                )
-            except Exception as exc:
-                logger.error("RDS event error: %s", exc)
+            await conn.execute(
+                """
+                INSERT INTO events (company_id, session_id, event_type, payload, created_at)
+                VALUES ($1, $2, $3, $4::jsonb, $5)
+                """,
+                company_id,
+                session_id,
+                event_type,
+                _json(payload),
+                _now(),
+            )
 
     async def save_nps(
         self,
@@ -228,20 +232,17 @@ class AWSDBService:
             return
 
         async with _pool.acquire() as conn:
-            try:
-                await conn.execute(
-                    """
-                    INSERT INTO nps (company_id, session_id, score, comment, created_at)
-                    VALUES ($1, $2, $3, $4, $5)
-                    """,
-                    company_id,
-                    session_id,
-                    score,
-                    comment,
-                    _now(),
-                )
-            except Exception as exc:
-                logger.error("RDS nps error: %s", exc)
+            await conn.execute(
+                """
+                INSERT INTO nps (company_id, session_id, score, comment, created_at)
+                VALUES ($1, $2, $3, $4, $5)
+                """,
+                company_id,
+                session_id,
+                score,
+                comment,
+                _now(),
+            )
 
     async def save_conversion(
         self,
@@ -256,27 +257,225 @@ class AWSDBService:
             return
 
         async with _pool.acquire() as conn:
-            try:
-                await conn.execute(
-                    """
-                    INSERT INTO conversions (
-                        company_id,
-                        session_id,
-                        campaign_id,
-                        action_id,
-                        action_label,
-                        value,
-                        created_at
-                    )
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)
-                    """,
+            await conn.execute(
+                """
+                INSERT INTO conversions (
                     company_id,
                     session_id,
                     campaign_id,
                     action_id,
                     action_label,
                     value,
-                    _now(),
+                    created_at
                 )
-            except Exception as exc:
-                logger.error("RDS conversion error: %s", exc)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                """,
+                company_id,
+                session_id,
+                campaign_id,
+                action_id,
+                action_label,
+                value,
+                _now(),
+            )
+
+    async def insert_metric(self, payload: dict[str, Any]) -> None:
+        if not _pool:
+            raise RuntimeError("RDS pool indisponível.")
+
+        async with _pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO metrics_events (
+                    company_id,
+                    session_id,
+                    event_type,
+                    payload,
+                    created_at
+                )
+                VALUES ($1, $2, $3, $4::jsonb, COALESCE($5, NOW()))
+                """,
+                payload.get("company_id"),
+                payload.get("session_id"),
+                payload.get("event") or payload.get("event_type") or "unknown",
+                _json(payload),
+                _parse_dt(payload.get("timestamp") or payload.get("created_at")),
+            )
+
+    async def upsert_lead(self, payload: dict[str, Any]) -> None:
+        if not _pool:
+            raise RuntimeError("RDS pool indisponível.")
+
+        async with _pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO leads (
+                    lead_id,
+                    company_id,
+                    session_id,
+                    full_name,
+                    email,
+                    cpf,
+                    phone,
+                    age,
+                    gender,
+                    favorite_brands,
+                    lgpd_consent,
+                    newsletter_opt_in,
+                    consent_version,
+                    source,
+                    ip_address,
+                    user_agent,
+                    access_page_url,
+                    recovery_page_url,
+                    access_qr_url,
+                    recovery_qr_url,
+                    payload,
+                    created_at,
+                    updated_at
+                )
+                VALUES (
+                    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,
+                    $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
+                    $21::jsonb,
+                    COALESCE($22, NOW()),
+                    COALESCE($23, NOW())
+                )
+                ON CONFLICT (lead_id)
+                DO UPDATE SET
+                    company_id = EXCLUDED.company_id,
+                    session_id = EXCLUDED.session_id,
+                    full_name = EXCLUDED.full_name,
+                    email = EXCLUDED.email,
+                    cpf = EXCLUDED.cpf,
+                    phone = EXCLUDED.phone,
+                    age = EXCLUDED.age,
+                    gender = EXCLUDED.gender,
+                    favorite_brands = EXCLUDED.favorite_brands,
+                    lgpd_consent = EXCLUDED.lgpd_consent,
+                    newsletter_opt_in = EXCLUDED.newsletter_opt_in,
+                    consent_version = EXCLUDED.consent_version,
+                    source = EXCLUDED.source,
+                    ip_address = EXCLUDED.ip_address,
+                    user_agent = EXCLUDED.user_agent,
+                    access_page_url = EXCLUDED.access_page_url,
+                    recovery_page_url = EXCLUDED.recovery_page_url,
+                    access_qr_url = EXCLUDED.access_qr_url,
+                    recovery_qr_url = EXCLUDED.recovery_qr_url,
+                    payload = EXCLUDED.payload,
+                    updated_at = NOW()
+                """,
+                payload["lead_id"],
+                payload["company_id"],
+                payload["session_id"],
+                payload.get("full_name"),
+                payload["email"],
+                payload.get("cpf"),
+                payload.get("phone"),
+                int(payload.get("age") or 0),
+                payload.get("gender"),
+                _json(payload.get("favorite_brands") or []),
+                bool(payload.get("lgpd_consent")),
+                bool(payload.get("newsletter_opt_in", True)),
+                payload.get("consent_version"),
+                payload.get("source"),
+                payload.get("ip_address"),
+                payload.get("user_agent"),
+                payload.get("access_page_url"),
+                payload.get("recovery_page_url"),
+                payload.get("access_qr_url"),
+                payload.get("recovery_qr_url"),
+                _json(payload),
+                _parse_dt(payload.get("created_at") or payload.get("timestamp")),
+                _parse_dt(payload.get("updated_at")),
+            )
+
+    async def insert_consent(self, payload: dict[str, Any]) -> None:
+        if not _pool:
+            raise RuntimeError("RDS pool indisponível.")
+
+        async with _pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO consents (
+                    consent_id,
+                    company_id,
+                    session_id,
+                    lead_id,
+                    email,
+                    full_name,
+                    lgpd_consent,
+                    newsletter_opt_in,
+                    consent_version,
+                    consent_text,
+                    source,
+                    ip_address,
+                    user_agent,
+                    payload,
+                    created_at
+                )
+                VALUES (
+                    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
+                    $14::jsonb,
+                    COALESCE($15, NOW())
+                )
+                ON CONFLICT (consent_id) DO NOTHING
+                """,
+                payload["consent_id"],
+                payload["company_id"],
+                payload["session_id"],
+                payload.get("lead_id"),
+                payload["email"],
+                payload.get("full_name"),
+                bool(payload.get("lgpd_consent")),
+                bool(payload.get("newsletter_opt_in", True)),
+                payload.get("consent_version"),
+                payload.get("consent_text"),
+                payload.get("source"),
+                payload.get("ip_address"),
+                payload.get("user_agent"),
+                _json(payload),
+                _parse_dt(payload.get("timestamp") or payload.get("created_at")),
+            )
+
+    async def record_sync_audit(self, sync_item: dict[str, Any], status: str, error: str | None = None) -> None:
+        if not _pool:
+            raise RuntimeError("RDS pool indisponível.")
+
+        async with _pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO sync_audit (
+                    sync_id,
+                    entity,
+                    operation,
+                    company_id,
+                    session_id,
+                    status,
+                    attempts,
+                    last_error,
+                    payload,
+                    created_at,
+                    synced_at
+                )
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,COALESCE($10, NOW()),$11)
+                ON CONFLICT (sync_id)
+                DO UPDATE SET
+                    status = EXCLUDED.status,
+                    attempts = EXCLUDED.attempts,
+                    last_error = EXCLUDED.last_error,
+                    payload = EXCLUDED.payload,
+                    synced_at = EXCLUDED.synced_at
+                """,
+                sync_item["sync_id"],
+                sync_item.get("entity"),
+                sync_item.get("operation"),
+                sync_item.get("company_id"),
+                sync_item.get("session_id"),
+                status,
+                int(sync_item.get("attempts") or 0),
+                error,
+                _json(sync_item.get("payload") or {}),
+                _parse_dt(sync_item.get("timestamp")),
+                _now() if status == "synced" else None,
+            )

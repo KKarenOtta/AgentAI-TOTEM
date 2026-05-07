@@ -73,13 +73,15 @@ def full_pipeline():
 def sync_pending_events(limit: int = 100):
     import asyncio
 
-    from app.services.aws_db_service import close_db_pool, init_db_pool
+    from app.services.aws_db_service import AWSDBService, close_db_pool, init_db_pool
     from core.persistence.sync_queue import list_pending, mark_failed, mark_synced
 
     async def _run():
         await init_db_pool()
 
+        db = AWSDBService()
         rows = list_pending(limit=limit)
+
         synced = 0
         failed = 0
         skipped = 0
@@ -90,19 +92,34 @@ def sync_pending_events(limit: int = 100):
             payload = row.get("payload") or {}
 
             try:
-                if entity in {"metrics", "lead", "consent"}:
-                    # Primeira versão: mantém fila preparada e marca como falha controlada
-                    # até o schema RDS dessas entidades estar formalizado.
+                if entity == "metrics":
+                    await db.insert_metric(payload)
+                elif entity == "lead":
+                    await db.upsert_lead(payload)
+                elif entity == "consent":
+                    await db.insert_consent(payload)
+                else:
                     skipped += 1
-                    mark_failed(sync_id, f"sync_not_mapped:{entity}")
+                    mark_failed(sync_id, f"unknown_entity:{entity}")
                     continue
 
-                skipped += 1
-                mark_failed(sync_id, f"unknown_entity:{entity}")
+                mark_synced(sync_id)
+                synced += 1
+
+                try:
+                    await db.record_sync_audit(row, status="synced")
+                except Exception:
+                    pass
 
             except Exception as exc:
                 failed += 1
-                mark_failed(sync_id, f"{type(exc).__name__}: {exc}")
+                error = f"{type(exc).__name__}: {exc}"
+                mark_failed(sync_id, error)
+
+                try:
+                    await db.record_sync_audit(row, status="failed", error=error)
+                except Exception:
+                    pass
 
         await close_db_pool()
 
