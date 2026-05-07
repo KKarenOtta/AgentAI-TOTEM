@@ -67,3 +67,50 @@ def full_pipeline():
     rebuild_embeddings.delay()
 
     return "pipeline triggered"
+
+
+@celery.task(name="tasks.sync_pending_events")
+def sync_pending_events(limit: int = 100):
+    import asyncio
+
+    from app.services.aws_db_service import close_db_pool, init_db_pool
+    from core.persistence.sync_queue import list_pending, mark_failed, mark_synced
+
+    async def _run():
+        await init_db_pool()
+
+        rows = list_pending(limit=limit)
+        synced = 0
+        failed = 0
+        skipped = 0
+
+        for row in rows:
+            sync_id = row.get("sync_id")
+            entity = row.get("entity")
+            payload = row.get("payload") or {}
+
+            try:
+                if entity in {"metrics", "lead", "consent"}:
+                    # Primeira versão: mantém fila preparada e marca como falha controlada
+                    # até o schema RDS dessas entidades estar formalizado.
+                    skipped += 1
+                    mark_failed(sync_id, f"sync_not_mapped:{entity}")
+                    continue
+
+                skipped += 1
+                mark_failed(sync_id, f"unknown_entity:{entity}")
+
+            except Exception as exc:
+                failed += 1
+                mark_failed(sync_id, f"{type(exc).__name__}: {exc}")
+
+        await close_db_pool()
+
+        return {
+            "synced": synced,
+            "failed": failed,
+            "skipped": skipped,
+            "total": len(rows),
+        }
+
+    return asyncio.run(_run())
