@@ -173,9 +173,9 @@ O sistema utiliza uma arquitetura híbrida com:
 		
 	Abrir acessos no navegador
 	Usuário (Totem)
-	http://127.0.0.1:8000/totem/FLX-001
+	http://52.201.76.45:8000/totem/FLX-001
 	Admin/Empresa
-	http://127.0.0.1:8000/login
+	http://52.201.76.45:8000/login
 	- acesso: admin | senha: 123456
 			  flx   | senha: flz123
 			  
@@ -203,7 +203,7 @@ O sistema utiliza uma arquitetura híbrida com:
 				cd alpha_test
 				python app.py
 
-				Navegador: http://192.168.15.15:5000/
+				Navegador: http://10.49.220.215:5000/
 				
 
 ## 5. Métricas Utilizadas
