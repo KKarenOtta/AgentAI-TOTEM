@@ -8,6 +8,7 @@ from typing import Any
 from uuid import uuid4
 
 from core.totem.consent_store import save_consent
+from core.persistence.sync_queue import enqueue_sync
 from core.totem.metrics import MetricsLogger
 from core.totem.qr import generate_qr_from_text
 from core.totem.recovery_store import save_recovery_memory
@@ -207,6 +208,17 @@ def save_lead(payload: dict[str, Any]) -> dict[str, Any]:
     new_rows = [row for row in _read_all() if row.get("lead_id") != lead["lead_id"]]
     new_rows.append(lead)
     _write_all(new_rows)
+
+    try:
+        enqueue_sync(
+            entity="lead",
+            operation="upsert",
+            payload=lead,
+            company_id=lead["company_id"],
+            session_id=lead["session_id"],
+        )
+    except Exception:
+        pass
 
     try:
         metrics_logger.save(

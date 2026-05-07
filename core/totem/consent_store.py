@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-import json
-import os
 from datetime import datetime
 from typing import Any
 from uuid import uuid4
+
+from core.persistence.jsonl_store import append_jsonl
+from core.persistence.sync_queue import enqueue_sync
 
 
 CONSENTS_PATH = "data/lgpd/consents.jsonl"
 
 
 def save_consent(payload: dict[str, Any]) -> dict[str, Any]:
-    os.makedirs("data/lgpd", exist_ok=True)
-
     consent = {
         "consent_id": uuid4().hex,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -30,7 +29,17 @@ def save_consent(payload: dict[str, Any]) -> dict[str, Any]:
         "user_agent": payload.get("user_agent"),
     }
 
-    with open(CONSENTS_PATH, "a", encoding="utf-8") as file:
-        file.write(json.dumps(consent, ensure_ascii=False) + "\n")
+    append_jsonl(CONSENTS_PATH, consent)
+
+    try:
+        enqueue_sync(
+            entity="consent",
+            operation="insert",
+            payload=consent,
+            company_id=consent["company_id"],
+            session_id=consent["session_id"],
+        )
+    except Exception:
+        pass
 
     return consent
