@@ -3,36 +3,33 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 from uuid import uuid4
 
 import pandas as pd
-from fastapi import APIRouter, UploadFile, File, Form
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi import APIRouter, File, Form, UploadFile
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
-from marketing.campaigns import (
-    list_campaigns,
-    create_campaign,
-    update_campaign,
-    delete_campaign,
-)
-from infra.realtime.event_bus import subscribe, unsubscribe
+from core.dashboard.service import build_company_dashboard
+from core.reporting.report_service import generate_company_report
 from core.totem.coupon_store import redeem_coupon
 from core.totem.lead_store import save_lead
 from core.totem.metrics import MetricsLogger
-from core.dashboard.service import build_company_dashboard
-from core.totem.qr import generate_qr_from_text
-from core.totem.recovery_store import save_session_handoff
 from core.totem.schemas import (
-    TotemTrackRequest,
-    TotemTrackResponse,
     TotemLeadCaptureRequest,
     TotemLeadCaptureResponse,
+    TotemTrackRequest,
+    TotemTrackResponse,
 )
-
+from infra.realtime.event_bus import subscribe, unsubscribe
+from marketing.campaigns import (
+    create_campaign,
+    delete_campaign,
+    list_campaigns,
+    update_campaign,
+)
 
 router = APIRouter(tags=["api"])
 
@@ -56,12 +53,11 @@ async def sse_events(company_id: str):
     async def event_stream():
         q = subscribe(company_id)
         loop = asyncio.get_event_loop()
+
         try:
             while True:
                 try:
-                    ev = await loop.run_in_executor(
-                        None, lambda: q.get(timeout=25)
-                    )
+                    ev = await loop.run_in_executor(None, lambda: q.get(timeout=25))
                     yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
                 except Exception:
                     yield 'data: {"type":"keepalive"}\n\n'
@@ -103,7 +99,8 @@ def get_metrics(company_id: str, days: int = 7):
 
     interactions_per_day = (
         df.groupby("date").size().reset_index(name="count").tail(days).to_dict(orient="records")
-        if "date" in df.columns else []
+        if "date" in df.columns
+        else []
     )
 
     tts_share = df["voice_source"].value_counts().to_dict() if "voice_source" in df.columns else {}
@@ -119,6 +116,7 @@ def get_metrics(company_id: str, days: int = 7):
                 text = str(profile)
                 if "age_range" in text:
                     import re
+
                     match = re.search(r"age_range['\"]?\s*[:=]\s*['\"]([^'\"]+)['\"]", text)
                     if match:
                         age_range = match.group(1)
@@ -132,18 +130,30 @@ def get_metrics(company_id: str, days: int = 7):
     if "tts_latency_s" in df.columns:
         avg_latency["tts"] = float(df["tts_latency_s"].dropna().mean())
 
-    return JSONResponse({
-        "interactions_per_day": interactions_per_day,
-        "tts_share": tts_share,
-        "age_range": age_counts,
-        "avg_latency": avg_latency,
-    })
+    return JSONResponse(
+        {
+            "interactions_per_day": interactions_per_day,
+            "tts_share": tts_share,
+            "age_range": age_counts,
+            "avg_latency": avg_latency,
+        }
+    )
 
 
 @router.get("/api/dashboard/{company_id}")
 def get_marketing_dashboard(company_id: str):
-    data = build_company_dashboard(company_id)
-    return JSONResponse(data)
+    return JSONResponse(build_company_dashboard(company_id))
+
+
+@router.get("/api/report/{company_id}")
+def get_company_report(company_id: str):
+    report_path = generate_company_report(company_id)
+
+    return FileResponse(
+        path=str(report_path),
+        filename=report_path.name,
+        media_type="application/pdf",
+    )
 
 
 @router.get("/api/campaigns/{company_id}")
