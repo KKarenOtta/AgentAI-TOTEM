@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Teste RAG - Totem</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #071018;
+      color: #f4f7fb;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 60px auto;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 34px;
+      margin-bottom: 8px;
+    }
+
+    p {
+      color: #9fb3c8;
+    }
+
+    .card {
+      background: #121c29;
+      border: 1px solid #263548;
+      border-radius: 16px;
+      padding: 24px;
+      margin-top: 24px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 100px;
+      background: #0b1420;
+      color: #fff;
+      border: 1px solid #263548;
+      border-radius: 12px;
+      padding: 14px;
+      font-size: 16px;
+      resize: vertical;
+    }
+
+    button {
+      margin-top: 16px;
+      padding: 12px 22px;
+      border: none;
+      border-radius: 10px;
+      background: #2563eb;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #475569;
+      cursor: not-allowed;
+    }
+
+    .answer {
+      margin-top: 24px;
+      background: #0b1420;
+      border: 1px solid #263548;
+      border-radius: 14px;
+      padding: 18px;
+      min-height: 100px;
+      white-space: pre-wrap;
+    }
+
+    .sources {
+      margin-top: 16px;
+      color: #93c5fd;
+      font-size: 14px;
+    }
+
+    .context {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #cbd5e1;
+    }
+
+    details {
+      margin-top: 12px;
+    }
+
+    summary {
+      cursor: pointer;
+      color: #93c5fd;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Teste RAG - Totem Inteligente</h1>
+    <p>Ambiente de teste sem sensor para validar embeddings, busca vetorial e resposta com LLM.</p>
+
+    <div class="card">
+      <h2>Atendimento</h2>
+
+      <textarea id="pergunta" placeholder="Digite uma pergunta. Ex: Onde ficam os pinguins?"></textarea>
+
+      <button id="btn" onclick="enviarPergunta()">Perguntar</button>
+
+      <div class="answer" id="resposta">
+        Aguardando pergunta...
+      </div>
+
+      <div class="sources" id="fontes"></div>
+
+      <details class="context">
+        <summary>Ver contextos recuperados</summary>
+        <pre id="contextos"></pre>
+      </details>
+    </div>
+  </div>
+
+  <script>
+    const companyId = "{{ company_id }}";
+
+    async function enviarPergunta() {
+      const pergunta = document.getElementById("pergunta").value.trim();
+      const respostaDiv = document.getElementById("resposta");
+      const fontesDiv = document.getElementById("fontes");
+      const contextosPre = document.getElementById("contextos");
+      const btn = document.getElementById("btn");
+
+      if (!pergunta) {
+        respostaDiv.innerText = "Digite uma pergunta primeiro.";
+        return;
+      }
+
+      btn.disabled = true;
+      respostaDiv.innerText = "Consultando base vetorial e gerando resposta...";
+      fontesDiv.innerText = "";
+      contextosPre.innerText = "";
+
+      try {
+        const resp = await fetch("/api/rag-test/perguntar", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            company_id: companyId,
+            pergunta: pergunta
+          })
+        });
+
+        const data = await resp.json();
+
+        respostaDiv.innerText = data.resposta || "Sem resposta.";
+
+        if (data.fontes && data.fontes.length > 0) {
+          fontesDiv.innerText = "Fontes: " + data.fontes.join(", ");
+        }
+
+        if (data.contextos_recuperados) {
+          contextosPre.innerText = JSON.stringify(data.contextos_recuperados, null, 2);
+        }
+
+      } catch (err) {
+        respostaDiv.innerText = "Erro ao chamar a API: " + err;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>

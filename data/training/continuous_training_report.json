@@ -1,0 +1,12 @@
+{
+  "generated_at": "2026-04-29T14:05:56",
+  "company_id": null,
+  "companies": [
+    "FLX-001"
+  ],
+  "faq_embeddings_indexed": 1,
+  "interaction_embeddings_indexed": 36,
+  "faq_candidates": 2,
+  "campaign_weights_count": 62,
+  "status": "ok"
+}

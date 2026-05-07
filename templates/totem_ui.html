@@ -2,300 +2,470 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <title>Totem • AgentAI</title>
+
   <link rel="stylesheet" href="/static/css/app.css" />
+
   <style>
     .hidden { display: none !important; }
-    .qr-image { width: 220px; max-width: 100%; background: #fff; padding: 10px; border-radius: 16px; }
-    .final-link { word-break: break-all; font-weight: 700; }
+
+    .totem-public-body {
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    .totem-shell {
+      min-height: 100vh;
+      display: grid;
+      place-items: start center;
+      padding: 32px;
+    }
+
+    .totem-panel {
+      width: min(980px, 100%);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 32px;
+      padding: 42px;
+      background:
+        radial-gradient(circle at top, rgba(39,224,161,.14), transparent 34%),
+        linear-gradient(180deg, rgba(24,33,44,.96), rgba(10,15,22,.98));
+      box-shadow: 0 24px 80px rgba(0,0,0,.42);
+    }
+
+    .totem-orb {
+      width: 92px;
+      height: 92px;
+      margin: 0 auto 26px;
+      border-radius: 999px;
+      background: radial-gradient(circle, #27e0a1 0%, #127553 52%, rgba(39,224,161,.08) 72%);
+      box-shadow: 0 0 50px rgba(39,224,161,.42);
+      opacity: .72;
+      transition: .25s ease;
+    }
+
+    .totem-orb.active {
+      opacity: 1;
+      transform: scale(1.06);
+      box-shadow: 0 0 72px rgba(39,224,161,.62);
+    }
+
+    .totem-title {
+      margin: 0;
+      text-align: center;
+      font-size: clamp(2.2rem, 5vw, 4.8rem);
+      letter-spacing: -0.05em;
+    }
+
+    .totem-subtitle {
+      margin: 14px auto 0;
+      text-align: center;
+      max-width: 720px;
+      font-size: clamp(1.05rem, 2vw, 1.45rem);
+    }
+
+    .answer-card {
+      margin-top: 34px;
+      padding: 28px;
+      border-radius: 26px;
+      background: rgba(8,12,18,.74);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .answer-box {
+      min-height: 150px;
+      padding: 26px;
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(4,8,14,.52);
+      color: #eef3f8;
+      font-size: clamp(1.25rem, 2.1vw, 1.9rem);
+      line-height: 1.42;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 20px;
+    }
+
+    .text-card,
+    .final-card {
+      margin-top: 22px;
+      padding: 24px;
+      border-radius: 24px;
+      background: rgba(8,12,18,.72);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .qr-image {
+      width: 240px;
+      max-width: 100%;
+      margin: 16px auto;
+      display: block;
+      background: #fff;
+      padding: 12px;
+      border-radius: 18px;
+    }
+
+    .final-link {
+      word-break: break-all;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    @media (max-width: 720px) {
+      .totem-shell {
+        padding: 16px;
+      }
+
+      .totem-panel {
+        padding: 26px;
+        border-radius: 24px;
+      }
+
+      .answer-box {
+        min-height: 120px;
+      }
+    }
   </style>
 </head>
+
 <body class="totem-public-body">
+  <main class="totem-shell">
+    <section class="totem-panel">
+      <div class="totem-orb" id="orb"></div>
 
-<main class="container">
-  <section class="totem-stage">
-    <div class="totem-orb" id="orb"></div>
+      <h1 class="totem-title" id="title">Aguardando presença...</h1>
+      <p class="totem-subtitle muted" id="subtitle">O sistema será ativado automaticamente.</p>
 
-    <h1 id="title">Aguardando presença...</h1>
-    <p class="muted" id="subtitle">O sistema será ativado automaticamente.</p>
+      <div class="answer-card">
+        <h2>Atendimento</h2>
+        <div id="answer" class="answer-box">Aguardando ativação...</div>
 
-    <div class="card" style="margin-top:20px;max-width:900px;margin-left:auto;margin-right:auto;">
-      <h2>Atendimento</h2>
-      <div id="answer" class="answer-box">Aguardando ativação...</div>
-
-      <div class="actions" style="margin-top:16px;">
-        <button class="btn primary hidden" onclick="unlockAudio()" id="btnAudio">Ativar som</button>
-        <button class="btn primary hidden" onclick="focusInput()" id="btnContinue">Continuar interação</button>
-        <button class="btn hidden" onclick="endSession('completed')" id="btnFinish">Encerrar e continuar no celular</button>
+        <div class="actions">
+          <button class="btn primary hidden" onclick="startVoiceQuestion()" id="btnAsk">Fazer pergunta</button>
+          <button class="btn primary hidden" onclick="startVoiceQuestion()" id="btnAskAgain">Nova pergunta</button>
+          <button class="btn hidden" onclick="endSession('completed')" id="btnFinish">Encerrar atendimento</button>
+        </div>
       </div>
-    </div>
 
-    <div class="card hidden" id="interactionCard" style="margin-top:20px;max-width:900px;margin-left:auto;margin-right:auto;">
-      <textarea id="message" rows="3" placeholder="Digite sua pergunta..." disabled></textarea>
-      <div class="actions">
-        <button class="btn primary" onclick="sendMessage()" disabled id="btnSend">Enviar</button>
-        <button class="btn" onclick="clearInput()">Limpar</button>
+      <div class="text-card hidden" id="textCard">
+        <h2>Pergunta por texto</h2>
+        <textarea id="message" rows="3" placeholder="Digite sua pergunta..."></textarea>
+
+        <div class="actions">
+          <button class="btn primary" onclick="sendTextQuestion()" id="btnSendText">Enviar texto</button>
+          <button class="btn" onclick="clearInput()">Limpar</button>
+        </div>
       </div>
-    </div>
 
-    <div class="card hidden" id="finalCard" style="margin-top:20px;max-width:900px;margin-left:auto;margin-right:auto;text-align:center;">
-      <h2>Continue no celular</h2>
-      <p id="finalMessage"></p>
-      <img id="handoffQr" class="qr-image hidden" alt="QR Code para continuar no celular" />
-      <p class="final-link" id="handoffUrl"></p>
-      <p class="muted">No celular: cadastro LGPD → ofertas → QR promocional → NPS.</p>
-    </div>
-  </section>
-</main>
+      <div class="final-card hidden" id="finalCard">
+        <h2>Continue no celular</h2>
+        <p id="finalMessage"></p>
+        <img id="handoffQr" class="qr-image hidden" alt="QR Code para continuar no celular" />
+        <p class="final-link" id="handoffUrl"></p>
+        <p class="muted">Depois da leitura do QR Code, o totem reinicia automaticamente.</p>
+      </div>
+    </section>
+  </main>
 
-<script>
-const companyId = "{{ company_id }}";
+  <script>
+    const companyId = "{{ company_id }}";
 
-let sessionId = "totem-ui-" + Date.now();
-let currentAudio = null;
-let pendingAudioBase64 = null;
-let activated = false;
-let eventSource = null;
-let audioUnlocked = false;
+    let sessionId = "totem-ui-" + Date.now();
+    let currentAudio = null;
+    let activated = false;
+    let captureInProgress = false;
 
-function byId(id) {
-  return document.getElementById(id);
-}
-
-function show(id) {
-  byId(id).classList.remove("hidden");
-}
-
-function hide(id) {
-  byId(id).classList.add("hidden");
-}
-
-function setStatus(title, subtitle, answer) {
-  byId("title").textContent = title;
-  byId("subtitle").textContent = subtitle || "";
-
-  if (answer !== undefined) {
-    byId("answer").textContent = answer;
-  }
-}
-
-function stopAudio() {
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio.currentTime = 0;
-    currentAudio = null;
-  }
-}
-
-function playAudioBase64(audioBase64) {
-  stopAudio();
-
-  if (!audioBase64) {
-    return;
-  }
-
-  pendingAudioBase64 = audioBase64;
-
-  if (!audioUnlocked) {
-    show("btnAudio");
-    return;
-  }
-
-  currentAudio = new Audio("data:audio/mp3;base64," + audioBase64);
-  currentAudio.play().catch(() => {
-    show("btnAudio");
-  });
-}
-
-function unlockAudio() {
-  audioUnlocked = true;
-  hide("btnAudio");
-
-  if (pendingAudioBase64) {
-    playAudioBase64(pendingAudioBase64);
-  }
-}
-
-function enableInteraction() {
-  show("interactionCard");
-  show("btnContinue");
-  show("btnFinish");
-
-  byId("message").disabled = false;
-  byId("btnSend").disabled = false;
-}
-
-function focusInput() {
-  enableInteraction();
-  unlockAudio();
-  byId("message").focus();
-}
-
-async function activateTotemFromBackend(payload) {
-  if (activated) return;
-
-  activated = true;
-
-  if (payload && payload.session_id) {
-    sessionId = payload.session_id;
-  }
-
-  hide("finalCard");
-  setStatus("Presença detectada", "Ativando atendimento...", "Preparando saudação...");
-
-  try {
-    const res = await fetch("/totem/activate", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        company_id: companyId,
-        session_id: sessionId,
-        prefer_audio: true
-      })
-    });
-
-    if (!res.ok) {
-      throw new Error("Falha HTTP em /totem/activate: " + res.status);
+    function byId(id) {
+      return document.getElementById(id);
     }
 
-    const data = await res.json();
-    const greeting = data.greeting || (payload && payload.message) || "Olá! Como posso ajudar você hoje?";
-
-    setStatus("Como posso ajudar hoje?", "Faça uma pergunta ou toque em continuar.", greeting);
-    enableInteraction();
-    playAudioBase64(data.audio_base64);
-
-  } catch (error) {
-    console.error("Erro ao ativar totem:", error);
-
-    const fallbackGreeting = (payload && payload.message) || "Olá! Como posso ajudar você hoje?";
-    setStatus("Como posso ajudar hoje?", "", fallbackGreeting);
-    enableInteraction();
-  }
-}
-
-function connectSSE() {
-  eventSource = new EventSource(`/api/events/${companyId}`);
-
-  eventSource.onmessage = function(event) {
-    try {
-      const data = JSON.parse(event.data);
-
-      if (data.type === "totem_activated") {
-        activateTotemFromBackend(data.payload || {});
-      }
-
-      if (data.type === "presence_cleared") {
-        resetScreen();
-      }
-    } catch (error) {
-      console.error("Erro ao processar SSE:", error);
+    function show(id) {
+      byId(id).classList.remove("hidden");
     }
-  };
 
-  eventSource.onerror = function(error) {
-    console.warn("Erro SSE:", error);
-  };
-}
+    function hide(id) {
+      byId(id).classList.add("hidden");
+    }
 
-async function sendMessage() {
-  unlockAudio();
-  stopAudio();
+    function setOrb(active) {
+      byId("orb").classList.toggle("active", Boolean(active));
+    }
 
-  const message = byId("message").value.trim();
+    function setStatus(title, subtitle, answer) {
+      byId("title").textContent = title;
+      byId("subtitle").textContent = subtitle || "";
 
-  if (!message) {
-    return;
-  }
+      if (answer !== undefined) {
+        byId("answer").textContent = answer;
+      }
+    }
 
-  byId("btnSend").disabled = true;
-  setStatus("Consultando...", "Buscando na FAQ e, se necessário, usando IA.", "Processando sua pergunta...");
+    function stopAudio() {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        currentAudio = null;
+      }
+    }
 
-  try {
-    const res = await fetch("/totem/interact", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        company_id: companyId,
-        session_id: sessionId,
-        message,
-        prefer_audio: true
-      })
-    });
+    function showQuestionControls() {
+      show("btnAskAgain");
+      show("btnFinish");
+      show("textCard");
+      hide("btnAsk");
+    }
 
-    const data = await res.json();
+    function showInitialControls() {
+      show("btnAsk");
+      show("btnFinish");
+      show("textCard");
+      hide("btnAskAgain");
+    }
 
-    setStatus(
-      "Resposta",
-      "Você pode continuar perguntando ou encerrar para receber o QR no celular.",
-      data.text || "Não encontrei uma resposta objetiva."
-    );
+    async function playAudioBase64(audioBase64) {
+      stopAudio();
 
-    playAudioBase64(data.audio_base64);
-    byId("message").value = "";
+      if (!audioBase64) {
+        return false;
+      }
 
-  } catch (error) {
-    console.error("Erro ao enviar mensagem:", error);
-    setStatus("Erro", "", "Não foi possível processar sua pergunta agora.");
-  } finally {
-    byId("btnSend").disabled = false;
-  }
-}
+      return new Promise((resolve) => {
+        try {
+          currentAudio = new Audio("data:audio/mp3;base64," + audioBase64);
+          currentAudio.playsInline = true;
+          currentAudio.onended = () => resolve(true);
+          currentAudio.onerror = () => resolve(false);
+          currentAudio.play().catch(() => resolve(false));
+        } catch (error) {
+          resolve(false);
+        }
+      });
+    }
 
-async function endSession(reason) {
-  stopAudio();
+    async function activateTotemFromBackend(payload) {
+      if (activated) return;
 
-  const res = await fetch("/totem/end", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      company_id: companyId,
-      session_id: sessionId,
-      reason
-    })
-  });
+      activated = true;
+      setOrb(true);
 
-  const data = await res.json();
+      if (payload && payload.session_id) {
+        sessionId = payload.session_id;
+      }
 
-  hide("interactionCard");
-  hide("btnContinue");
-  hide("btnFinish");
-  hide("btnAudio");
-  show("finalCard");
+      hide("finalCard");
+      setStatus("Presença detectada", "Ativando atendimento...", "Preparando saudação...");
 
-  setStatus("Atendimento finalizado", "Continue pelo celular.", data.message || "Atendimento finalizado.");
-  byId("finalMessage").textContent = data.message || "";
+      try {
+        const res = await fetch("/totem/activate", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            company_id: companyId,
+            session_id: sessionId,
+            prefer_audio: true
+          })
+        });
 
-  if (data.handoff_qr_url) {
-    byId("handoffQr").src = data.handoff_qr_url;
-    show("handoffQr");
-  }
+        const data = await res.json();
+        const greeting = data.greeting || "Olá! Como posso ajudar você hoje?";
 
-  byId("handoffUrl").textContent = data.handoff_url || "";
-}
+        setStatus("Como posso ajudar hoje?", "Fale após a saudação ou digite sua pergunta.", greeting);
+        showInitialControls();
 
-function clearInput() {
-  byId("message").value = "";
-}
+        await playAudioBase64(data.audio_base64);
+        startVoiceQuestion();
+      } catch (error) {
+        console.error("Erro ao ativar totem:", error);
+        setStatus("Como posso ajudar hoje?", "Fale ou digite sua pergunta.", "Olá! Como posso ajudar você hoje?");
+        showInitialControls();
+      }
+    }
 
-function resetScreen() {
-  activated = false;
-  audioUnlocked = false;
-  pendingAudioBase64 = null;
-  sessionId = "totem-ui-" + Date.now();
+    async function startVoiceQuestion() {
+      if (captureInProgress) return;
 
-  stopAudio();
-  hide("interactionCard");
-  hide("finalCard");
-  hide("btnAudio");
-  hide("btnContinue");
-  hide("btnFinish");
+      captureInProgress = true;
+      stopAudio();
 
-  setStatus("Aguardando presença...", "O sistema será ativado automaticamente.", "Aguardando ativação...");
-}
+      hide("btnAsk");
+      hide("btnAskAgain");
 
-connectSSE();
-</script>
+      setStatus("Estou escutando...", "Fale sua pergunta agora.", "Capturando áudio pelo microfone do totem...");
 
+      try {
+        const res = await fetch(`/api/voice/capture?session_id=${encodeURIComponent(sessionId)}`, {
+          method: "POST"
+        });
+
+        const data = await res.json();
+
+        if (!data.ok) {
+          setStatus("Erro", "Não foi possível acionar o microfone.", data.error || "Falha ao capturar áudio.");
+          showQuestionControls();
+        }
+      } catch (error) {
+        console.error("Erro ao iniciar captura:", error);
+        setStatus("Erro", "Não foi possível acionar o microfone.", "Verifique o Raspberry voice_server.py.");
+        showQuestionControls();
+      } finally {
+        captureInProgress = false;
+      }
+    }
+
+    async function sendTextQuestion() {
+      stopAudio();
+
+      const message = byId("message").value.trim();
+      if (!message) return;
+
+      byId("btnSendText").disabled = true;
+      setStatus("Processando...", "Gerando resposta.", message);
+
+      try {
+        const res = await fetch("/totem/interact", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            company_id: companyId,
+            session_id: sessionId,
+            message,
+            prefer_audio: true
+          })
+        });
+
+        const data = await res.json();
+
+        setStatus("Resposta", "Você pode fazer nova pergunta ou encerrar.", data.text || "Resposta pronta.");
+        byId("message").value = "";
+
+        await playAudioBase64(data.audio_base64);
+        showQuestionControls();
+      } catch (error) {
+        setStatus("Erro", "", "Não foi possível processar sua pergunta.");
+        showQuestionControls();
+      } finally {
+        byId("btnSendText").disabled = false;
+      }
+    }
+
+    async function endSession(reason) {
+      stopAudio();
+
+      const res = await fetch("/totem/end", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          company_id: companyId,
+          session_id: sessionId,
+          reason
+        })
+      });
+
+      const data = await res.json();
+
+      hide("btnAsk");
+      hide("btnAskAgain");
+      hide("btnFinish");
+      hide("textCard");
+      show("finalCard");
+
+      setStatus("Atendimento finalizado", "Leia o QR Code para continuar no celular.", data.summary || data.message || "Atendimento finalizado.");
+      byId("finalMessage").textContent = data.message || "";
+
+      if (data.handoff_qr_url) {
+        byId("handoffQr").src = data.handoff_qr_url;
+        show("handoffQr");
+      }
+
+      byId("handoffUrl").textContent = data.handoff_url || "";
+
+      setTimeout(() => {
+        resetScreen(false);
+      }, 10000);
+    }
+
+    function clearInput() {
+      byId("message").value = "";
+    }
+
+    function resetScreen(reloadPage) {
+      activated = false;
+      sessionId = "totem-ui-" + Date.now();
+      captureInProgress = false;
+
+      stopAudio();
+      setOrb(false);
+
+      hide("btnAsk");
+      hide("btnAskAgain");
+      hide("btnFinish");
+      hide("textCard");
+      hide("finalCard");
+
+      setStatus("Aguardando presença...", "O sistema será ativado automaticamente.", "Aguardando ativação...");
+
+      if (reloadPage) {
+        window.location.reload();
+      }
+    }
+
+    function connectSSE() {
+      const eventSource = new EventSource(`/api/events/${companyId}`);
+
+      eventSource.onmessage = function(event) {
+        try {
+          const data = JSON.parse(event.data);
+          console.log("SSE:", data);
+
+          if (
+            data.type === "presence_detected" ||
+            data.type === "presence_triggered" ||
+            data.type === "totem_activated"
+          ) {
+            activateTotemFromBackend(data.payload || {});
+          }
+
+          if (data.type === "voice_status") {
+            const payload = data.payload || {};
+            const status = payload.status;
+            const text = payload.text || "";
+            const audio = payload.payload?.audio_base64 || payload.audio_base64;
+
+            if (status === "answer_ready") {
+              setStatus("Resposta", "Você pode fazer nova pergunta ou encerrar.", text || "Resposta pronta.");
+
+              playAudioBase64(audio).then(() => {
+                showQuestionControls();
+              });
+            }
+
+            if (status === "error") {
+              setStatus("Erro", "", text || "Não consegui processar a pergunta.");
+              showQuestionControls();
+            }
+          }
+
+          if (data.type === "presence_cleared") {
+            resetScreen(true);
+          }
+        } catch (error) {
+          console.error("Erro SSE:", error);
+        }
+      };
+
+      eventSource.onerror = function(error) {
+        console.warn("Erro SSE:", error);
+      };
+    }
+
+    resetScreen(false);
+    connectSSE();
+  </script>
 </body>
 </html>

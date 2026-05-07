@@ -1,128 +1,247 @@
 <img width="201" height="231" alt="IAgora" src="https://github.com/user-attachments/assets/29dd313b-b9f6-4df1-875f-915245640425" />
 
-APÓS TRABALHAR NAS SUAS ALTERAÇOES: criar o COMMIT:
+# TOTEM I.A.Gora — Plataforma Inteligente de Atendimento com IA Multimodal
 
-		pip freeze > requirements.txt
-		pip freeze > requirements-pi.txt
+O TOTEM I.A.Gora é uma plataforma de atendimento inteligente baseada em IA, projetada para ambientes físicos (white-label).
+Ele integra visão computacional, voz, linguagem natural e recomendação inteligente, permitindo interação fluida entre usuários e sistemas digitais.
+
+O sistema utiliza uma arquitetura híbrida com:
+	Machine Learning supervisionado (classificação de intenção)
+	Busca semântica com embeddings
+	Fallback com LLM
+	Pipeline automatizado de aprendizado contínuo via Celery
+
+## 1. Stack Principal
+	Backend
+	Python 3.11
+	FastAPI
+	Uvicorn
+	Machine Learning
+	SentenceTransformers (embeddings multilíngue)
+	Scikit-learn (Logistic Regression)
+	PyTorch (dependência indireta)
+	Pipeline / Orquestração
+	Celery
+	Redis
+	Dados
+	JSONL / JSON
+	Persistência local (estrutura modular)
+	Edge (hardware)
+	Raspberry Pi 3
+	PIR Sensor
+	Câmera (fswebcam)
+
+## 2. Arquitetura do Sistema
+
+		      Visão geral
+		Usuário (voz/presença)
+		        ↓
+		Raspberry Pi (sensores + imagem)
+		        ↓
+		API FastAPI
+		        ↓
+		Orchestrator
+		        ↓
+		[1] Intent ML
+		[2] FAQ Engine (embedding)
+		[3] Contexto empresa
+		[4] LLM fallback
+		        ↓
+		Resposta (voz/texto/UI)
+		Pipeline completo (automático)
+		Admin altera FAQ
+		        ↓
+		save_faq()
+		        ↓
+		Celery (full_pipeline)
+		        ↓
+		1. build_intent_dataset
+		2. train_intent_model
+		3. rebuild_embeddings
+		4. evaluate
+		        ↓
+		Modelo atualizado
+		        ↓
+		Orchestrator usa novo modelo
+
+## 3. Features Utilizadas
+	IA e ML
+	Classificação de intenção (supervisionado)
+	Embeddings semânticos multilíngue
+	Re-ranking com score + uso
+	Fallback com LLM (OpenAI)
+	Sistema
+	Cache inteligente
+	Pipeline assíncrono
+	Aprendizado contínuo
+	Multi-empresa (company_id)
+	Edge
+	Detecção de presença (PIR)
+	Captura de imagem
+	Validação humana (OpenCV)
+	Negócio
+	Recomendações
+	Cupons (QR Code)
+	Tracking de conversão
+
+## 4. Como Rodar o Projeto
+	4.1 Setup
+	git clone https://github.com/KKarenOtta/AgentAI-TOTEM
+	cd ~/Desktop/AgentAI-TOTEM
 	
-		git add .
+	python3 -m venv venv
+	source venv/bin/activate
 	
-		git commit -m "Descrição das alterações que você realizou”
-		
-		git push -u origin main
+	pip install -r requirements.txt
 
-
-Verifique o status do repositório:
+	Instalar Redis:
 	
-		git status
+	brew install redis
+	brew services start redis
 
+### 4.2 Testar ambiente
+	python - <<'PY'
+	from ml.intent.predictor import predict
 
-RECARREGAR VARIAVEIS E REINICIAR BACKEND
+	print(predict("onde ficam os pinguins?"))
+	PY
 
-		pkill -f "uvicorn app.main:app"
-		cd ~/AgentAI-TOTEM
-		set -a
-		source .env
-		set +a
-		python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+### 4.3 Rodar aplicação
+	Terminal 1 — API
+	cd ~/Desktop/AgentAI-TOTEM
+	source venv/bin/activate
+	uvicorn app.main:app \
+	  --host 0.0.0.0 \
+	  --port 8000 \
+	  --reload \
+	  --reload-dir app \
+	  --reload-dir core \
+	  --reload-dir ml \
+	  --reload-dir templates \
+	  --reload-dir static
 
+	Terminal 2 - Escutar eventos
+		curl -N "http://127.0.0.1:8000/api/events/FLX-001"
+	  
+	Terminal 3 — Ativar REDIS
+		brew services start redis
+		TESTAR: redis-cli ping (resposta esperada: PONG)
+
+	 Terminal 4 - Worker Celery
+	cd ~/Desktop/AgentAI-TOTEM
+	source venv/bin/activate
+	celery -A infra.async_tasks.celery_app worker \
+ 	 --loglevel=info \
+  	 --pool=solo
+
+	 Terminal 5 - Testes ML/RN + Pipeline
+	 	GERAR DATATSET DE INTENÇAO
+			cd ~/Desktop/AgentAI-TOTEM
+			source venv/bin/activate
+			python ml/intent/dataset_builder.py
+			wc -l data/ml/intent/dataset.jsonl
+			head data/ml/intent/dataset.jsonl
+
+		TREINAR MODELO MANUAL
+			python ml/intent/train.py
 		
-		http://192.168.15.12:8000/client/FLX-001
-
-Endereços de suporte navegador em: 
-
-		http://127.0.0.1:8000/docs
-		http://127.0.0.1:8000/openapi.json
-		http://127.0.0.1:8000/health
-		http://127.0.0.1:8000/client/FLX-001
-		http://127.0.0.1:8000/admin
-		http://127.0.0.1:8000/client/FLX-001)
-
-
-Testar Fluxo completo: 
-
-		cd ~/AgentAI-TOTEM
-		set -a
-		source .env
-		set +a
-		cd edge/raspberry_presence_sender
-		python3 main.py
-
-
-Gerar relatórios em CMD:
-Relatório resumido
+		TESTAR INFERENCIA
+			python - <<'PY'
+			from ml.intent.predictor import predict
+			tests = [
+			    "onde ficam os pinguins?",
+			    "que horas fecha?",
+			    "tem desconto hoje?",
+			    "onde comer?",
+			    "tem banheiro?",
+			    "onde ficam as flores?"
+			]
+			for t in tests:
+			    intent, conf = predict(t)
+			    print(t, "=>", intent, conf)
+			PY
 		
-		sed -n '1,200p' data/metrics/metrics_report.md
+		DISPARAR PIPELINE COMPLETA (CELERY)
+			python - <<'PY'
+			from infra.async_tasks.tasks import full_pipeline
+			result = full_pipeline.delay()
+			print("task_id:", result.id)
+			PY
 
-Últimas interações de uma empresa
-
-		grep -n '"company_id": "FLX-001"' data/metrics/metrics.jsonl | tail -n 20
-
-Ver campanhas salvas
+		VER RELATORIO DO MODELO
+			cat data/ml/intent/reports/training_report.json
 		
-		cat data/campaigns.json
+	Abrir acessos no navegador
+	Usuário (Totem)
+	http://52.201.76.45:8000/totem/FLX-001
+	Admin/Empresa
+	http://52.201.76.45:8000/login
+	- acesso: admin | senha: 123456
+			  flx   | senha: flz123
+			  
+	 Terminal 6 - acesso [raspberry]
+			arp -a
+			ssh lostgear@raspberrypi.local
+			Confirmar hostname -I
+			ping 192.168.15.12
+			senha: ****
+			cd AgentAI-TOTEM
+			source venv/bin/activate
+			python edge/raspberry_runtime/sensor_runtime.py
 
-Ver empresas salvas
+	Terminal 7 - [raspberry]
+			SUBIR SERVIDOR DE VOZ:
+				cd ~/AgentAI-TOTEM
+				source venv/bin/activate	
+				python edge/voice_server.py
 
-		cat data/companies.json
+	Terminal 8 - [raspberry]
+				cd ~/AgentAI-TOTEM
+				source venv/bin/activate
+				python -c "import flask; print(flask.__version__)"
+				
+				cd alpha_test
+				python app.py
 
-Guia de Teste da Aplicação AgentAI-TOTEM
-Fluxo operacional, URLs de teste e checklist funcional
+				Navegador: http://10.49.220.215:5000/
+				
 
-Objetivo
+## 5. Métricas Utilizadas
+	ML (Intent)
+	Accuracy
+	Precision (macro / weighted)
+	Recall
+	F1-score
+	Sistema
+	Tempo de resposta
+	Cache hit rate
+	Confidence do modelo
+	Negócio
+	Taxa de conversão (cupons)
+	Engajamento
+	Uso por intent
+
+## 6. Análise
+	Resultado atual
+		accuracy: ~0.69
+		macro_f1: ~0.70
+	Interpretação
+		Modelo funcional e consistente
+	Limitação principal: 
+		Dataset pequeno
+		Confiança baixa em classes similares
+		Dependência de dados reais para evolução
+
+## 7. Conclusão
+
+O AgentAI-TOTEM apresenta um sistema baseado em regras para uma plataforma de IA híbrida com:
+
+	ML + Embeddings + Regras + LLM + Feedback
+
+Capaz de:
 	
-	Este documento serve para testar a aplicação de ponta a ponta: totem, cadastro mobile, cupons, validação na loja, dashboard e NPS.
-	
-Pré-requisitos
-
-- Servidor FastAPI ativo em http://127.0.0.1:8000 ou http://192.168.15.6:8000.
-- Projeto com .env carregado e diretórios app/, services/ e templates/ monitorados no uvicorn.
-- Dispositivo móvel na mesma rede local para testar o handoff via QR.
-
-Endereços para abrir no navegador: 
-
-		http://127.0.0.1:8000/health	Saúde da aplicação	Retorno JSON com status ok.
-		http://127.0.0.1:8000/client/FLX-001	Tela principal do totem	Ativação, pergunta, resposta, resumo, recomendações, handoff mobile e NPS.
-		http://127.0.0.1:8000/client/FLX-001	Dashboard da empresa	KPIs de leads, cupons, conversão e lojas.
-		http://127.0.0.1:8000/client/FLX-001/campaigns	Gestão de campanhas	Campanhas ativas, mídia, cupom e desconto.
-		http://127.0.0.1:8000/store/redeem	Validação na loja	Consulta e resgate do cupom com store_id e operator_id.
-		http://192.168.15.6:8000/mobile/start/<session_id>	Início do fluxo mobile	Entrada vinda do QR do totem.
-		http://192.168.15.6:8000/mobile/capture/<session_id>	Cadastro mobile	Nome, idade, gênero, e-mail, CPF obrigatório e LGPD.
-		http://192.168.15.6:8000/mobile/content/<lead_id>	Conteúdo pós-cadastro	Resumo da pesquisa, QR de campanha, cupom e expiração.
-
-
-Fluxo completo recomendado
-	1. Abrir /client/FLX-001.
-	2. Dashboard presença ou ativar atendimento.
-	3. Fazer uma pergunta sobre o negócio, por exemplo: "onde fica o banheiro e quais promoções estão ativas?".
-	4. Confirmar resposta textual, resumo da pesquisa e ofertas recomendadas.
-	5. Clicar em "Continuar no celular" e ler o QR gerado.
-	6. No celular, abrir /mobile/start/<session_id>.
-	7. Prosseguir para /mobile/capture/<session_id> e preencher o cadastro completo.
-	8. Confirmar redirecionamento para /mobile/content/<lead_id>.
-	9. Verificar cupom emitido, QR do cupom, expiração e descrição da campanha.
-	10. Abrir /store/redeem no dispositivo da loja e validar o coupon_id.
-	11. Confirmar status redeemed em data/coupons/coupons.jsonl e métrica coupon_redeemed em data/metrics/metrics.jsonl.
-	12. Encerrar o atendimento no totem e registrar uma nota NPS.
-
-Checklist funcional
-Resposta local do negócio antes de fallback para IA.
-Resumo da pesquisa gerado no totem.
-QR de handoff mobile funcional.
-CPF obrigatório no cadastro mobile.
-Cupom emitido com expires_at, qr_url, store_id e operator_id.
-Resgate de cupom altera status para redeemed.
-Métrica coupon_redeemed gravada.
-Nota NPS gravada ao final.
-Teste rápido por terminal
-
-Comandos essenciais:
-		
-		curl http://127.0.0.1:8000/health
-		curl -X POST http://127.0.0.1:8000/totem/activate -H "Content-Type: application/json" -d '{"company_id":"FLX-001","session_id":"fluxo-completo-001"}'
-		curl -X POST http://127.0.0.1:8000/totem/interact -H "Content-Type: application/json" -d '{"company_id":"FLX-001","session_id":"fluxo-completo-001","message":"onde fica o banheiro e quais promoções estão ativas?","prefer_audio":false,"input_mode":"text"}'
-		curl -X POST http://127.0.0.1:8000/api/mobile-handoff -H "Content-Type: application/json" -d '{"company_id":"FLX-001","session_id":"fluxo-completo-001","research_summary":"Pergunta sobre banheiro e promoções","recommendations_snapshot":{},"source":"totem_live"}'
-
-Observações de teste
-Se houver divergência entre o que o totem mostra e o que o terminal retorna, priorize os arquivos JSON e os logs do backend para confirmar o estado real do fluxo.
+	Aprender com uso real
+	Melhorar continuamente
+	Escalar para múltiplas empresas
+	Operar em tempo real em ambiente físico
 	

@@ -1,0 +1,16 @@
+[
+  {
+    "question": "qual o hor\u00e1rio de funcionamento",
+    "answer": "Funcionamos das 9h \u00e0s 17h.",
+    "intent": "horario",
+    "score": 1,
+    "uses": 12
+  },
+  {
+    "question": "o que h\u00e1 para crian\u00e7as pequenas?",
+    "answer": "Conhe\u00e7a nossos pratos kids na pra\u00e7a de alimenta\u00e7\u00e3o! ",
+    "intent": "geral",
+    "score": 0,
+    "uses": 0
+  }
+]
