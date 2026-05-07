@@ -3,13 +3,7 @@ import threading
 import time
 
 from sensor_service import update_system_state, get_public_status, get_full_status, set_led_state
-from security_service import (
-    configure_security,
-    configure_logging,
-    is_admin_logged,
-    validate_login_input,
-    authenticate
-)
+from security_service import configure_security, configure_logging, is_admin_logged, validate_login_input, authenticate
 
 app = Flask(__name__)
 configure_security(app)
