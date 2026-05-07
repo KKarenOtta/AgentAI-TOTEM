@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -17,30 +18,52 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _env(name: str, default: str = "") -> str:
+    return (os.getenv(name) or default).strip()
+
+
+def _rds_enabled() -> bool:
+    required = [
+        "AWS_DB_HOST",
+        "AWS_DB_NAME",
+        "AWS_DB_USER",
+        "AWS_DB_PASSWORD",
+    ]
+
+    return all(_env(name) for name in required)
+
+
+def _build_dsn() -> str:
+    return (
+        f"postgresql://{_env('AWS_DB_USER')}:{_env('AWS_DB_PASSWORD')}"
+        f"@{_env('AWS_DB_HOST')}:{_env('AWS_DB_PORT', '5432')}/{_env('AWS_DB_NAME')}"
+    )
+
+
 async def init_db_pool() -> None:
     global _pool
 
-    host = os.getenv("AWS_DB_HOST")
-    if not host:
-        logger.warning("AWS_DB_HOST não configurado; RDS desativado.")
+    if not _rds_enabled():
+        logger.warning("RDS desativado: variáveis AWS_DB_* incompletas.")
         return
 
-    dsn = (
-        f"postgresql://{os.getenv('AWS_DB_USER')}:{os.getenv('AWS_DB_PASSWORD')}"
-        f"@{host}:{os.getenv('AWS_DB_PORT', '5432')}/{os.getenv('AWS_DB_NAME')}"
-    )
+    timeout = float(_env("AWS_DB_CONNECT_TIMEOUT_SECONDS", "3"))
 
     try:
-        _pool = await asyncpg.create_pool(
-            dsn=dsn,
-            min_size=2,
-            max_size=10,
-            command_timeout=10,
-            ssl="require",
+        _pool = await asyncio.wait_for(
+            asyncpg.create_pool(
+                dsn=_build_dsn(),
+                min_size=1,
+                max_size=5,
+                command_timeout=5,
+                ssl="require",
+            ),
+            timeout=timeout,
         )
         logger.info("RDS conectado.")
+
     except Exception as exc:
-        logger.error("Erro RDS: %s", exc)
+        logger.warning("RDS indisponível no startup; seguindo sem RDS: %s", type(exc).__name__)
         _pool = None
 
 

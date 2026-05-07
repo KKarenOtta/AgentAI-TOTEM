@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api/voice", tags=["voice"])
 
 
 def get_voice_server_url() -> str:
-    return os.getenv("VOICE_SERVER_URL", "http://127.0.0.1:8001").rstrip("/")
+    return os.getenv("VOICE_SERVER_URL", "http://127.0.0.1:5000").rstrip("/")
 
 
 @router.post("/capture")
@@ -31,7 +31,10 @@ def capture(session_id: str):
                 "error": response.text,
             }
 
-        return {"ok": True}
+        return {
+            "ok": True,
+            "voice_server_url": voice_server_url,
+        }
 
     except Exception as exc:
         return {

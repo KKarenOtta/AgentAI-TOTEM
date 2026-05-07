@@ -1,21 +1,16 @@
 from __future__ import annotations
 
 import json
-import sys
-from pathlib import Path
-from http.server import BaseHTTPRequestHandler, HTTPServer
 import socket
-
-# =========================
-# FIX ROOT PATH
-# =========================
+import sys
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
-
-# =========================
 
 from edge.voice_agent import capture_once
 
@@ -24,20 +19,30 @@ PORT = 5000
 
 
 def get_local_ip() -> str:
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     try:
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
+        sock.connect(("8.8.8.8", 80))
+        ip = sock.getsockname()[0]
     except Exception:
         ip = "127.0.0.1"
     finally:
-        s.close()
+        sock.close()
 
     return ip
 
 
+def run_capture_async(session_id: str) -> None:
+    try:
+        capture_once(session_id)
+    except Exception as exc:
+        print("[VOICE SERVER] capture error:", exc)
+
+
 class Handler(BaseHTTPRequestHandler):
+    def log_message(self, format, *args):
+        return
+
     def do_POST(self):
         if self.path != "/capture":
             self.send_response(404)
@@ -45,47 +50,70 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         try:
-            length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(length)
+            content_length = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_length)
 
-            payload = json.loads(body.decode("utf-8"))
+            payload = json.loads(raw_body.decode("utf-8"))
 
-            session_id = payload.get("session_id")
+            session_id = (payload.get("session_id") or "").strip()
 
-            print(f"[VOICE SERVER] trigger recebido: {session_id}")
+            if not session_id:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
 
-            capture_once(session_id)
+                self.wfile.write(
+                    json.dumps(
+                        {
+                            "ok": False,
+                            "error": "session_id obrigatório",
+                        }
+                    ).encode("utf-8")
+                )
+                return
 
-            response = {
-                "ok": True
-            }
+            print("[VOICE SERVER] trigger:", session_id)
+
+            thread = threading.Thread(
+                target=run_capture_async,
+                args=(session_id,),
+                daemon=True,
+            )
+
+            thread.start()
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
 
             self.wfile.write(
-                json.dumps(response).encode("utf-8")
+                json.dumps(
+                    {
+                        "ok": True,
+                        "session_id": session_id,
+                        "mode": "async",
+                    }
+                ).encode("utf-8")
             )
 
         except Exception as exc:
             print("[VOICE SERVER] erro:", exc)
-
-            response = {
-                "ok": False,
-                "error": str(exc)
-            }
 
             self.send_response(500)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
 
             self.wfile.write(
-                json.dumps(response).encode("utf-8")
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": str(exc),
+                    }
+                ).encode("utf-8")
             )
 
 
-def run():
+def run() -> None:
     local_ip = get_local_ip()
 
     print("")

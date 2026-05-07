@@ -54,7 +54,11 @@ app.include_router(totem_options_router)
 
 @app.on_event("startup")
 async def startup_event():
-    await init_db_pool()
+    import os
+
+    if os.getenv("AWS_DB_STARTUP_ENABLED", "false").strip().lower() in {"1", "true", "yes"}:
+        await init_db_pool()
+
     start_presence_listener()
 
 
