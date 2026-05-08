@@ -40,3 +40,5 @@ runtime/pids/*
 runtime/logs/*.log
 !runtime/pids/.gitkeep
 !runtime/logs/.gitkeep
+data/audio/
+piper/*.tar.gz
