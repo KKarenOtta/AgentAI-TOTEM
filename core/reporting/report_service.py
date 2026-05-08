@@ -9,6 +9,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from core.analytics.aggregators.time_series import build_time_series
 from core.dashboard.service import build_company_dashboard
 
 
@@ -40,15 +41,32 @@ def _table(rows: list[list[Any]], widths: list[int] | None = None) -> Table:
     return table
 
 
+def _rows_from_named(items: list[dict[str, Any]], first: str, second: str = "count") -> list[list[Any]]:
+    rows = [[first, second]]
+
+    for item in items[:10]:
+        rows.append([_safe(item.get("name")), _safe(item.get(second))])
+
+    if len(rows) == 1:
+        rows.append(["-", "0"])
+
+    return rows
+
+
 def generate_company_report(company_id: str) -> Path:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
+
+    build_time_series(company_id)
 
     data = build_company_dashboard(company_id)
     kpis = data.get("kpis") or {}
     ai = data.get("ai") or {}
     sync = data.get("sync_health") or {}
+    sentiment = data.get("sentiment") or {}
+    recommendation = data.get("recommendation_feedback") or {}
     campaigns = data.get("campaigns") or []
     stores = data.get("stores") or []
+    daily = ((data.get("timeseries") or {}).get("daily") or [])[-10:]
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     out = REPORT_DIR / f"{company_id}_executive_report_{timestamp}.pdf"
@@ -125,17 +143,53 @@ def generate_company_report(company_id: str) -> Path:
         )
     )
 
+    story.append(Paragraph("Sentimento e NPS", h2_style))
+    story.append(
+        _table(
+            [
+                ["Métrica", "Valor"],
+                ["Registros analisados", _safe(sentiment.get("count"))],
+                ["Sentimento médio", _safe(sentiment.get("avg_sentiment_score"))],
+            ],
+            [220, 250],
+        )
+    )
+    story.append(_table(_rows_from_named(sentiment.get("sentiments") or [], "Sentimento")))
+    story.append(_table(_rows_from_named(sentiment.get("frustration_risk") or [], "Risco de frustração")))
+
+    story.append(Paragraph("Reward Learning de Campanhas", h2_style))
+    reward_rows = [["Campanha", "Eventos", "Reward", "Cliques", "Conversões"]]
+    for item in (recommendation.get("campaigns") or [])[:15]:
+        reward_rows.append(
+            [
+                _safe(item.get("campaign_id")),
+                _safe(item.get("events")),
+                _safe(item.get("reward_sum")),
+                _safe(item.get("clicks")),
+                _safe(item.get("conversions")),
+            ]
+        )
+    story.append(_table(reward_rows if len(reward_rows) > 1 else [["Campanha", "Eventos", "Reward", "Cliques", "Conversões"], ["-", "0", "0", "0", "0"]]))
+
+    story.append(Paragraph("Série Temporal Diária", h2_style))
+    daily_rows = [["Período", "Sessões", "Interações", "Leads", "NPS"]]
+    for item in daily:
+        daily_rows.append(
+            [
+                _safe(item.get("period")),
+                _safe(item.get("sessions")),
+                _safe(item.get("interactions")),
+                _safe(item.get("leads")),
+                _safe(item.get("nps")),
+            ]
+        )
+    story.append(_table(daily_rows if len(daily_rows) > 1 else [["Período", "Sessões", "Interações", "Leads", "NPS"], ["-", "0", "0", "0", "0"]]))
+
     story.append(Paragraph("Intenções Detectadas", h2_style))
-    intent_rows = [["Intenção", "Ocorrências"]]
-    for row in ai.get("intents") or []:
-        intent_rows.append([_safe(row.get("name")), _safe(row.get("count"))])
-    story.append(_table(intent_rows if len(intent_rows) > 1 else [["Intenção", "Ocorrências"], ["-", "0"]]))
+    story.append(_table(_rows_from_named(ai.get("intents") or [], "Intenção")))
 
     story.append(Paragraph("Fontes de Resposta", h2_style))
-    source_rows = [["Fonte", "Ocorrências"]]
-    for row in ai.get("response_sources") or []:
-        source_rows.append([_safe(row.get("name")), _safe(row.get("count"))])
-    story.append(_table(source_rows if len(source_rows) > 1 else [["Fonte", "Ocorrências"], ["-", "0"]]))
+    story.append(_table(_rows_from_named(ai.get("response_sources") or [], "Fonte")))
 
     story.append(Paragraph("Campanhas", h2_style))
     campaign_rows = [["Campanha", "Impressões", "Emitidos", "Resgatados", "CTR", "Conversão"]]

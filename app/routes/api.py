@@ -311,3 +311,84 @@ def api_redeem_coupon(payload: Dict[str, Any]):
             "coupon": coupon,
         }
     )
+
+# =========================================================
+# ENTERPRISE RECOMMENDATION FEEDBACK
+# =========================================================
+
+from core.recommendation_feedback.store import (
+    build_recommendation_summary,
+    register_reward,
+)
+
+
+@router.post("/api/recommendation-feedback")
+def api_recommendation_feedback(payload: dict):
+    company_id = payload.get("company_id")
+    campaign_id = payload.get("campaign_id")
+
+    if not company_id:
+        return {"ok": False, "error": "company_id_required"}
+
+    if not campaign_id:
+        return {"ok": False, "error": "campaign_id_required"}
+
+    result = register_reward(
+        company_id=company_id,
+        session_id=payload.get("session_id"),
+        campaign_id=campaign_id,
+        event_type=payload.get("event_type") or "interaction",
+        intent=payload.get("intent"),
+        score=payload.get("score"),
+        payload=payload.get("payload") or payload,
+    )
+
+    return {
+        "ok": True,
+        "result": result,
+    }
+
+
+@router.get("/api/recommendation-feedback/{company_id}")
+def api_recommendation_feedback_summary(company_id: str):
+    return build_recommendation_summary(company_id)
+
+# =========================================================
+# ENTERPRISE REPORT GENERATION
+# =========================================================
+
+from fastapi.responses import FileResponse
+from core.reporting.report_service import generate_company_report
+
+
+@router.post("/api/reports/{company_id}/generate")
+def api_generate_company_report(company_id: str):
+    path = generate_company_report(company_id)
+
+    return {
+        "ok": True,
+        "company_id": company_id,
+        "path": str(path),
+        "download_url": f"/api/reports/{company_id}/latest",
+    }
+
+
+@router.get("/api/reports/{company_id}/latest")
+def api_download_latest_company_report(company_id: str):
+    report_dir = Path("data/reports")
+    files = sorted(
+        report_dir.glob(f"{company_id}_executive_report_*.pdf"),
+        key=lambda item: item.stat().st_mtime,
+        reverse=True,
+    )
+
+    if not files:
+        path = generate_company_report(company_id)
+    else:
+        path = files[0]
+
+    return FileResponse(
+        path=str(path),
+        media_type="application/pdf",
+        filename=path.name,
+    )

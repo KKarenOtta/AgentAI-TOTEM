@@ -133,6 +133,25 @@ async function loadDashboard() {
 }
 
 loadDashboard();
+
+async function generateReport() {
+  const status = document.getElementById("reportStatus");
+  status.textContent = "Gerando relatório...";
+
+  const res = await fetch(`/api/reports/${companyId}/generate`, {
+    method: "POST"
+  });
+
+  const data = await res.json();
+
+  if (!data.ok) {
+    status.textContent = "Erro ao gerar relatório.";
+    return;
+  }
+
+  status.innerHTML = `<a href="${data.download_url}" target="_blank">Baixar relatório PDF</a>`;
+}
+
 </script>
 
 {% endblock %}

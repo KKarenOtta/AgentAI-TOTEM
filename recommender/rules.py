@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from core.recommendation_feedback.store import log_recommendation_event
 from recommender.scoring import score_campaign
 
 
@@ -13,6 +14,7 @@ def recommend_actions(
     company_id: str | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     intent = intent or "general"
+    profile = profile or {}
 
     scored = []
     for campaign in active_campaigns or []:
@@ -28,10 +30,30 @@ def recommend_actions(
 
     top_actions = []
     for score, campaign, why in scored[:top_k]:
+        campaign_id = campaign.get("campaign_id") or campaign.get("id") or campaign.get("code")
+
+        if company_id and campaign_id:
+            try:
+                log_recommendation_event(
+                    company_id=company_id,
+                    session_id=profile.get("session_id"),
+                    campaign_id=campaign_id,
+                    event_type="impression",
+                    intent=intent,
+                    score=score,
+                    reward=0.05,
+                    payload={
+                        "profile": profile,
+                        "reason": why,
+                    },
+                )
+            except Exception:
+                pass
+
         top_actions.append(
             {
                 "type": "campaign",
-                "campaign_id": campaign.get("campaign_id") or campaign.get("id") or campaign.get("code"),
+                "campaign_id": campaign_id,
                 "title": campaign.get("title") or campaign.get("name") or "Campanha",
                 "description": campaign.get("description") or "",
                 "cta_label": campaign.get("cta_label") or campaign.get("cta") or "Quero meu desconto",
