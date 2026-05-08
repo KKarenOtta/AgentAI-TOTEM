@@ -1,247 +1,449 @@
 <img width="201" height="231" alt="IAgora" src="https://github.com/user-attachments/assets/29dd313b-b9f6-4df1-875f-915245640425" />
 
-# TOTEM I.A.Gora — Plataforma Inteligente de Atendimento com IA Multimodal
+# TOTEM I.A.Gora — Enterprise AI Multimodal Platform
 
-O TOTEM I.A.Gora é uma plataforma de atendimento inteligente baseada em IA, projetada para ambientes físicos (white-label).
-Ele integra visão computacional, voz, linguagem natural e recomendação inteligente, permitindo interação fluida entre usuários e sistemas digitais.
+O TOTEM I.A.Gora é uma plataforma enterprise de atendimento inteligente baseada em IA multimodal, projetada para ambientes físicos, varejo, zoológicos, shoppings, eventos, hospitais, turismo e operações white-label.
 
-O sistema utiliza uma arquitetura híbrida com:
-	Machine Learning supervisionado (classificação de intenção)
-	Busca semântica com embeddings
-	Fallback com LLM
-	Pipeline automatizado de aprendizado contínuo via Celery
+A plataforma integra:
 
-## 1. Stack Principal
-	Backend
-	Python 3.11
-	FastAPI
-	Uvicorn
-	Machine Learning
-	SentenceTransformers (embeddings multilíngue)
-	Scikit-learn (Logistic Regression)
-	PyTorch (dependência indireta)
-	Pipeline / Orquestração
-	Celery
-	Redis
-	Dados
-	JSONL / JSON
-	Persistência local (estrutura modular)
-	Edge (hardware)
-	Raspberry Pi 3
-	PIR Sensor
-	Câmera (fswebcam)
+- IA Conversacional
+- Visão Computacional
+- Processamento de Voz
+- Busca Semântica
+- Recommendation Engine
+- Sentiment Analysis
+- Reward Learning
+- Edge Computing
+- Analytics Enterprise
+- Persistência híbrida JSON + AWS RDS
 
-## 2. Arquitetura do Sistema
+---
 
-		      Visão geral
-		Usuário (voz/presença)
-		        ↓
-		Raspberry Pi (sensores + imagem)
-		        ↓
-		API FastAPI
-		        ↓
-		Orchestrator
-		        ↓
-		[1] Intent ML
-		[2] FAQ Engine (embedding)
-		[3] Contexto empresa
-		[4] LLM fallback
-		        ↓
-		Resposta (voz/texto/UI)
-		Pipeline completo (automático)
-		Admin altera FAQ
-		        ↓
-		save_faq()
-		        ↓
-		Celery (full_pipeline)
-		        ↓
-		1. build_intent_dataset
-		2. train_intent_model
-		3. rebuild_embeddings
-		4. evaluate
-		        ↓
-		Modelo atualizado
-		        ↓
-		Orchestrator usa novo modelo
+# 1. Arquitetura Enterprise
 
-## 3. Features Utilizadas
-	IA e ML
-	Classificação de intenção (supervisionado)
-	Embeddings semânticos multilíngue
-	Re-ranking com score + uso
-	Fallback com LLM (OpenAI)
-	Sistema
-	Cache inteligente
-	Pipeline assíncrono
-	Aprendizado contínuo
-	Multi-empresa (company_id)
-	Edge
-	Detecção de presença (PIR)
-	Captura de imagem
-	Validação humana (OpenCV)
-	Negócio
-	Recomendações
-	Cupons (QR Code)
-	Tracking de conversão
+## Fluxo operacional completo
 
-## 4. Como Rodar o Projeto
-	4.1 Setup
+			     Sensores Raspberry Pi 3
+				(3 sensores ultrassônicos)
+				            ↓
+				Detecção contínua de presença
+				       (5 segundos)
+				            ↓
+					Captura de imagem
+					(fswebcam / OpenCV)
+				            ↓
+					Validação humana
+					(OpenCV + AWS Rekognition)
+				            ↓
+					Trigger do TOTEM
+				            ↓
+					Greeting automático
+					(TTS + animação UI)
+				            ↓
+				Captura de voz do usuário
+				            ↓
+					STT (Speech-to-Text)
+				            ↓
+					Pipeline de IA
+					 ├── Intent ML
+					 ├── FAQ Semântica
+					 ├── Embeddings
+					 ├── Contexto da empresa
+					 ├── Recommendation Engine
+					 ├── Sentiment Analysis
+					 └── LLM Fallback
+					        ↓
+					Resposta inteligente
+				            ↓
+						TTS + UI
+				            ↓
+				QR Code / Device Handoff
+				            ↓
+				  Lead Capture + LGPD
+				            ↓
+					NPS + Analytics
+				            ↓
+					Reward Learning
+				            ↓
+				  Aprendizado contínuo
+
+# 2. Stack Tecnológica
+   
+		Backend
+		Python 3.11
+		FastAPI
+		Uvicorn
+		Jinja2
+		SQLAlchemy
+		IA / Machine Learning
+		SentenceTransformers
+		Transformers
+		HuggingFace
+		Scikit-Learn
+		PyTorch
+		OpenAI API
+		Embeddings multilíngue
+		Pipeline / Runtime
+		Celery
+		Redis
+		Celery Beat
+		Sync Worker
+		Runtime Manager
+		Banco de Dados
+		Persistência híbrida
+		JSONL local resiliente
+		JSON local
+		AWS PostgreSQL RDS
+		Sync automático
+		Edge AI
+		Raspberry Pi 3
+		Sensores ultrassônicos
+		OpenCV
+		fswebcam
+		Captura de áudio
+		Voice Server
+
+# 3. Arquitetura de IA
+## 3.1 Intent Classification
+
+Classificação supervisionada de intenção usando Scikit-Learn.
+
+Exemplos:
+	localização
+	horário
+	promoção
+	alimentação
+	banheiro
+	eventos
+	suporte
+
+## 3.2 FAQ Engine Semântica
+
+Sistema baseado em embeddings semânticos multilíngue.
+
+		 Pergunta usuário
+		        ↓
+		    Embedding
+		        ↓
+		 Busca vetorial
+		        ↓
+		Ranking semântico
+		        ↓
+		   Resposta FAQ
+
+Possui:
+
+	semantic ranking
+	usage learning
+	correction workflow
+	reindexação automática
+	monitoramento de qualidade
+
+## 3.3 LLM Fallback
+
+Quando a FAQ não encontra resposta satisfatória:
+
+	FAQ score baixo
+	        ↓
+	Fallback OpenAI
+	        ↓
+	Resposta gerada
+	        ↓
+	Persistência para aprendizado
+
+## 3.4 Sentiment Analysis
+
+Análise emocional utilizando Transformers.
+
+Classificações: positive - neutral - negative
+
+Também calcula:
+	promoter
+	passive
+	detractor
+	frustration risk
+	engagement score
+Integrado ao NPS.
+
+## 3.5 Recommendation Engine
+
+Sistema inteligente de campanhas. Possui:
+
+	recommendation scoring
+	reward learning
+	CTR analytics
+	conversion analytics
+	adaptive campaign weights
+
+Eventos:
+
+	impression
+	click
+	conversion
+	redeemed
+	interaction
+
+# 4. Persistência Enterprise
+## 4.1 Persistência Local
+
+Arquivos:
+
+	data/
+	├── analytics/
+	├── faq/
+	├── leads/
+	├── lgpd/
+	├── metrics/
+	├── recommendation_feedback/
+	├── reports/
+	├── semantic/
+	├── sentiment/
+	└── sync/
+
+## 4.2 AWS RDS
+
+O sistema sincroniza automaticamente:
+
+	leads
+	métricas
+	consentimentos
+	analytics
+	sync audit
+
+Fluxo:
+
+	JSONL local
+	      ↓
+	Sync Queue
+	      ↓
+	Sync Worker
+	      ↓
+	AWS RDS PostgreSQL
+
+#5. Runtime Enterprise
+Inicialização única
+
+O sistema possui runtime centralizado.
+
+Comando:
+
+	bash runtime/totem_manager.sh restart
+
+O runtime sobe automaticamente:
+
+Backend FastAPI
+Redis validation
+Celery Worker
+Celery Beat
+Sync Worker
+Healthcheck
+AWS validation
+
+# 6. Como Rodar o Projeto
+## 6.1 Setup
+
 	git clone https://github.com/KKarenOtta/AgentAI-TOTEM
-	cd ~/Desktop/AgentAI-TOTEM
-	
-	python3 -m venv venv
-	source venv/bin/activate
-	
-	pip install -r requirements.txt
 
-	Instalar Redis:
+	cd ~/Desktop/AgentAI-TOTEM
+
+	python3 -m venv venv
+
+	source venv/bin/activate
+
+	pip install -r requirements.txt/ requirements-edge.txt
+
+6.2 Redis
+
+macOS:
 	
 	brew install redis
+	
 	brew services start redis
 
-### 4.2 Testar ambiente
-	python - <<'PY'
-	from ml.intent.predictor import predict
+	redis-cli ping
 
-	print(predict("onde ficam os pinguins?"))
-	PY
+Resposta esperada:
 
-### 4.3 Rodar aplicação
-	Terminal 1 — API
-	cd ~/Desktop/AgentAI-TOTEM
+	PONG
+
+## 6.3 Runtime único
+	bash runtime/totem_manager.sh restart
+## 6.4 Verificar status
+	bash runtime/totem_manager.sh status
+## 6.5 Ver logs
+	bash runtime/totem_manager.sh logs
+
+# 7. Raspberry Pi Runtime
+## 7.1 Runtime sensores
+	cd ~/AgentAI-TOTEM
+	
 	source venv/bin/activate
-	uvicorn app.main:app \
-	  --host 0.0.0.0 \
-	  --port 8000 \
-	  --reload \
-	  --reload-dir app \
-	  --reload-dir core \
-	  --reload-dir ml \
-	  --reload-dir templates \
-	  --reload-dir static
 
-	Terminal 2 - Escutar eventos
-		curl -N "http://127.0.0.1:8000/api/events/FLX-001"
-	  
-	Terminal 3 — Ativar REDIS
-		brew services start redis
-		TESTAR: redis-cli ping (resposta esperada: PONG)
+	python edge/raspberry_runtime/sensor_runtime.py
 
-	 Terminal 4 - Worker Celery
-	cd ~/Desktop/AgentAI-TOTEM
+## 7.2 Voice Server
+	cd ~/AgentAI-TOTEM
+	
 	source venv/bin/activate
-	celery -A infra.async_tasks.celery_app worker \
- 	 --loglevel=info \
-  	 --pool=solo
+	
+	python edge/voice_server.py
 
-	 Terminal 5 - Testes ML/RN + Pipeline
-	 	GERAR DATATSET DE INTENÇAO
-			cd ~/Desktop/AgentAI-TOTEM
-			source venv/bin/activate
-			python ml/intent/dataset_builder.py
-			wc -l data/ml/intent/dataset.jsonl
-			head data/ml/intent/dataset.jsonl
+# 8. Interfaces do Sistema - navegador
 
-		TREINAR MODELO MANUAL
-			python ml/intent/train.py
-		
-		TESTAR INFERENCIA
-			python - <<'PY'
-			from ml.intent.predictor import predict
-			tests = [
-			    "onde ficam os pinguins?",
-			    "que horas fecha?",
-			    "tem desconto hoje?",
-			    "onde comer?",
-			    "tem banheiro?",
-			    "onde ficam as flores?"
-			]
-			for t in tests:
-			    intent, conf = predict(t)
-			    print(t, "=>", intent, conf)
-			PY
-		
-		DISPARAR PIPELINE COMPLETA (CELERY)
-			python - <<'PY'
-			from infra.async_tasks.tasks import full_pipeline
-			result = full_pipeline.delay()
-			print("task_id:", result.id)
-			PY
-
-		VER RELATORIO DO MODELO
-			cat data/ml/intent/reports/training_report.json
-		
-	Abrir acessos no navegador
-	Usuário (Totem)
+Totem
+	
 	http://52.201.76.45:8000/totem/FLX-001
-	Admin/Empresa
+
+Login
+	
 	http://52.201.76.45:8000/login
-	- acesso: admin | senha: 123456
-			  flx   | senha: flz123
-			  
-	 Terminal 6 - acesso [raspberry]
-			arp -a
-			ssh lostgear@raspberrypi.local
-			Confirmar hostname -I
-			ping 192.168.15.12
-			senha: ****
-			cd AgentAI-TOTEM
-			source venv/bin/activate
-			python edge/raspberry_runtime/sensor_runtime.py
 
-	Terminal 7 - [raspberry]
-			SUBIR SERVIDOR DE VOZ:
-				cd ~/AgentAI-TOTEM
-				source venv/bin/activate	
-				python edge/voice_server.py
+Dashboard empresa
+	
+	http://52.201.76.45:8000/client/FLX-001
 
-	Terminal 8 - [raspberry]
-				cd ~/AgentAI-TOTEM
-				source venv/bin/activate
-				python -c "import flask; print(flask.__version__)"
-				
-				cd alpha_test
-				python app.py
+FAQ Admin
+	
+	http://52.201.76.45:8000/admin/faq
 
-				Navegador: http://10.49.220.215:5000/
-				
+# 9. Dashboard Enterprise
 
-## 5. Métricas Utilizadas
-	ML (Intent)
+	KPIs operacionais
+	sentiment analytics
+	reward learning
+	campaign analytics
+	sync health
+	NPS analytics
+	AI metrics
+	conversion analytics
+	realtime status
+
+# 10. Relatórios Enterprise
+
+O sistema gera relatórios PDF automáticos.
+
+Inclui:
+
+	KPIs
+	campanhas
+	sentiment analysis
+	analytics temporal
+	reward learning
+	métricas IA
+	NPS
+	performance operacional
+
+API:
+
+	POST /api/reports/{company_id}/generate
+	GET  /api/reports/{company_id}/latest
+
+# 11. Pipeline de Aprendizado Contínuo
+	Celery Pipeline
+	Admin corrige FAQ
+	        ↓
+	save_faq()
+	        ↓
+	reindex embeddings
+	        ↓
+	dataset builder
+	        ↓
+	fine tune
+	        ↓
+	evaluate
+	        ↓
+	optimize
+	        ↓
+	modelo atualizado
+
+# 12. Métricas
+	IA
 	Accuracy
-	Precision (macro / weighted)
+	Precision
 	Recall
 	F1-score
-	Sistema
-	Tempo de resposta
-	Cache hit rate
-	Confidence do modelo
+	Semantic hit rate
+	Fallback rate
+	Confidence score
+	Operacional
+	Latência
+	Sync health
+	Queue status
+	Runtime health
 	Negócio
-	Taxa de conversão (cupons)
-	Engajamento
-	Uso por intent
+	CTR
+	Conversion rate
+	Reward score
+	Leads
+	NPS
+	Engagement
 
-## 6. Análise
-	Resultado atual
-		accuracy: ~0.69
-		macro_f1: ~0.70
-	Interpretação
-		Modelo funcional e consistente
-	Limitação principal: 
-		Dataset pequeno
-		Confiança baixa em classes similares
-		Dependência de dados reais para evolução
+# 13. Estrutura Principal
+	app/
+	core/
+	DB/
+	edge/
+	infra/
+	ml/
+	recommender/
+	runtime/
+	templates/
+	static/
+	data/
 
-## 7. Conclusão
+# 14. Estado Atual do Projeto - O TOTEM atualmente possui:
 
-O AgentAI-TOTEM apresenta um sistema baseado em regras para uma plataforma de IA híbrida com:
+	IA multimodal funcional
+	aprendizado contínuo
+	analytics enterprise
+	reward learning
+	recommendation engine
+	sentiment analysis
+	embeddings persistentes
+	runtime centralizado
+	persistência híbrida
+	dashboard enterprise
+	geração de relatórios
+	edge orchestration
+	integração AWS
+	multi-tenant
 
-	ML + Embeddings + Regras + LLM + Feedback
+# 15. Roadmap Enterprise
+
+Próximas evoluções:
+
+Feature Store
+Vector Database dedicado
+Distributed Event Bus
+Online Learning
+Fine-tuning contínuo
+Multi-node orchestration
+Voice streaming
+Interrupção de voz
+Agent memory
+RLHF
+Observability
+Distributed tracing
+GPU inference
+Multi-tenant vector isolation
+
+16. Conclusão
+
+O TOTEM I.A.Gora evoluiu de um protótipo baseado em regras para uma plataforma enterprise de IA multimodal com:
+
+						ML + Embeddings + Reward Learning + LLM + Analytics + Edge AI
 
 Capaz de:
-	
-	Aprender com uso real
-	Melhorar continuamente
-	Escalar para múltiplas empresas
-	Operar em tempo real em ambiente físico
-	
+
+operar em tempo real
+aprender continuamente
+integrar sensores físicos
+gerar inteligência operacional
+escalar multi-empresa
+executar analytics enterprise
+entregar atendimento inteligente em ambientes físicos
+MD
+
+python -m py_compile app/main.py
+
+git status --short
