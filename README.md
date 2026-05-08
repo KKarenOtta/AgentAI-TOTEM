@@ -27,13 +27,13 @@ A plataforma integra:
 				(3 sensores ultrassônicos)
 				            ↓
 				Detecção contínua de presença
-				       (5 segundos)
+				       (3 segundos)
 				            ↓
 					Captura de imagem
 					(fswebcam / OpenCV)
 				            ↓
 					Validação humana
-					(OpenCV + AWS Rekognition)
+				(OpenCV + AWS Rekognition)
 				            ↓
 					Trigger do TOTEM
 				            ↓
