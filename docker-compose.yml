@@ -1,0 +1,56 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  backend:
+    build: .
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./runtime:/app/runtime
+
+  sync_worker:
+    build: .
+    env_file:
+      - .env
+    command: python -m core.persistence.sync_worker
+    depends_on:
+      - redis
+      - backend
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./runtime:/app/runtime
+
+  celery_worker:
+    build: .
+    env_file:
+      - .env
+    command: celery -A infra.async_tasks.celery_app.celery worker --loglevel=INFO --pool=solo
+    depends_on:
+      - redis
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./runtime:/app/runtime
+
+  celery_beat:
+    build: .
+    env_file:
+      - .env
+    command: celery -A infra.async_tasks.celery_app.celery beat --loglevel=INFO
+    depends_on:
+      - redis
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./runtime:/app/runtime

@@ -1,0 +1,15 @@
+[Unit]
+Description=TOTEM Backend
+After=network-online.target redis.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/AgentAI-TOTEM
+EnvironmentFile=/opt/AgentAI-TOTEM/.env
+ExecStart=/opt/AgentAI-TOTEM/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

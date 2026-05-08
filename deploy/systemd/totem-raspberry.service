@@ -1,0 +1,15 @@
+[Unit]
+Description=TOTEM Raspberry Runtime
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/lostgear/AgentAI-TOTEM
+EnvironmentFile=/home/lostgear/AgentAI-TOTEM/.env
+ExecStart=/bin/bash /home/lostgear/AgentAI-TOTEM/runtime/start_raspberry.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
