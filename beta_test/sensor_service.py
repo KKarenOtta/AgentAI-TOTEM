@@ -15,9 +15,10 @@ ULTRA_SENSORS = [
 ]
 
 ALERT_DISTANCE_CM = 8
-SESSION_MAX_DISTANCE_CM = 80
-INVITE_MAX_DISTANCE_CM = 200
-TEMP_ALERT_LIMIT = 30
+SESSION_DISTANCE_CM = 100
+INVITE_DISTANCE_CM = 200
+TEMP_ALERT_HIGH = 40
+TEMP_ALERT_LOW = 5
 DHT_READ_INTERVAL = 3.0
 
 GPIO.setmode(GPIO.BCM)
@@ -104,6 +105,7 @@ def read_dht22(logger=None):
     global last_dht_read, last_temperature, last_humidity
 
     now = time.time()
+
     if now - last_dht_read < DHT_READ_INTERVAL:
         return last_temperature, last_humidity
 
@@ -132,39 +134,50 @@ def classify_distance(distance_cm):
         return "espera"
     if distance_cm <= ALERT_DISTANCE_CM:
         return "alerta"
-    if distance_cm <= SESSION_MAX_DISTANCE_CM:
+    if ALERT_DISTANCE_CM < distance_cm <= SESSION_DISTANCE_CM:
         return "sessao"
-    if distance_cm <= INVITE_MAX_DISTANCE_CM:
+    if SESSION_DISTANCE_CM < distance_cm < INVITE_DISTANCE_CM:
         return "convite"
     return "espera"
 
 
-def state_message(state):
+def is_temperature_alert(temperature):
+    if temperature is None:
+        return False
+    return temperature > TEMP_ALERT_HIGH or temperature < TEMP_ALERT_LOW
+
+
+def get_message(state, temperature=None):
     if state == "alerta":
+        if temperature is not None and temperature > TEMP_ALERT_HIGH:
+            return "Atencao: temperatura acima de 40 graus."
+        if temperature is not None and temperature < TEMP_ALERT_LOW:
+            return "Atencao: temperatura abaixo de 5 graus."
         return "Atencao: objeto muito proximo detectado."
+
     if state == "sessao":
         return "Ola, seja bem-vindo! Eu sou o Totem Inteligente FlexMedia, em que posso lhe ajudar?"
+
     if state == "convite":
         return "Chegue mais perto para iniciar o totem."
+
     return "Aguardando visitante"
 
 
-def decide_system_state(sensor_results, temperature):
-    if temperature is not None and temperature > TEMP_ALERT_LIMIT:
+def decide_state(sensor_results, temperature):
+    if is_temperature_alert(temperature):
         return "alerta", "Temperatura"
 
     for item in sensor_results:
-        if item["distance_cm"] is not None and item["distance_cm"] <= ALERT_DISTANCE_CM:
+        if item["state"] == "alerta":
             return "alerta", item["sensor"]
 
     for item in sensor_results:
-        dist = item["distance_cm"]
-        if dist is not None and ALERT_DISTANCE_CM < dist <= SESSION_MAX_DISTANCE_CM:
+        if item["state"] == "sessao":
             return "sessao", item["sensor"]
 
     for item in sensor_results:
-        dist = item["distance_cm"]
-        if dist is not None and SESSION_MAX_DISTANCE_CM < dist <= INVITE_MAX_DISTANCE_CM:
+        if item["state"] == "convite":
             return "convite", item["sensor"]
 
     return "espera", None
@@ -174,31 +187,35 @@ def update_system_state(logger=None):
     sensor_results = []
 
     for sensor in ULTRA_SENSORS:
-        dist = read_distance(sensor["trig"], sensor["echo"])
+        distance = read_distance(sensor["trig"], sensor["echo"])
+        sensor_state = classify_distance(distance)
+
         sensor_results.append({
             "sensor": sensor["name"],
-            "distance_cm": dist,
-            "state": classify_distance(dist),
+            "distance_cm": distance,
+            "state": sensor_state,
         })
+
         time.sleep(0.08)
 
     temperature, humidity = read_dht22(logger=logger)
-    state, active_sensor = decide_system_state(sensor_results, temperature)
+    totem_state, active_sensor = decide_state(sensor_results, temperature)
+    message = get_message(totem_state, temperature)
 
     system_data["temperature"] = temperature
     system_data["humidity"] = humidity
     system_data["ultrassons"] = sensor_results
-    system_data["presence"] = state != "espera"
-    system_data["totem_state"] = state
+    system_data["presence"] = totem_state in ("convite", "sessao", "alerta")
+    system_data["led"] = totem_state in ("convite", "sessao", "alerta")
+    system_data["message"] = message
+    system_data["totem_state"] = totem_state
     system_data["active_sensor"] = active_sensor
-    system_data["message"] = state_message(state)
 
     if system_data["manual_led_override"]:
         GPIO.output(LED_PIN, GPIO.HIGH)
+        system_data["led"] = True
     else:
-        GPIO.output(LED_PIN, GPIO.HIGH if state != "espera" else GPIO.LOW)
-
-    system_data["led"] = GPIO.input(LED_PIN) == 1
+        GPIO.output(LED_PIN, GPIO.HIGH if system_data["led"] else GPIO.LOW)
 
     return {
         "temperature": system_data["temperature"],
