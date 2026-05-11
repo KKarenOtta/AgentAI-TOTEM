@@ -48,8 +48,13 @@ start_process() {
   fi
 
   echo "[START] $name"
-  nohup bash -lc "cd '$ROOT_DIR' && $cmd" > "$log_file" 2>&1 &
+
+  nohup bash -lc \
+    "cd '$ROOT_DIR' && $cmd" \
+    > "$log_file" 2>&1 &
+
   echo $! > "$pid_file"
+
   echo "[OK] $name iniciado | PID $(cat "$pid_file")"
 }
 
@@ -67,12 +72,15 @@ stop_processes() {
 
     if kill -0 "$pid" 2>/dev/null; then
       echo "[STOP] $name | PID $pid"
+
       pkill -P "$pid" 2>/dev/null || true
       kill "$pid" 2>/dev/null || true
+
       sleep 1
 
       if kill -0 "$pid" 2>/dev/null; then
         echo "[FORCE] $name | PID $pid"
+
         pkill -9 -P "$pid" 2>/dev/null || true
         kill -9 "$pid" 2>/dev/null || true
       fi
@@ -81,8 +89,8 @@ stop_processes() {
     rm -f "$pid_file"
   done
 
-  lsof -tiTCP:8000 -sTCP:LISTEN | xargs kill -9 2>/dev/null || true
-  lsof -tiTCP:5000 -sTCP:LISTEN | xargs kill -9 2>/dev/null || true
+  lsof -tiTCP:8000 -sTCP:LISTEN \
+    | xargs kill -9 2>/dev/null || true
 
   echo "[OK] Serviços encerrados."
 }
@@ -91,20 +99,21 @@ is_raspberry() {
   uname -a | grep -qiE "raspberry|armv7|aarch64"
 }
 
-has_arecord() {
-  command -v arecord >/dev/null 2>&1
-}
-
 start_backend() {
-  start_process "backend" "$PYTHON_BIN -m uvicorn app.main:app --host 0.0.0.0 --port 8000"
+  start_process \
+    "backend" \
+    "$PYTHON_BIN -m uvicorn app.main:app --host 0.0.0.0 --port 8000"
 }
 
 start_sync_worker() {
-  start_process "sync_worker" "PYTHONPATH='$ROOT_DIR' $PYTHON_BIN -m core.persistence.sync_worker --interval 15"
+  start_process \
+    "sync_worker" \
+    "PYTHONPATH='$ROOT_DIR' $PYTHON_BIN -m core.persistence.sync_worker --interval 15"
 }
 
 start_celery() {
   local celery_bin
+
   celery_bin="$(dirname "$PYTHON_BIN")/celery"
 
   if [ ! -x "$celery_bin" ]; then
@@ -112,21 +121,20 @@ start_celery() {
     return
   fi
 
-  start_process "celery_worker" "PYTHONPATH='$ROOT_DIR' $celery_bin -A infra.async_tasks.celery_app.celery worker --loglevel=INFO -n totem_worker@%h"
-  start_process "celery_beat" "PYTHONPATH='$ROOT_DIR' $celery_bin -A infra.async_tasks.celery_app.celery beat --loglevel=INFO"
-}
+  start_process \
+    "celery_worker" \
+    "PYTHONPATH='$ROOT_DIR' $celery_bin -A infra.async_tasks.celery_app.celery worker --loglevel=INFO -n totem_worker@%h"
 
-start_voice() {
-  if has_arecord; then
-    start_process "voice_server" "$PYTHON_BIN edge/voice_server.py"
-  else
-    echo "[INFO] voice_server ignorado: arecord indisponível"
-  fi
+  start_process \
+    "celery_beat" \
+    "PYTHONPATH='$ROOT_DIR' $celery_bin -A infra.async_tasks.celery_app.celery beat --loglevel=INFO"
 }
 
 start_edge() {
   if is_raspberry; then
-    start_process "sensor_runtime" "$PYTHON_BIN edge/raspberry_runtime/sensor_runtime.py"
+    start_process \
+      "sensor_runtime" \
+      "$PYTHON_BIN edge/raspberry_runtime/sensor_runtime.py"
   else
     echo "[INFO] sensor_runtime ignorado: ambiente não identificado como Raspberry"
   fi
@@ -146,8 +154,10 @@ logs() {
 
   for log_file in "$LOG_DIR"/*.log; do
     [ -e "$log_file" ] || continue
+
     echo
     echo "==== $(basename "$log_file") ===="
+
     tail -n 80 "$log_file"
   done
 }
@@ -159,6 +169,7 @@ status() {
 
   echo
   echo "---- PIDS ----"
+
   for pid_file in "$PID_DIR"/*.pid; do
     [ -e "$pid_file" ] || continue
 
@@ -183,10 +194,11 @@ start_all() {
   echo "[OK] Python: $PYTHON_BIN"
 
   start_backend
+
   sleep 3
+
   start_sync_worker
   start_celery
-  start_voice
   start_edge
 
   echo
@@ -213,9 +225,6 @@ case "${1:-help}" in
   celery)
     start_celery
     ;;
-  voice)
-    start_voice
-    ;;
   edge)
     start_edge
     ;;
@@ -239,7 +248,6 @@ case "${1:-help}" in
     echo "  ./runtime/totem_manager.sh backend"
     echo "  ./runtime/totem_manager.sh sync"
     echo "  ./runtime/totem_manager.sh celery"
-    echo "  ./runtime/totem_manager.sh voice"
     echo "  ./runtime/totem_manager.sh edge"
     ;;
 esac

@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import math
 import os
+import shutil
 import subprocess
 import sys
 import wave
@@ -10,7 +11,6 @@ from array import array
 from pathlib import Path
 from typing import Any
 
-import requests
 from dotenv import load_dotenv
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -20,7 +20,10 @@ if str(ROOT_DIR) not in sys.path:
 
 load_dotenv(ROOT_DIR / ".env")
 
-API_BASE_URL = os.getenv("TOTEM_API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+from core.totem.orchestrator import TotemOrchestrator
+from core.totem.stt import stt_from_base64
+from infra.realtime.event_bus import publish
+
 COMPANY_ID = os.getenv("COMPANY_ID", "FLX-001").strip()
 DEVICE_ID = os.getenv("DEVICE_ID", "RPI3-SENSORS-001").strip()
 
@@ -34,12 +37,34 @@ RECORD_SECONDS = int(os.getenv("VOICE_RECORD_SECONDS", "6"))
 MIN_RMS = int(os.getenv("VOICE_MIN_RMS", "150"))
 MIN_TEXT_CHARS = int(os.getenv("VOICE_MIN_TEXT_CHARS", "3"))
 
-REQUEST_TIMEOUT_SECONDS = int(os.getenv("VOICE_REQUEST_TIMEOUT_SECONDS", "90"))
+orchestrator = TotemOrchestrator()
+
+
+def publish_voice_status(
+    session_id: str,
+    status: str,
+    text: str | None = None,
+    payload: dict[str, Any] | None = None,
+) -> None:
+    publish(
+        company_id=COMPANY_ID,
+        event="voice_status",
+        payload={
+            "session_id": session_id,
+            "status": status,
+            "text": text,
+            "payload": payload or {},
+        },
+    )
 
 
 def record_audio() -> bool:
     print("[VOICE] captura iniciada")
     print("[VOICE] device:", AUDIO_DEVICE)
+
+    if not shutil.which("arecord"):
+        print("[VOICE] arecord indisponível neste ambiente")
+        return False
 
     command = [
         "arecord",
@@ -56,12 +81,17 @@ def record_audio() -> bool:
         AUDIO_FILE,
     ]
 
-    result = subprocess.run(
-        command,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            command,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        print("[VOICE] arecord não encontrado")
+        return False
 
     if result.returncode != 0:
         print("[VOICE] erro arecord:", result.stderr.strip())
@@ -69,7 +99,11 @@ def record_audio() -> bool:
 
     path = Path(AUDIO_FILE)
 
-    if not path.exists() or path.stat().st_size <= 44:
+    if not path.exists():
+        print("[VOICE] arquivo inexistente")
+        return False
+
+    if path.stat().st_size <= 44:
         print("[VOICE] arquivo de áudio inválido")
         return False
 
@@ -118,77 +152,52 @@ def should_ignore_text(text: str) -> bool:
     return any(fragment in lower for fragment in ignored_fragments)
 
 
-def post_json(path: str, payload: dict[str, Any], timeout: int = REQUEST_TIMEOUT_SECONDS) -> dict[str, Any] | None:
-    if not API_BASE_URL:
-        print("[VOICE] TOTEM_API_BASE_URL vazio")
-        return None
-
-    url = f"{API_BASE_URL}{path}"
-
-    try:
-        response = requests.post(url, json=payload, timeout=timeout)
-        print("[VOICE] POST", path, response.status_code)
-
-        if response.status_code >= 400:
-            print("[VOICE] erro backend:", response.text[:500])
-            return None
-
-        return response.json()
-
-    except Exception as exc:
-        print("[VOICE] erro request:", type(exc).__name__, str(exc))
-        return None
-
-
 def transcribe(audio_base64: str) -> str:
-    data = post_json(
-        "/api/audio/transcribe",
-        {"audio_base64": audio_base64},
-        timeout=60,
-    )
+    text, latency, provider = stt_from_base64(audio_base64)
 
-    if not data:
-        return ""
-
-    text = (data.get("text") or "").strip()
-    print("[VOICE] transcrição:", text)
-    return text
-
-
-def publish_voice_status(
-    session_id: str,
-    status: str,
-    text: str | None = None,
-    payload: dict[str, Any] | None = None,
-) -> None:
-    post_json(
-        "/api/voice/status",
+    print(
+        "[VOICE] transcrição",
         {
-            "company_id": COMPANY_ID,
-            "session_id": session_id,
-            "status": status,
-            "text": text,
-            "payload": payload or {},
+            "provider": provider,
+            "latency": latency,
         },
-        timeout=10,
     )
+
+    return (text or "").strip()
 
 
 def interact(session_id: str, text: str) -> dict[str, Any] | None:
-    return post_json(
-        "/totem/interact",
-        {
-            "company_id": COMPANY_ID,
-            "session_id": session_id,
-            "message": text,
-            "prefer_audio": True,
-            "profile": {
+    try:
+        resposta, recommendations, audio_path, metric, idioma = orchestrator.interact(
+            company_id=COMPANY_ID,
+            session_id=session_id,
+            pergunta=text,
+            profile={
                 "device_id": DEVICE_ID,
                 "input_mode": "voice",
             },
-        },
-        timeout=REQUEST_TIMEOUT_SECONDS,
-    )
+            prefer_audio=True,
+        )
+
+        audio_base64 = None
+
+        if audio_path:
+            audio_file = Path(audio_path)
+
+            if audio_file.exists():
+                audio_base64 = base64.b64encode(audio_file.read_bytes()).decode("utf-8")
+
+        return {
+            "text": resposta,
+            "recommendations": recommendations,
+            "audio_base64": audio_base64,
+            "metric": metric,
+            "language": idioma,
+        }
+
+    except Exception as exc:
+        print("[VOICE] erro interact:", type(exc).__name__, str(exc))
+        return None
 
 
 def capture_once(session_id: str | None) -> None:
@@ -199,7 +208,6 @@ def capture_once(session_id: str | None) -> None:
         return
 
     print("[VOICE] sessão:", sid)
-    print("[VOICE] api:", API_BASE_URL)
     print("[VOICE] company:", COMPANY_ID)
 
     publish_voice_status(
@@ -212,7 +220,11 @@ def capture_once(session_id: str | None) -> None:
         publish_voice_status(
             sid,
             "capture_error",
-            "Não consegui capturar o áudio.",
+            "Não consegui capturar o áudio neste ambiente.",
+            {
+                "audio_device": AUDIO_DEVICE,
+                "arecord_available": bool(shutil.which("arecord")),
+            },
         )
         return
 
@@ -224,7 +236,10 @@ def capture_once(session_id: str | None) -> None:
             sid,
             "silence",
             "Não consegui ouvir sua pergunta. Tente novamente.",
-            {"rms": rms, "min_rms": MIN_RMS},
+            {
+                "rms": rms,
+                "min_rms": MIN_RMS,
+            },
         )
         return
 
@@ -239,11 +254,7 @@ def capture_once(session_id: str | None) -> None:
         )
         return
 
-    publish_voice_status(
-        sid,
-        "transcribed",
-        text,
-    )
+    publish_voice_status(sid, "transcribed", text)
 
     data = interact(sid, text)
 
