@@ -94,12 +94,32 @@ class TotemOrchestrator:
         self._transition(session_id, Event.SESSION_STARTED)
         self._transition(session_id, Event.GREETING_DONE)
 
+        greeting_audio_path = None
+        greeting_audio_base64 = None
+
+        try:
+            greeting_audio_path, *_ = gerar_audio(DEFAULT_GREETING, "pt")
+            if greeting_audio_path:
+                from pathlib import Path
+                import base64
+
+                audio_file = Path(greeting_audio_path)
+                if audio_file.exists():
+                    greeting_audio_base64 = base64.b64encode(
+                        audio_file.read_bytes()
+                    ).decode("utf-8")
+        except Exception:
+            greeting_audio_path = None
+            greeting_audio_base64 = None
+
         publish(
             company_id=company_id,
             event="totem_activated",
             payload={
                 "session_id": session_id,
                 "message": DEFAULT_GREETING,
+                "audio_path": greeting_audio_path,
+                "audio_base64": greeting_audio_base64,
                 "presence": payload,
             },
         )
