@@ -20,6 +20,7 @@ from core.totem.session_store import (
     set_last_recommendations,
 )
 from core.totem.tts import gerar_audio
+from infra.realtime.event_bus import publish
 
 logger = logging.getLogger(__name__)
 
@@ -150,11 +151,24 @@ async def totem_activate(payload: ActivateRequest):
         audio_path, _, _, _, _ = gerar_audio(GREETING_DEFAULT, "pt")
         audio_base64 = _audio_to_base64(audio_path)
 
+    event_payload = {
+        "session_id": payload.session_id,
+        "message": GREETING_DEFAULT,
+        "audio_path": audio_path,
+        "audio_base64": audio_base64,
+    }
+
+    publish(
+        company_id=payload.company_id,
+        event="totem_activated",
+        payload=event_payload,
+    )
+
     await db.save_event(
         company_id=payload.company_id,
         session_id=payload.session_id,
         event_type="totem_activated",
-        payload={"greeting": GREETING_DEFAULT},
+        payload=event_payload,
     )
 
     return {
