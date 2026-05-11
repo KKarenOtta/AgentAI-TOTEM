@@ -3,13 +3,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from core.auth.password import hash_password, verify_password
+from core.auth.password import hash_password, is_legacy_hash, verify_password
 
 USERS_FILE = Path("data/users.json")
 
 
 def _ensure_file() -> None:
     USERS_FILE.parent.mkdir(parents=True, exist_ok=True)
+
     if not USERS_FILE.exists():
         USERS_FILE.write_text("[]\n", encoding="utf-8")
 
@@ -26,7 +27,10 @@ def load_users() -> list[dict]:
 
 def save_users(users: list[dict]) -> None:
     _ensure_file()
-    USERS_FILE.write_text(json.dumps(users, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    USERS_FILE.write_text(
+        json.dumps(users, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
 
 def public_users() -> list[dict]:
@@ -43,17 +47,23 @@ def public_users() -> list[dict]:
 
 def find_user(username: str) -> dict | None:
     username = username.strip()
-    return next((u for u in load_users() if u.get("username") == username), None)
+    return next((user for user in load_users() if user.get("username") == username), None)
 
 
 def authenticate(username: str, password: str) -> dict | None:
+    username = username.strip()
     user = find_user(username)
 
     if not user:
         return None
 
-    if not verify_password(password, user.get("password", "")):
+    stored_hash = user.get("password", "")
+
+    if not verify_password(password, stored_hash):
         return None
+
+    if is_legacy_hash(stored_hash):
+        _upgrade_password_hash(username, password)
 
     safe_user = dict(user)
     safe_user.pop("password", None)
@@ -100,7 +110,6 @@ def delete_user(username: str) -> bool:
 
     users = load_users()
     kept = []
-
     removed = False
 
     for user in users:
@@ -108,6 +117,7 @@ def delete_user(username: str) -> bool:
             if user.get("role") == "admin":
                 kept.append(user)
                 continue
+
             removed = True
             continue
 
@@ -115,3 +125,14 @@ def delete_user(username: str) -> bool:
 
     save_users(kept)
     return removed
+
+
+def _upgrade_password_hash(username: str, password: str) -> None:
+    users = load_users()
+
+    for user in users:
+        if user.get("username") == username:
+            user["password"] = hash_password(password)
+            break
+
+    save_users(users)
