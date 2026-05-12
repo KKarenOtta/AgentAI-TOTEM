@@ -1,9 +1,9 @@
 {
   "FLX-001": {
     "company_id": "FLX-001",
-    "device_id": "LOCAL-PRESENCE-TEST",
-    "temperature": 24.0,
-    "humidity": 58.0,
-    "updated_at_ts": 1778535962.34656
+    "device_id": "RPI3-SENSORS-FINAL-002",
+    "temperature": 21.4,
+    "humidity": 61.0,
+    "updated_at_ts": 1778548696.559489
   }
 }

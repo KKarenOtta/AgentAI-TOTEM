@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import base64
 import os
+import time
+from typing import Any
 
 from infra.realtime.event_bus import publish
 from repositories.presence_repository import PresenceRepository
+
 from core.sensors.climate_store import save_climate
+from core.totem.orchestrator import TotemOrchestrator
 from core.vision.rekognition_adapter import RekognitionAdapter
 
 _presence_repo = PresenceRepository()
+_orchestrator = TotemOrchestrator()
 
 
 class PresenceService:
@@ -22,30 +27,23 @@ class PresenceService:
         company_id: str,
         device_id: str,
         image_base64: str | None = None,
-        sensor_payload: dict | None = None,
-    ) -> dict:
+        sensor_payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        company_id = company_id.strip()
+        device_id = device_id.strip()
         sensor_payload = sensor_payload or {}
+
         save_climate(company_id, device_id, sensor_payload)
 
-        attributes = {
-            "validation_engine": "opencv_haar_v2",
-            "human_validated": False,
-            "faces_detected": 0,
-            "profiles_detected": 0,
-            "image_received": bool(image_base64),
-            "require_image": self.require_image,
-            "require_human_validation": self.require_human_validation,
-            "sensor_payload": sensor_payload,
-        }
+        attributes = self._base_attributes(sensor_payload=sensor_payload, image_base64=image_base64)
 
         if self.require_image and not image_base64:
-            return {
-                "company_id": company_id,
-                "device_id": device_id,
-                "present": False,
-                "reason": "image_required",
-                "attributes": attributes,
-            }
+            return self._rejected(
+                company_id=company_id,
+                device_id=device_id,
+                reason="image_required",
+                attributes=attributes,
+            )
 
         validated = not self.require_human_validation
 
@@ -64,33 +62,97 @@ class PresenceService:
                     attributes["reason"] = "ok"
 
         if self.require_human_validation and not validated:
-            return {
-                "company_id": company_id,
-                "device_id": device_id,
-                "present": False,
-                "reason": "human_not_validated",
-                "attributes": attributes,
-            }
+            return self._rejected(
+                company_id=company_id,
+                device_id=device_id,
+                reason="human_not_validated",
+                attributes=attributes,
+            )
 
-        state = _presence_repo.set_present(company_id=company_id, device_id=device_id)
-        state["attributes"] = attributes
-        state["validated"] = validated
-        state["sensor_payload"] = sensor_payload
+        session_id = _presence_repo.active_session(company_id, device_id)
+        if not session_id:
+            session_id = self._new_session_id()
+
+        attributes["human_validated"] = bool(validated)
+
+        attributes["human_validated"] = bool(validated)
+
+        state = _presence_repo.set_present(
+            company_id=company_id,
+            device_id=device_id,
+            session_id=session_id,
+            attributes=attributes,
+            sensor_payload=sensor_payload,
+        )
 
         publish(company_id=company_id, event="presence_detected", payload=state)
+
+        if state.get("is_new_session"):
+            _orchestrator.on_presence_event(company_id=company_id, payload=state)
+
         return state
 
-    def heartbeat(self, company_id: str, device_id: str) -> dict:
+    def heartbeat(self, company_id: str, device_id: str) -> dict[str, Any]:
+        company_id = company_id.strip()
+        device_id = device_id.strip()
+
         state = _presence_repo.heartbeat(company_id=company_id, device_id=device_id)
         publish(company_id=company_id, event="presence_heartbeat", payload=state)
         return state
 
-    def clear(self, company_id: str, device_id: str) -> dict:
+    def clear(self, company_id: str, device_id: str) -> dict[str, Any]:
+        company_id = company_id.strip()
+        device_id = device_id.strip()
+
         state = _presence_repo.clear(company_id=company_id, device_id=device_id)
         publish(company_id=company_id, event="presence_cleared", payload=state)
+
+        session_id = state.get("session_id")
+        if session_id:
+            _orchestrator.end_presence_session(
+                company_id=company_id,
+                session_id=session_id,
+                reason="presence_cleared",
+            )
+
         return state
 
-    def _validate_human_with_image(self, image_base64: str) -> tuple[bool, dict]:
+    def _base_attributes(
+        self,
+        sensor_payload: dict[str, Any],
+        image_base64: str | None,
+    ) -> dict[str, Any]:
+        return {
+            "validation_engine": "opencv_haar_v2",
+            "human_validated": False,
+            "faces_detected": 0,
+            "profiles_detected": 0,
+            "image_received": bool(image_base64),
+            "require_image": self.require_image,
+            "require_human_validation": self.require_human_validation,
+            "sensor_payload": sensor_payload,
+        }
+
+    def _rejected(
+        self,
+        company_id: str,
+        device_id: str,
+        reason: str,
+        attributes: dict[str, Any],
+    ) -> dict[str, Any]:
+        state = {
+            "company_id": company_id,
+            "device_id": device_id,
+            "present": False,
+            "reason": reason,
+            "attributes": attributes,
+            "is_new_session": False,
+            "is_duplicate": False,
+        }
+        publish(company_id=company_id, event="presence_rejected", payload=state)
+        return state
+
+    def _validate_human_with_image(self, image_base64: str) -> tuple[bool, dict[str, Any]]:
         try:
             import cv2
             import numpy as np
@@ -146,3 +208,7 @@ class PresenceService:
                 "profiles_detected": 0,
                 "reason": f"validation_error:{type(exc).__name__}",
             }
+
+    @staticmethod
+    def _new_session_id() -> str:
+        return f"totem-{int(time.time() * 1000)}"

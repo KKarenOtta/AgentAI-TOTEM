@@ -11,16 +11,15 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.services.aws_db_service import AWSDBService
-from core.totem.orchestrator import TotemOrchestrator
+from core.totem.orchestrator import DEFAULT_GREETING, TotemOrchestrator
 from core.totem.qr import generate_qr_from_text
 from core.totem.recovery_store import save_session_handoff
 from core.totem.session_store import (
     get_last_recommendations,
+    get_or_create_session,
     get_session,
     set_last_recommendations,
 )
-from core.totem.tts import gerar_audio
-from infra.realtime.event_bus import publish
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +27,6 @@ router = APIRouter()
 orchestrator = TotemOrchestrator()
 db = AWSDBService()
 
-GREETING_DEFAULT = "Olá! Como posso ajudar você hoje?"
 HANDOFF_DIR = Path("data/device_handoffs")
 
 
@@ -64,7 +62,6 @@ def _audio_to_base64(path: str | None) -> str | None:
         return None
 
     audio_path = Path(path)
-
     if not audio_path.exists():
         return None
 
@@ -138,45 +135,47 @@ def _save_device_handoff(company_id: str, session_id: str, url: str) -> dict:
 
 @router.post("/totem/activate")
 async def totem_activate(payload: ActivateRequest):
+    session = get_or_create_session(
+        company_id=payload.company_id,
+        session_id=payload.session_id,
+        profile={"source": "manual_activate"},
+    )
+
+    if session.get("activated_at"):
+        return {
+            "status": "already_active",
+            "session_id": payload.session_id,
+            "greeting": DEFAULT_GREETING,
+            "audio_path": None,
+            "audio_base64": None,
+        }
+
+    orchestrator.on_presence_event(
+        company_id=payload.company_id,
+        payload={
+            "company_id": payload.company_id,
+            "device_id": "manual",
+            "session_id": payload.session_id,
+            "present": True,
+            "validated": True,
+            "force": True,
+            "sensor_payload": {"source": "manual_activate"},
+            "attributes": {"human_validated": True, "validation_engine": "manual"},
+        },
+    )
+
     await db.save_session_start(
         session_id=payload.session_id,
         company_id=payload.company_id,
-        device_id=None,
-    )
-
-    audio_path = None
-    audio_base64 = None
-
-    if payload.prefer_audio:
-        audio_path, _, _, _, _ = gerar_audio(GREETING_DEFAULT, "pt")
-        audio_base64 = _audio_to_base64(audio_path)
-
-    event_payload = {
-        "session_id": payload.session_id,
-        "message": GREETING_DEFAULT,
-        "audio_path": audio_path,
-        "audio_base64": audio_base64,
-    }
-
-    publish(
-        company_id=payload.company_id,
-        event="totem_activated",
-        payload=event_payload,
-    )
-
-    await db.save_event(
-        company_id=payload.company_id,
-        session_id=payload.session_id,
-        event_type="totem_activated",
-        payload=event_payload,
+        device_id="manual",
     )
 
     return {
         "status": "activated",
         "session_id": payload.session_id,
-        "greeting": GREETING_DEFAULT,
-        "audio_path": audio_path,
-        "audio_base64": audio_base64,
+        "greeting": DEFAULT_GREETING,
+        "audio_path": None,
+        "audio_base64": None,
     }
 
 
@@ -231,6 +230,12 @@ async def totem_nps(payload: NPSRequest):
 
 @router.post("/totem/end")
 async def totem_end(payload: EndRequest):
+    orchestrator.end_presence_session(
+        company_id=payload.company_id,
+        session_id=payload.session_id,
+        reason=payload.reason,
+    )
+
     await db.save_session_end(
         session_id=payload.session_id,
         reason=payload.reason,

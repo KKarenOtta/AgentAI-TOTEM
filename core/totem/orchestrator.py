@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import base64
 import os
 import threading
 import time
+from pathlib import Path
 from typing import Any
 
 from infra.async_tasks.tasks import log_training_task
@@ -24,9 +26,11 @@ from core.totem.session_store import add_turn, get_or_create_session, get_state,
 from core.totem.state_machine import Event, State, TRANSITIONS
 from core.totem.tts import gerar_audio
 
-
 DEFAULT_GREETING = "Olá! Como posso ajudar você hoje?"
-MIN_INTENT_CONFIDENCE = 0.45
+MIN_INTENT_CONFIDENCE = float(os.getenv("MIN_INTENT_CONFIDENCE", "0.45"))
+
+_LISTENER_STARTED = False
+_LISTENER_LOCK = threading.Lock()
 
 
 def normalize(text: str) -> str:
@@ -45,83 +49,78 @@ def detect_intent_safe(text: str) -> tuple[str | None, float]:
     return intent, float(confidence)
 
 
+def audio_to_base64(path: str | None) -> str | None:
+    if not path:
+        return None
+
+    audio_path = Path(path)
+    if not audio_path.exists():
+        return None
+
+    try:
+        return base64.b64encode(audio_path.read_bytes()).decode("utf-8")
+    except Exception:
+        return None
+
+
 class TotemOrchestrator:
     def __init__(self) -> None:
         self.metrics = MetricsLogger()
         self.faq = FAQEngine()
 
-    def _transition(self, session_id: str, event: Event) -> State:
-        try:
-            current = State(get_state(session_id))
-        except Exception:
-            current = State.IDLE
-
-        next_state = TRANSITIONS.get((current, event))
-
-        if not next_state:
-            return current
-
-        set_state(session_id, next_state.value)
-
-        print(
-            {
-                "session_id": session_id,
-                "from": current.value,
-                "to": next_state.value,
-                "event": event.value,
-            }
-        )
-
-        return next_state
-
     def on_presence_event(self, company_id: str, payload: dict[str, Any]) -> str | None:
         if not payload.get("present"):
             return None
 
-        session_id = f"totem-{int(time.time() * 1000)}"
+        session_id = payload.get("session_id") or f"totem-{int(time.time() * 1000)}"
+        device_id = payload.get("device_id")
 
-        get_or_create_session(
+        session = get_or_create_session(
             company_id=company_id,
             session_id=session_id,
             profile={
-                "device_id": payload.get("device_id"),
+                "device_id": device_id,
                 "validated": payload.get("validated"),
                 "sensor_payload": payload.get("sensor_payload") or {},
+                "presence_attributes": payload.get("attributes") or {},
             },
         )
+
+        already_activated = bool(session.get("activated_at"))
+        if already_activated and not payload.get("force"):
+            return session_id
+
+        session["activated_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+        self._save_profile_update(session_id, session)
 
         self._transition(session_id, Event.PRESENCE_DETECTED)
         self._transition(session_id, Event.SESSION_STARTED)
         self._transition(session_id, Event.GREETING_DONE)
 
-        greeting_audio_path = None
-        greeting_audio_base64 = None
+        audio_path = None
+        audio_base64 = None
 
         try:
-            greeting_audio_path, *_ = gerar_audio(DEFAULT_GREETING, "pt")
-            if greeting_audio_path:
-                from pathlib import Path
-                import base64
-
-                audio_file = Path(greeting_audio_path)
-                if audio_file.exists():
-                    greeting_audio_base64 = base64.b64encode(
-                        audio_file.read_bytes()
-                    ).decode("utf-8")
+            audio_path, *_ = gerar_audio(DEFAULT_GREETING, "pt")
+            audio_base64 = audio_to_base64(audio_path)
         except Exception:
-            greeting_audio_path = None
-            greeting_audio_base64 = None
+            audio_path = None
+            audio_base64 = None
+
+        event_payload = {
+            "session_id": session_id,
+            "company_id": company_id,
+            "device_id": device_id,
+            "message": DEFAULT_GREETING,
+            "audio_path": audio_path,
+            "audio_base64": audio_base64,
+            "presence": payload,
+        }
 
         publish(
             company_id=company_id,
             event="totem_activated",
-            payload={
-                "session_id": session_id,
-                "message": DEFAULT_GREETING,
-                "audio_path": greeting_audio_path,
-                "audio_base64": greeting_audio_base64,
-                "presence": payload,
-            },
+            payload=event_payload,
         )
 
         self.metrics.save(
@@ -129,15 +128,35 @@ class TotemOrchestrator:
                 "event": "session_started",
                 "company_id": company_id,
                 "session_id": session_id,
-                "device_id": payload.get("device_id"),
+                "device_id": device_id,
                 "validated": payload.get("validated"),
+                "source": "presence_orchestrator",
             }
         )
 
         return session_id
 
-    def handle_presence_event(self, company_id: str, payload: dict[str, Any]) -> str | None:
-        return self.on_presence_event(company_id, payload)
+    def end_presence_session(self, company_id: str, session_id: str, reason: str = "presence_cleared") -> None:
+        self._transition(session_id, Event.SESSION_END)
+
+        publish(
+            company_id=company_id,
+            event="session_ended",
+            payload={
+                "company_id": company_id,
+                "session_id": session_id,
+                "reason": reason,
+            },
+        )
+
+        self.metrics.save(
+            {
+                "event": "session_ended",
+                "company_id": company_id,
+                "session_id": session_id,
+                "reason": reason,
+            }
+        )
 
     def interact(
         self,
@@ -222,8 +241,8 @@ class TotemOrchestrator:
 
     def _llm_answer(self, company_id: str, pergunta: str, intent: str | None = None) -> str:
         context = load_company_context(company_id)
-
         api_key = os.getenv("OPENAI_API_KEY")
+
         if not api_key:
             return "Não tenho essa informação agora."
 
@@ -231,7 +250,6 @@ class TotemOrchestrator:
             from openai import OpenAI
 
             client = OpenAI(api_key=api_key)
-
             intent_context = f"Intenção classificada: {intent}" if intent else "Intenção classificada: não disponível"
 
             response = client.chat.completions.create(
@@ -334,24 +352,69 @@ class TotemOrchestrator:
                 "session_id": session_id,
                 "response": resposta,
                 "recommendations": recommendations,
+                "audio_path": audio_path,
+                "audio_base64": audio_to_base64(audio_path),
                 "metric": metric,
             },
         )
 
         return resposta, recommendations, audio_path, metric, idioma
 
+    def _transition(self, session_id: str, event: Event) -> State:
+        try:
+            current = State(get_state(session_id))
+        except Exception:
+            current = State.IDLE
+
+        next_state = TRANSITIONS.get((current, event))
+        if not next_state:
+            return current
+
+        set_state(session_id, next_state.value)
+        return next_state
+
+    @staticmethod
+    def _save_profile_update(session_id: str, session: dict[str, Any]) -> None:
+        from core.totem.session_store import _save
+
+        _save(session_id, session)
+
 
 def start_presence_listener() -> None:
+    enabled = os.getenv("TOTEM_PRESENCE_LISTENER_ENABLED", "false").strip().lower() in {"1", "true", "yes"}
+
+    if not enabled:
+        return
+
+    global _LISTENER_STARTED
+
+    with _LISTENER_LOCK:
+        if _LISTENER_STARTED:
+            return
+
+        _LISTENER_STARTED = True
+
     def loop() -> None:
         company_id = os.getenv("DEFAULT_COMPANY_ID", "FLX-001")
-        q = subscribe(company_id)
         orchestrator = TotemOrchestrator()
 
         while True:
-            event = q.get()
+            try:
+                q = subscribe(company_id)
 
-            if event.get("type") in ("presence_detected", "presence_triggered"):
-                orchestrator.on_presence_event(company_id, event.get("payload") or {})
+                while True:
+                    event = q.get(timeout=30)
+                    event_type = event.get("type")
 
-    thread = threading.Thread(target=loop, daemon=True)
+                    if event_type == "presence_triggered":
+                        orchestrator.on_presence_event(company_id, event.get("payload") or {})
+
+            except Exception:
+                time.sleep(2)
+
+    thread = threading.Thread(
+        target=loop,
+        daemon=True,
+        name="totem-presence-listener",
+    )
     thread.start()
