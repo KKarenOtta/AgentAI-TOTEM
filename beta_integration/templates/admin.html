@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel administrativo</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=52">
+</head>
+<body class="admin-body">
+  <main class="admin-page">
+    <section class="admin-hero">
+      
+
+      <p class="admin-eyebrow">FLEXMEDIA TOTEM</p>
+      <h1 class="admin-title">Painel administrativo</h1>
+      <p class="admin-subtitle">
+        Área técnica protegida para monitoramento e ações de controle do totem.
+      </p>
+      </section>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="admin-flash-list" role="status" aria-live="polite">
+          {% for message in messages %}
+            <div class="admin-flash-item">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <section class="admin-grid">
+      <article class="admin-card admin-card-wide">
+        <div class="admin-card-head">
+          <span class="admin-kicker">Controle</span>
+          <h2>Ações rápidas</h2>
+        </div>
+
+        <div class="admin-actions">
+          <form method="POST" action="/admin/led" class="admin-action-form">
+            <input type="hidden" name="acao" value="ligar">
+            <button type="submit" class="admin-button admin-button-gold">Ligar LED</button>
+          </form>
+
+          <form method="POST" action="/admin/led" class="admin-action-form">
+            <input type="hidden" name="acao" value="desligar">
+            <button type="submit" class="admin-button admin-button-dark">Desligar LED</button>
+          </form>
+
+          <form method="POST" action="/admin/led" class="admin-action-form">
+            <input type="hidden" name="acao" value="piscar">
+            <button type="submit" class="admin-button admin-button-outline">Testar LED</button>
+          </form>
+        </div>
+      </article>
+
+      <article class="admin-card">
+        <div class="admin-card-head">
+          <span class="admin-kicker">Sessão</span>
+          <h2>Administrador</h2>
+        </div>
+        <p class="admin-meta">
+          Acesso autenticado ativo para operações administrativas do sistema.
+        </p>
+        <div class="admin-inline-actions">
+          <a href="{{ url_for('index') }}" class="admin-link-button">Voltar ao totem</a>
+          <a href="{{ url_for('logout') }}" class="admin-link-button admin-link-danger">Encerrar sessão</a>
+        </div>
+        
+      </article>
+      <article class="admin-card">
+        <div class="admin-card-head">
+          <span class="admin-kicker">Acesso</span>
+          <h2>Novo administrador</h2>
+        </div>
+
+        <p class="admin-meta">
+          Crie um novo usuario com login e senha para acesso ao painel administrativo.
+        </p>
+
+        <form class="admin-user-form" method="POST" action="{{ url_for('create_admin_user_route') }}">
+          <label class="admin-label" for="new_username">Usuario</label>
+          <input
+            class="admin-input"
+            type="text"
+            id="new_username"
+            name="new_username"
+            maxlength="50"
+            required
+            autocomplete="username"
+          >
+
+          <label class="admin-label" for="new_password">Senha</label>
+          <input
+            class="admin-input"
+            type="password"
+            id="new_password"
+            name="new_password"
+            maxlength="100"
+            required
+            autocomplete="new-password"
+          >
+
+          <button class="admin-button admin-button-gold" type="submit">
+            Criar usuario
+          </button>
+        </form>
+      </article>
+      
+      <article class="admin-card">
+        <div class="admin-card-head">
+          <span class="admin-kicker">Status</span>
+          <h2>Monitoramento</h2>
+        </div>
+        <div class="admin-status-list">
+          <div class="admin-status-item">
+            <span>Temperatura</span>
+            <strong id="admin-temp">-- C</strong>
+          </div>
+          <div class="admin-status-item">
+            <span>Umidade</span>
+            <strong id="admin-hum">-- %</strong>
+          </div>
+          <div class="admin-status-item">
+            <span>Sensor 1</span>
+            <strong id="admin-dist1">-- cm</strong>
+          </div>
+          <div class="admin-status-item">
+            <span>Sensor 2</span>
+            <strong id="admin-dist2">-- cm</strong>
+          </div>
+          <div class="admin-status-item">
+            <span>Sensor 3</span>
+            <strong id="admin-dist3">-- cm</strong>
+          </div>
+          <div class="admin-status-item">
+            <span>Estado</span>
+            <strong id="admin-led">--</strong>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    async function atualizarStatusAdmin() {
+      try {
+        const response = await fetch("/api/status");
+        const data = await response.json();
+
+        document.getElementById("admin-temp").textContent =
+          data.temperature !== null && data.temperature !== undefined ? `${data.temperature} C` : "-- C";
+        document.getElementById("admin-hum").textContent =
+          data.humidity !== null && data.humidity !== undefined ? `${data.humidity} %` : "-- %";
+        document.getElementById("admin-dist1").textContent =
+          data.distance_sensor_1_cm !== null && data.distance_sensor_1_cm !== undefined ? `${data.distance_sensor_1_cm} cm` : "-- cm";
+        document.getElementById("admin-dist2").textContent =
+          data.distance_sensor_2_cm !== null && data.distance_sensor_2_cm !== undefined ? `${data.distance_sensor_2_cm} cm` : "-- cm";
+        document.getElementById("admin-dist3").textContent =
+          data.distance_sensor_3_cm !== null && data.distance_sensor_3_cm !== undefined ? `${data.distance_sensor_3_cm} cm` : "-- cm";
+        document.getElementById("admin-led").textContent =
+          data.led !== null && data.led !== undefined ? data.led : "--";
+      } catch (error) {
+        console.error("Erro ao atualizar status do admin:", error);
+      }
+    }
+
+    atualizarStatusAdmin();
+    setInterval(atualizarStatusAdmin, 3000);
+  </script>
+</body>
+</html>

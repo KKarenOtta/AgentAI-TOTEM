@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login administrativo</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=51">
+</head>
+<body class="login-body">
+  <main class="login-page">
+    <section class="login-screen">
+      <div class="login-pulse-wrap" aria-hidden="true">
+        <span class="login-pulse-ring ring-1"></span>
+        <span class="login-pulse-ring ring-2"></span>
+        <span class="login-pulse-core"></span>
+      </div>
+
+      <div class="login-card">
+        <p class="login-eyebrow">FLEXMEDIA TOTEM</p>
+        <h1 class="login-title">Área administrativa</h1>
+        <p class="login-subtitle">
+          Entre com suas credenciais para acessar o painel técnico do totem.
+        </p>
+
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="login-alert">
+              {% for message in messages %}
+                <p>{{ message }}</p>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST" class="login-form">
+          <div class="login-field">
+            <label for="username">Usuário</label>
+            <input type="text" id="username" name="username" required maxlength="50">
+          </div>
+
+          <div class="login-field">
+            <label for="password">Senha</label>
+            <input type="password" id="password" name="password" required maxlength="100">
+          </div>
+
+          <button type="submit" class="login-button">Entrar</button>
+        </form>
+
+        <a href="{{ url_for('index') }}" class="login-back">Voltar ao totem</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
