@@ -20,6 +20,7 @@ from core.totem.session_store import (
     get_session,
     set_last_recommendations,
 )
+from core.totem.tts import gerar_audio
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ def _audio_to_base64(path: str | None) -> str | None:
         return None
 
     audio_path = Path(path)
+
     if not audio_path.exists():
         return None
 
@@ -70,6 +72,18 @@ def _audio_to_base64(path: str | None) -> str | None:
     except Exception as exc:
         logger.warning("Falha ao converter áudio para base64: %s", exc)
         return None
+
+
+def _build_greeting_audio(prefer_audio: bool | None) -> tuple[str | None, str | None]:
+    if not prefer_audio:
+        return None, None
+
+    try:
+        audio_path, *_ = gerar_audio(DEFAULT_GREETING, "pt")
+        return audio_path, _audio_to_base64(audio_path)
+    except Exception as exc:
+        logger.warning("Falha ao gerar áudio do greeting: %s", exc)
+        return None, None
 
 
 def _public_base_url() -> str:
@@ -142,12 +156,14 @@ async def totem_activate(payload: ActivateRequest):
     )
 
     if session.get("activated_at"):
+        audio_path, audio_base64 = _build_greeting_audio(payload.prefer_audio)
+
         return {
             "status": "already_active",
             "session_id": payload.session_id,
             "greeting": DEFAULT_GREETING,
-            "audio_path": None,
-            "audio_base64": None,
+            "audio_path": audio_path,
+            "audio_base64": audio_base64,
         }
 
     orchestrator.on_presence_event(
@@ -160,7 +176,10 @@ async def totem_activate(payload: ActivateRequest):
             "validated": True,
             "force": True,
             "sensor_payload": {"source": "manual_activate"},
-            "attributes": {"human_validated": True, "validation_engine": "manual"},
+            "attributes": {
+                "human_validated": True,
+                "validation_engine": "manual",
+            },
         },
     )
 
@@ -170,12 +189,14 @@ async def totem_activate(payload: ActivateRequest):
         device_id="manual",
     )
 
+    audio_path, audio_base64 = _build_greeting_audio(payload.prefer_audio)
+
     return {
         "status": "activated",
         "session_id": payload.session_id,
         "greeting": DEFAULT_GREETING,
-        "audio_path": None,
-        "audio_base64": None,
+        "audio_path": audio_path,
+        "audio_base64": audio_base64,
     }
 
 
