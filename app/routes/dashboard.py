@@ -201,11 +201,17 @@ def client_campaigns(company_id: str, request: Request):
 
 @router.get("/totem/{company_id}", response_class=HTMLResponse)
 def totem_ui(company_id: str, request: Request):
+    raspberry_voice_server_url = os.getenv(
+        "RASPBERRY_VOICE_SERVER_URL",
+        os.getenv("VOICE_SERVER_URL", ""),
+    ).strip().rstrip("/")
+
     return templates.TemplateResponse(
         request=request,
         name="totem_ui.html",
         context={
             "request": request,
             "company_id": company_id,
+            "raspberry_voice_server_url": raspberry_voice_server_url,
         },
     )

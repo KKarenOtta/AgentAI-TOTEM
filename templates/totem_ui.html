@@ -216,6 +216,7 @@
 
   <script>
     const companyId = "{{ company_id }}";
+    const raspberryVoiceServerUrl = "{{ raspberry_voice_server_url or '' }}";
 
     const AUTO_LISTEN_AFTER_GREETING = true;
     const PLAY_AUDIO_ON_INTERACTION_COMPLETED = false;
@@ -390,6 +391,69 @@
       setVoiceBusy(false);
     }
 
+    async function requestVoiceCapture(sessionId) {
+      const payload = {
+        session_id: sessionId,
+      };
+
+      if (raspberryVoiceServerUrl) {
+        const directUrl = `${raspberryVoiceServerUrl}/capture`;
+
+        try {
+          debug("Solicitando captura direta no Raspberry | " + directUrl);
+
+          const response = await fetch(directUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
+
+          const data = await response.json().catch(() => ({}));
+
+          if (response.ok && data.ok !== false) {
+            return {
+              ok: true,
+              mode: data.mode || "direct_raspberry",
+              source: "direct_raspberry",
+              data,
+            };
+          }
+
+          debug("Falha captura direta Raspberry: " + JSON.stringify(data));
+        } catch (e) {
+          debug("Erro captura direta Raspberry: " + e.message);
+        }
+      }
+
+      debug("Fallback captura via backend AWS");
+
+      const response = await fetch(
+        `/api/voice/capture?session_id=${encodeURIComponent(sessionId)}`,
+        { method: "POST" }
+      );
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data.ok === false) {
+        return {
+          ok: false,
+          mode: data.mode || "backend",
+          source: "backend",
+          error: data.error || data.response || "Falha ao acionar captura de voz.",
+          data,
+        };
+      }
+
+      return {
+        ok: true,
+        mode: data.mode || "backend",
+        source: "backend",
+        data,
+      };
+    }
+
     async function startVoiceQuestion() {
       if (voiceBusy) return false;
 
@@ -413,33 +477,34 @@
       debug("Solicitando captura de voz | session_id=" + sessionId);
 
       try {
-        const response = await fetch(
-          `/api/voice/capture?session_id=${encodeURIComponent(sessionId)}`,
-          { method: "POST" }
-        );
+        const result = await requestVoiceCapture(sessionId);
 
-        const data = await response.json().catch(() => ({}));
-
-        if (!response.ok || data.ok === false) {
+        if (!result.ok) {
           setVoiceBusy(false);
 
           setStatus(
             "Erro de voz",
             "Tente novamente.",
-            data.error || "Falha ao acionar o Raspberry."
+            result.error || "Falha ao acionar o Raspberry."
           );
 
-          debug("Falha /api/voice/capture: " + JSON.stringify(data));
+          debug("Falha captura voz: " + JSON.stringify(result.data || {}));
           return false;
         }
 
-        debug("Captura acionada no Raspberry | mode=" + (data.mode || "unknown"));
+        debug(
+          "Captura acionada | source=" +
+          result.source +
+          " | mode=" +
+          (result.mode || "unknown")
+        );
+
         return true;
       } catch (e) {
         console.error(e);
         setVoiceBusy(false);
         setStatus("Erro", "Tente novamente.", "Falha ao capturar áudio.");
-        debug("Erro fetch /api/voice/capture: " + e.message);
+        debug("Erro startVoiceQuestion: " + e.message);
         return false;
       }
     }
