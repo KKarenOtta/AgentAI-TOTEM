@@ -216,7 +216,6 @@
 
   <script>
     const companyId = "{{ company_id }}";
-    const raspberryVoiceServerUrl = "{{ raspberry_voice_server_url or '' }}";
 
     const AUTO_LISTEN_AFTER_GREETING = true;
     const PLAY_AUDIO_ON_INTERACTION_COMPLETED = false;
@@ -391,34 +390,6 @@
       setVoiceBusy(false);
     }
 
-    async function requestVoiceCapture(sessionId) {
-  debug("Solicitando captura via backend AWS");
-
-  const url =
-    `/api/voice/capture?session_id=${encodeURIComponent(sessionId)}` +
-    `&company_id=${encodeURIComponent(companyId)}`;
-
-  const response = await fetch(url, { method: "POST" });
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok || data.ok === false) {
-    return {
-      ok: false,
-      mode: data.mode || "backend",
-      source: "backend",
-      error: data.error || data.response || "Falha ao acionar captura de voz.",
-      data,
-    };
-  }
-
-  return {
-    ok: true,
-    mode: data.mode || "backend",
-    source: "backend",
-    data,
-  };
-}
-
     async function startVoiceQuestion() {
       if (voiceBusy) return false;
 
@@ -442,34 +413,33 @@
       debug("Solicitando captura de voz | session_id=" + sessionId);
 
       try {
-        const result = await requestVoiceCapture(sessionId);
+        const response = await fetch(
+          `/api/voice/capture?session_id=${encodeURIComponent(sessionId)}`,
+          { method: "POST" }
+        );
 
-        if (!result.ok) {
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok || data.ok === false) {
           setVoiceBusy(false);
 
           setStatus(
             "Erro de voz",
             "Tente novamente.",
-            result.error || "Falha ao acionar o Raspberry."
+            data.error || "Falha ao acionar o Raspberry."
           );
 
-          debug("Falha captura voz: " + JSON.stringify(result.data || {}));
+          debug("Falha /api/voice/capture: " + JSON.stringify(data));
           return false;
         }
 
-        debug(
-          "Captura acionada | source=" +
-          result.source +
-          " | mode=" +
-          (result.mode || "unknown")
-        );
-
+        debug("Captura acionada no Raspberry | mode=" + (data.mode || "unknown"));
         return true;
       } catch (e) {
         console.error(e);
         setVoiceBusy(false);
         setStatus("Erro", "Tente novamente.", "Falha ao capturar áudio.");
-        debug("Erro startVoiceQuestion: " + e.message);
+        debug("Erro fetch /api/voice/capture: " + e.message);
         return false;
       }
     }
@@ -580,49 +550,46 @@
     }
 
     async function handleTotemActivated(payload) {
-  if (!payload) {
-    return;
-  }
+      const incomingSessionId = payload.session_id || sessionId;
 
-  if (payload.session_id) {
-    sessionId = payload.session_id;
-  }
+      if (!incomingSessionId) return;
 
-  const sid = payload.session_id || sessionId;
-  if (!sid) {
-    return;
-  }
+      sessionId = incomingSessionId;
 
-  if (!payload.audio_base64) {
-    setStatus(payload.text || "Atendimento iniciado.", "ok");
-    await maybeStartAutoListen();
-    return;
-  }
+      setActive(true);
+      setVoiceBusy(false);
+      enableInteraction();
 
-  if (!audioUnlocked) {
-    window.__pendingGreetingPayload = payload;
-    show("btnAudio");
-    setStatus("Áudio pronto. Toque em Ativar áudio para ouvir.", "warn");
-    debug("Greeting aguardando desbloqueio de áudio");
-    return;
-  }
+      setStatus(
+        "Como posso ajudar?",
+        audioUnlocked
+          ? "Vou iniciar a escuta após a saudação."
+          : "Clique em Ativar áudio para ouvir e iniciar a escuta.",
+        payload.message || "Olá! Como posso ajudar você hoje?"
+      );
 
-  if (greetedSessions.has(sid)) {
-    await maybeStartAutoListen();
-    return;
-  }
+      debug("totem_activated | session_id=" + sessionId);
 
-  const played = await playAudio(
-    payload.audio_base64,
-    `greeting:${sid}:${(payload.audio_base64 || "").length}`
-  );
+      if (greetedSessions.has(sessionId)) {
+        await maybeStartAutoListen();
+        return;
+      }
 
-  if (played) {
-    greetedSessions.add(sid);
-  }
+      greetedSessions.add(sessionId);
 
-  await maybeStartAutoListen();
-}
+      if (!audioUnlocked) {
+        show("btnAudio");
+        debug("Greeting aguardando desbloqueio de áudio");
+        return;
+      }
+
+      await playAudio(
+        payload.audio_base64,
+        `greeting:${sessionId}:${(payload.audio_base64 || "").length}`
+      );
+
+      await maybeStartAutoListen();
+    }
 
     async function handleInteractionCompleted(payload) {
       if (payload.session_id && payload.session_id !== sessionId) return;
@@ -862,13 +829,6 @@
     }
 
     el("btnAudio").addEventListener("click", async () => {
-  const pendingGreeting = window.__pendingGreetingPayload;
-  if (pendingGreeting) {
-    window.__pendingGreetingPayload = null;
-    await handleTotemActivated(pendingGreeting);
-    return;
-  }
-
       const ok = await unlockAudio();
 
       if (ok && sessionId && greetedSessions.has(sessionId)) {
