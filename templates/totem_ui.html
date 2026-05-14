@@ -392,67 +392,32 @@
     }
 
     async function requestVoiceCapture(sessionId) {
-      const payload = {
-        session_id: sessionId,
-      };
+  debug("Solicitando captura via backend AWS");
 
-      if (raspberryVoiceServerUrl) {
-        const directUrl = `${raspberryVoiceServerUrl}/capture`;
+  const url =
+    `/api/voice/capture?session_id=${encodeURIComponent(sessionId)}` +
+    `&company_id=${encodeURIComponent(companyId)}`;
 
-        try {
-          debug("Solicitando captura direta no Raspberry | " + directUrl);
+  const response = await fetch(url, { method: "POST" });
+  const data = await response.json().catch(() => ({}));
 
-          const response = await fetch(directUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-          });
+  if (!response.ok || data.ok === false) {
+    return {
+      ok: false,
+      mode: data.mode || "backend",
+      source: "backend",
+      error: data.error || data.response || "Falha ao acionar captura de voz.",
+      data,
+    };
+  }
 
-          const data = await response.json().catch(() => ({}));
-
-          if (response.ok && data.ok !== false) {
-            return {
-              ok: true,
-              mode: data.mode || "direct_raspberry",
-              source: "direct_raspberry",
-              data,
-            };
-          }
-
-          debug("Falha captura direta Raspberry: " + JSON.stringify(data));
-        } catch (e) {
-          debug("Erro captura direta Raspberry: " + e.message);
-        }
-      }
-
-      debug("Fallback captura via backend AWS");
-
-      const response = await fetch(
-        `/api/voice/capture?session_id=${encodeURIComponent(sessionId)}`,
-        { method: "POST" }
-      );
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok || data.ok === false) {
-        return {
-          ok: false,
-          mode: data.mode || "backend",
-          source: "backend",
-          error: data.error || data.response || "Falha ao acionar captura de voz.",
-          data,
-        };
-      }
-
-      return {
-        ok: true,
-        mode: data.mode || "backend",
-        source: "backend",
-        data,
-      };
-    }
+  return {
+    ok: true,
+    mode: data.mode || "backend",
+    source: "backend",
+    data,
+  };
+}
 
     async function startVoiceQuestion() {
       if (voiceBusy) return false;
@@ -615,46 +580,49 @@
     }
 
     async function handleTotemActivated(payload) {
-      const incomingSessionId = payload.session_id || sessionId;
+  if (!payload) {
+    return;
+  }
 
-      if (!incomingSessionId) return;
+  if (payload.session_id) {
+    sessionId = payload.session_id;
+  }
 
-      sessionId = incomingSessionId;
+  const sid = payload.session_id || sessionId;
+  if (!sid) {
+    return;
+  }
 
-      setActive(true);
-      setVoiceBusy(false);
-      enableInteraction();
+  if (!payload.audio_base64) {
+    setStatus(payload.text || "Atendimento iniciado.", "ok");
+    await maybeStartAutoListen();
+    return;
+  }
 
-      setStatus(
-        "Como posso ajudar?",
-        audioUnlocked
-          ? "Vou iniciar a escuta após a saudação."
-          : "Clique em Ativar áudio para ouvir e iniciar a escuta.",
-        payload.message || "Olá! Como posso ajudar você hoje?"
-      );
+  if (!audioUnlocked) {
+    window.__pendingGreetingPayload = payload;
+    show("btnAudio");
+    setStatus("Áudio pronto. Toque em Ativar áudio para ouvir.", "warn");
+    debug("Greeting aguardando desbloqueio de áudio");
+    return;
+  }
 
-      debug("totem_activated | session_id=" + sessionId);
+  if (greetedSessions.has(sid)) {
+    await maybeStartAutoListen();
+    return;
+  }
 
-      if (greetedSessions.has(sessionId)) {
-        await maybeStartAutoListen();
-        return;
-      }
+  const played = await playAudio(
+    payload.audio_base64,
+    `greeting:${sid}:${(payload.audio_base64 || "").length}`
+  );
 
-      greetedSessions.add(sessionId);
+  if (played) {
+    greetedSessions.add(sid);
+  }
 
-      if (!audioUnlocked) {
-        show("btnAudio");
-        debug("Greeting aguardando desbloqueio de áudio");
-        return;
-      }
-
-      await playAudio(
-        payload.audio_base64,
-        `greeting:${sessionId}:${(payload.audio_base64 || "").length}`
-      );
-
-      await maybeStartAutoListen();
-    }
+  await maybeStartAutoListen();
+}
 
     async function handleInteractionCompleted(payload) {
       if (payload.session_id && payload.session_id !== sessionId) return;
@@ -894,6 +862,13 @@
     }
 
     el("btnAudio").addEventListener("click", async () => {
+  const pendingGreeting = window.__pendingGreetingPayload;
+  if (pendingGreeting) {
+    window.__pendingGreetingPayload = null;
+    await handleTotemActivated(pendingGreeting);
+    return;
+  }
+
       const ok = await unlockAudio();
 
       if (ok && sessionId && greetedSessions.has(sessionId)) {
