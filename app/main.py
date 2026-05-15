@@ -85,6 +85,9 @@ async def auth_middleware(request: Request, call_next):
 
     public = [
         "/login",
+        "/docs",
+	"/redoc",
+	"/openapi.json",
         "/device",
         "/store",
         "/campaign",
