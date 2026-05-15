@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
@@ -43,9 +42,10 @@
       border-radius: 999px;
       background:
         radial-gradient(circle,
-        #27e0a1 0%,
-        #127553 52%,
-        rgba(39,224,161,.08) 72%);
+          #27e0a1 0%,
+          #127553 52%,
+          rgba(39,224,161,.08) 72%
+        );
       box-shadow: 0 0 64px rgba(39,224,161,.45);
       opacity: .5;
       transition: .25s ease;
@@ -178,17 +178,11 @@
       </div>
 
       <div class="actions">
-        <button class="primary" id="btnAudio">
-          Ativar áudio
-        </button>
+        <button class="primary" id="btnAudio">Ativar áudio</button>
 
-        <button class="primary hidden" id="btnVoice">
-          Fazer pergunta
-        </button>
+        <button class="primary hidden" id="btnVoice">Fazer pergunta</button>
 
-        <button class="hidden" id="btnFinish">
-          Encerrar atendimento
-        </button>
+        <button class="hidden" id="btnFinish">Encerrar atendimento</button>
       </div>
 
       <textarea
@@ -198,9 +192,7 @@
       ></textarea>
 
       <div class="actions hidden" id="textActions">
-        <button class="primary" id="btnSendText">
-          Enviar texto
-        </button>
+        <button class="primary" id="btnSendText">Enviar texto</button>
       </div>
 
       <div id="finalBlock" class="hidden">
@@ -276,23 +268,23 @@
 
     function resetSessionState() {
       stopAudio();
-    
+
       if (sessionId) {
         greetedSessions.delete(sessionId);
       }
-    
+
       playedAudioKeys.clear();
-    
+
       autoListenScheduled = false;
       setVoiceBusy(false);
-    
+
       disableInteraction();
-    
+
       hide("finalBlock");
       hide("qr");
-    
+
       setActive(false);
-    
+
       sessionId = null;
     }
 
@@ -343,79 +335,79 @@
       }
     }
 
-   async function playAudio(audioBase64, key) {
-  stopAudio();
+    async function playAudio(audioBase64, key) {
+      stopAudio();
 
-  if (!audioBase64) {
-    debug("Audio ausente");
-    return false;
-  }
-
-  const audioKey = key || String(audioBase64.length);
-
-  if (playedAudioKeys.has(audioKey)) {
-    debug("Áudio ignorado por duplicidade: " + audioKey);
-    return false;
-  }
-
-  playedAudioKeys.add(audioKey);
-
-  return new Promise((resolve) => {
-    try {
-      function tryPlay(mimeType) {
-        currentAudio = new Audio(
-          data:${mimeType};base64,${audioBase64}
-        );
-
-        currentAudio.onended = () => {
-          debug("Áudio finalizado: " + audioKey);
-          resolve(true);
-        };
-
-        currentAudio.onerror = async () => {
-          debug("Falha ao reproduzir como " + mimeType);
-
-          if (mimeType === "audio/mp3") {
-            try {
-              tryPlay("audio/wav");
-              return;
-            } catch (_) {}
-          }
-
-          playedAudioKeys.delete(audioKey);
-          resolve(false);
-        };
-
-        const playPromise = currentAudio.play();
-
-        if (playPromise && typeof playPromise.catch === "function") {
-          playPromise.catch((error) => {
-            debug("Audio.play bloqueado: " + error.message);
-
-            playedAudioKeys.delete(audioKey);
-
-            show("btnAudio");
-
-            setStatus(
-              "Áudio bloqueado",
-              "Clique em Ativar áudio para continuar.",
-              "O navegador bloqueou a reprodução automática."
-            );
-
-            resolve(false);
-          });
-        }
+      if (!audioBase64) {
+        debug("Audio ausente");
+        return false;
       }
 
-      tryPlay("audio/mp3");
+      const audioKey = key || String(audioBase64.length);
 
-    } catch (e) {
-      playedAudioKeys.delete(audioKey);
-      debug("Falha ao preparar áudio: " + e.message);
-      resolve(false);
+      if (playedAudioKeys.has(audioKey)) {
+        debug("Áudio ignorado por duplicidade: " + audioKey);
+        return false;
+      }
+
+      playedAudioKeys.add(audioKey);
+
+      return new Promise((resolve) => {
+        try {
+          function tryPlay(mimeType) {
+            currentAudio = new Audio(
+              `data:${mimeType};base64,${audioBase64}`
+            );
+
+            currentAudio.onended = () => {
+              debug("Áudio finalizado: " + audioKey);
+              resolve(true);
+            };
+
+            currentAudio.onerror = async () => {
+              debug("Falha ao reproduzir como " + mimeType);
+
+              if (mimeType === "audio/mp3") {
+                try {
+                  tryPlay("audio/wav");
+                  return;
+                } catch (_) {}
+              }
+
+              playedAudioKeys.delete(audioKey);
+              resolve(false);
+            };
+
+            const playPromise = currentAudio.play();
+
+            if (playPromise && typeof playPromise.catch === "function") {
+              playPromise.catch((error) => {
+                debug("Audio.play bloqueado: " + error.message);
+
+                playedAudioKeys.delete(audioKey);
+
+                show("btnAudio");
+
+                setStatus(
+                  "Áudio bloqueado",
+                  "Clique em Ativar áudio para continuar.",
+                  "O navegador bloqueou a reprodução automática."
+                );
+
+                resolve(false);
+              });
+            }
+          }
+
+          tryPlay("audio/mp3");
+
+        } catch (e) {
+          playedAudioKeys.delete(audioKey);
+          debug("Falha ao preparar áudio: " + e.message);
+          resolve(false);
+        }
+      });
     }
-  });
-}
 
     function enableInteraction() {
       show("btnVoice");
@@ -432,500 +424,16 @@
       setVoiceBusy(false);
     }
 
-    async function startVoiceQuestion() {
-      if (voiceBusy) return false;
-
-      if (!sessionId) {
-        setStatus(
-          "Aguardando sessão",
-          "",
-          "Aproxime-se do totem para iniciar o atendimento."
-        );
-        return false;
-      }
-
-      setVoiceBusy(true);
-
-      setStatus(
-        "Escutando...",
-        "Fale sua pergunta agora.",
-        "Capturando áudio..."
-      );
-
-      debug("Solicitando captura de voz | session_id=" + sessionId);
-
-      try {
-        const response = await fetch(
-          /api/voice/capture?session_id=${encodeURIComponent(sessionId)},
-          { method: "POST" }
-        );
-
-        const data = await response.json().catch(() => ({}));
-
-        if (!response.ok || data.ok === false) {
-          setVoiceBusy(false);
-
-          setStatus(
-            "Erro de voz",
-            "Tente novamente.",
-            data.error || "Falha ao acionar o Raspberry."
-          );
-
-          debug("Falha /api/voice/capture: " + JSON.stringify(data));
-          return false;
-        }
-
-        debug("Captura acionada no Raspberry | mode=" + (data.mode || "unknown"));
-        return true;
-      } catch (e) {
-        console.error(e);
-        setVoiceBusy(false);
-        setStatus("Erro", "Tente novamente.", "Falha ao capturar áudio.");
-        debug("Erro fetch /api/voice/capture: " + e.message);
-        return false;
-      }
-    }
-
-    async function sendTextQuestion() {
-      if (voiceBusy) return;
-
-      if (!sessionId) {
-        setStatus(
-          "Aguardando sessão",
-          "",
-          "Aproxime-se do totem para iniciar o atendimento."
-        );
-        return;
-      }
-
-      const message = el("message").value.trim();
-
-      if (!message) return;
-
-      setVoiceBusy(true);
-      setStatus("Processando...", "", message);
-
-      try {
-        const response = await fetch("/totem/interact", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({
-            company_id: companyId,
-            session_id: sessionId,
-            message,
-            prefer_audio: true
-          })
-        });
-
-        const data = await response.json();
-
-        setStatus(
-          "Resposta",
-          "Você pode fazer outra pergunta.",
-          data.text || "Resposta pronta."
-        );
-
-        el("message").value = "";
-
-        await playAudio(
-          data.audio_base64,
-          text:${sessionId}:${data.text || ""}:${(data.audio_base64 || "").length}
-        );
-      } catch (e) {
-        console.error(e);
-        setStatus("Erro", "", "Falha ao processar pergunta.");
-        debug("Erro /totem/interact texto: " + e.message);
-      } finally {
-        setVoiceBusy(false);
-      }
-    }
-
-    async function finishSession() {
-        if (!sessionId) return;
-      
-        const endingSession = sessionId;
-      
-        const response = await fetch("/totem/end", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({
-            company_id: companyId,
-            session_id: endingSession,
-            reason: "completed"
-          })
-        });
-      
-        const data = await response.json();
-      
-        greetedSessions.delete(endingSession);
-        playedAudioKeys.clear();
-      
-        setStatus(
-          "Atendimento finalizado",
-          "Continue no celular.",
-          data.message || "Escaneie o QR Code."
-        );
-      
-        if (data.handoff_qr_url) {
-          el("qr").src = data.handoff_qr_url;
-          show("qr");
-        }
-      
-        el("handoff").textContent = data.handoff_url || "";
-      
-        show("finalBlock");
-      
-        disableInteraction();
-      
-        setActive(false);
-      
-        sessionId = null;
-      }
-
-    async function maybeStartAutoListen() {
-      if (!AUTO_LISTEN_AFTER_GREETING) return;
-      if (!audioUnlocked) return;
-      if (!sessionId) return;
-      if (voiceBusy) return;
-      if (autoListenScheduled) return;
-
-      autoListenScheduled = true;
-
-      setTimeout(async () => {
-        autoListenScheduled = false;
-
-        if (!sessionId || voiceBusy) return;
-
-        await startVoiceQuestion();
-      }, 500);
-    }
-
-    async function handleTotemActivated(payload) {
-      const incomingSessionId = payload.session_id;
-    
-      if (!incomingSessionId) {
-        debug("totem_activated sem session_id");
-        return;
-      }
-    
-      if (sessionId && sessionId !== incomingSessionId) {
-        debug(
-          `Nova sessão detectada. Limpando sessão anterior: ${sessionId}`
-        );
-    
-        resetSessionState();
-      }
-    
-      sessionId = incomingSessionId;
-    
-      playedAudioKeys.clear();
-    
-      setActive(true);
-      setVoiceBusy(false);
-    
-      enableInteraction();
-    
-      setStatus(
-        "Como posso ajudar?",
-        audioUnlocked
-          ? "Vou iniciar a escuta após a saudação."
-          : "Clique em Ativar áudio para ouvir e iniciar a escuta.",
-        payload.message || "Olá! Como posso ajudar você hoje?"
-      );
-    
-      debug("totem_activated | session_id=" + sessionId);
-    
-      if (!audioUnlocked) {
-        show("btnAudio");
-        debug("Greeting aguardando desbloqueio de áudio");
-        return;
-      }
-    
-      greetedSessions.delete(sessionId);
-    
-      if (!greetedSessions.has(sessionId)) {
-        greetedSessions.add(sessionId);
-    
-        await playAudio(
-          payload.audio_base64,
-          `greeting:${sessionId}:${Date.now()}`
-        );
-      }
-    
-      await maybeStartAutoListen();
-    }
-
-    async function handleInteractionCompleted(payload) {
-      if (payload.session_id && payload.session_id !== sessionId) return;
-
-      setVoiceBusy(false);
-
-      setStatus(
-        "Resposta",
-        "Você pode fazer outra pergunta.",
-        payload.response || payload.text || "Resposta pronta."
-      );
-
-      debug("interaction_completed | session_id=" + sessionId);
-
-      if (!PLAY_AUDIO_ON_INTERACTION_COMPLETED) return;
-
-      await playAudio(
-        payload.audio_base64,
-        interaction:${sessionId}:${payload.response || payload.text || ""}:${(payload.audio_base64 || "").length}
-      );
-    }
-
-    function handlePresenceDetected(payload) {
-      if (payload.session_id) {
-        sessionId = payload.session_id;
-      }
-
-      setActive(true);
-      debug("presence_detected | session_id=" + (sessionId || "null"));
-
-      if (!sessionId) {
-        setStatus(
-          "Presença detectada",
-          "Validando atendimento...",
-          "Preparando saudação."
-        );
-      }
-    }
-
-    function handlePresenceCleared(payload) {
-      if (
-        payload.session_id &&
-        sessionId &&
-        payload.session_id !== sessionId
-      ) {
-        return;
-      }
-    
-      debug("presence_cleared");
-    
-      resetSessionState();
-    
-      setStatus(
-        "Aguardando presença...",
-        audioUnlocked
-          ? "Áudio ativo. O sistema será ativado automaticamente."
-          : "Ative o áudio uma vez para permitir fala automática.",
-        audioUnlocked
-          ? "Aguardando ativação..."
-          : "Clique em “Ativar áudio” e aproxime-se do totem."
-      );
-    }
-    
-    async function handleVoiceStatus(payload) {
-      if (!payload) return;
-      if (payload.session_id && sessionId && payload.session_id !== sessionId) return;
-
-      const status = payload.status;
-      const nested = payload.payload || {};
-
-      debug(voice_status | ${status} | session_id=${payload.session_id || "null"});
-
-      if (status === "listening" || status === "recording") {
-        setVoiceBusy(true);
-        setStatus(
-          "Escutando...",
-          "Fale sua pergunta agora.",
-          payload.text || "Capturando áudio..."
-        );
-        return;
-      }
-
-      if (status === "transcribed") {
-        setVoiceBusy(true);
-        setStatus(
-          "Transcrição recebida",
-          "Processando resposta...",
-          payload.text || "Processando pergunta."
-        );
-        return;
-      }
-
-      if (status === "answer_ready") {
-        setVoiceBusy(false);
-
-        const answer = payload.text || "Resposta pronta.";
-        const audioBase64 = nested.audio_base64 || payload.audio_base64 || "";
-
-        setStatus(
-          "Resposta",
-          "Você pode fazer outra pergunta.",
-          answer
-        );
-
-        await playAudio(
-          audioBase64,
-          answer:${payload.session_id || sessionId}:${answer}:${audioBase64.length}
-        );
-
-        return;
-      }
-
-      if (status === "capture_error") {
-        setVoiceBusy(false);
-        setStatus(
-          "Erro de captura",
-          "Verifique o microfone do Raspberry.",
-          payload.text || "Não consegui capturar o áudio."
-        );
-        return;
-      }
-
-      if (status === "silence") {
-        setVoiceBusy(false);
-        setStatus(
-          "Não ouvi sua pergunta",
-          "Fale mais perto do microfone e tente novamente.",
-          payload.text || "Áudio abaixo do volume mínimo."
-        );
-        return;
-      }
-
-      if (status === "empty_transcription") {
-        setVoiceBusy(false);
-        setStatus(
-          "Não entendi a pergunta",
-          "Fale mais perto do microfone e tente novamente.",
-          payload.text || "A transcrição veio vazia."
-        );
-        return;
-      }
-
-      if (status === "interaction_error") {
-        setVoiceBusy(false);
-        setStatus(
-          "Erro ao responder",
-          "Tente novamente.",
-          payload.text || "Não consegui processar sua pergunta agora."
-        );
-        return;
-      }
-
-      if (status === "error") {
-        setVoiceBusy(false);
-        setStatus(
-          "Erro de voz",
-          "Tente novamente.",
-          payload.text || "Falha no fluxo de voz."
-        );
-      }
-    }
-
-    function handleSSEMessage(event) {
-      try {
-        const data = JSON.parse(event.data);
-        console.log("SSE COMPLETO:", data);
-        const payload = data.payload || {};
-
-        if (data.type === "keepalive") {
-          return;
-        }
-
-        debug("SSE recebido: " + data.type);
-
-       if (data.type === "session_ended") {
-          debug(
-            "session_ended | session_id=" +
-            (payload.session_id || "null")
-          );
-        
-          resetSessionState();
-        
-          setStatus(
-            "Aguardando presença...",
-            audioUnlocked
-              ? "Áudio ativo. O sistema será ativado automaticamente."
-              : "Ative o áudio uma vez para permitir fala automática.",
-            audioUnlocked
-              ? "Aguardando ativação..."
-              : "Clique em “Ativar áudio” e aproxime-se do totem."
-          );
-        
-          return;
-        }
-        
-        if (data.type === "presence_cleared") {
-          handlePresenceCleared(payload);
-          return;
-        }
-
-        if (data.type === "totem_activated") {
-          handleTotemActivated(payload);
-          return;
-        }
-
-        if (data.type === "interaction_completed") {
-          handleInteractionCompleted(payload);
-          return;
-        }
-
-        if (data.type === "voice_status") {
-          handleVoiceStatus(payload);
-          return;
-        }
-
-        if (data.type === "session_ended") {
-          setActive(false);
-          setVoiceBusy(false);
-          debug("session_ended | session_id=" + (payload.session_id || "null"));
-        }
-
-      } catch (e) {
-        console.error(e);
-        debug("Erro ao processar SSE: " + e.message);
-      }
-    }
-
     function connectSSE() {
-      if (sse) {
-        sse.close();
-      }
+      sse = new EventSource(`/api/events/${companyId}`);
 
-      sse = new EventSource(/api/events/${companyId});
       sse.onmessage = handleSSEMessage;
 
-      sse.onopen = () => {
-        debug("SSE conectado | company_id=" + companyId);
-      };
-
       sse.onerror = () => {
-        debug("SSE desconectado. Reconectando...");
-
-        if (sse) {
-          sse.close();
-          sse = null;
-        }
-
         clearTimeout(reconnectTimer);
         reconnectTimer = setTimeout(connectSSE, 2000);
       };
     }
-
-    el("btnAudio").addEventListener("click", async () => {
-      const ok = await unlockAudio();
-
-      if (ok && sessionId && greetedSessions.has(sessionId)) {
-        await maybeStartAutoListen();
-      }
-    });
-
-    el("btnVoice").addEventListener("click", async () => {
-      if (!audioUnlocked) {
-        await unlockAudio();
-      }
-
-      await startVoiceQuestion();
-    });
-
-    el("btnSendText").addEventListener("click", sendTextQuestion);
-    el("btnFinish").addEventListener("click", finishSession);
-
-    connectSSE();
   </script>
 </body>
 </html>
