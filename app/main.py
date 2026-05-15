@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -10,24 +10,10 @@ from fastapi.staticfiles import StaticFiles
 
 load_dotenv()
 
+from core.config.runtime import IS_EDGE, IS_CLOUD
 from core.auth.session_store import get_session
-from app.routes.rag_test import router as rag_test_router
-from app.routes.dashboard import router as dashboard_router
-from app.routes.api import router as api_router
-from app.routes.totem import router as totem_router
-from app.routes.presence import router as presence_router
-from app.routes.analytics import router as analytics_router
-from app.routes.faq_admin import router as faq_admin_router
-from app.routes.semantic_dashboard import router as semantic_router
-from app.routes.device import router as device_router
-from app.routes.totem_options import router as totem_options_router
 from app.routes.auth import router as auth_router
-from app.routes.audio import router as audio_router
-from app.routes.voice_status import router as voice_status_router
-from app.routes.voice_control import router as voice_control_router
 
-from core.totem.orchestrator import start_presence_listener
-from app.services.aws_db_service import init_db_pool, close_db_pool
 
 app = FastAPI()
 
@@ -36,36 +22,62 @@ STATIC_DIR = BASE_DIR / "static"
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-# ROUTERS
-app.include_router(rag_test_router)
+# ROUTERS SEMPRE ATIVOS
 app.include_router(auth_router)
-app.include_router(dashboard_router)
-app.include_router(api_router)
-app.include_router(totem_router)
-app.include_router(audio_router)
-app.include_router(voice_status_router)
-app.include_router(voice_control_router)
-app.include_router(presence_router)
-app.include_router(analytics_router)
-app.include_router(faq_admin_router)
-app.include_router(semantic_router)
-app.include_router(device_router)
-app.include_router(totem_options_router)
+
+# ROUTERS EDGE (Raspberry / runtime local)
+if IS_EDGE:
+    from app.routes.rag_test import router as rag_test_router
+    from app.routes.dashboard import router as dashboard_router
+    from app.routes.api import router as api_router
+    from app.routes.totem import router as totem_router
+    from app.routes.presence import router as presence_router
+    from app.routes.analytics import router as analytics_router
+    from app.routes.faq_admin import router as faq_admin_router
+    from app.routes.semantic_dashboard import router as semantic_router
+    from app.routes.device import router as device_router
+    from app.routes.totem_options import router as totem_options_router
+    from app.routes.audio import router as audio_router
+    from app.routes.voice_status import router as voice_status_router
+    from app.routes.voice_control import router as voice_control_router
+
+    app.include_router(rag_test_router)
+    app.include_router(dashboard_router)
+    app.include_router(api_router)
+    app.include_router(totem_router)
+    app.include_router(audio_router)
+    app.include_router(voice_status_router)
+    app.include_router(voice_control_router)
+    app.include_router(presence_router)
+    app.include_router(analytics_router)
+    app.include_router(faq_admin_router)
+    app.include_router(semantic_router)
+    app.include_router(device_router)
+    app.include_router(totem_options_router)
+
+# ROUTERS CLOUD (AWS / processamento pesado)
+if IS_CLOUD:
+    from app.routes.cloud_interact import router as cloud_interact_router
+
+    app.include_router(cloud_interact_router)
 
 
 @app.on_event("startup")
 async def startup_event():
-    import os
-
     if os.getenv("AWS_DB_STARTUP_ENABLED", "false").strip().lower() in {"1", "true", "yes"}:
+        from app.services.aws_db_service import init_db_pool
         await init_db_pool()
 
-    start_presence_listener()
+    if IS_EDGE:
+        from core.totem.orchestrator import start_presence_listener
+        start_presence_listener()
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
+    from app.services.aws_db_service import close_db_pool
     await close_db_pool()
+
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
@@ -81,6 +93,10 @@ async def auth_middleware(request: Request, call_next):
         "/static",
         "/rag-test",
         "/api/rag-test",
+        "/cloud",
+        "/ws",
+        "/audio-file",
+        "/edge",
     ]
 
     if any(path.startswith(p) for p in public):
