@@ -1,11 +1,12 @@
 import base64
-from fastapi import APIRouter, UploadFile, File, Form
 
-from core.totem.orchestrator import TotemOrchestrator
+from fastapi import APIRouter, File, Form, UploadFile
+
 from core.totem.stt import stt_from_base64
+from core.tts.tts import gerar_audio
 
 router = APIRouter()
-orchestrator = TotemOrchestrator()
+
 
 @router.post("/cloud/interact")
 async def cloud_interact(
@@ -14,7 +15,7 @@ async def cloud_interact(
     message: str = Form(""),
     file: UploadFile | None = File(None),
 ):
-    transcript = message.strip()
+    transcript = (message or "").strip()
     stt_latency = 0
     stt_source = "text"
 
@@ -23,20 +24,19 @@ async def cloud_interact(
         audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
         transcript, stt_latency, stt_source = stt_from_base64(audio_b64)
 
-    resposta, recommendations, audio_path, metric, idioma = orchestrator.interact(
-        company_id=company_id,
-        session_id=session_id,
-        pergunta=transcript,
-        profile={},
-        prefer_audio=True,
-    )
+    answer_text = f"Recebido na cloud. company_id={company_id}, session_id={session_id}, texto={transcript}"
+
+    audio_path, tts_source, tts_status, tts_error, tts_latency = gerar_audio(answer_text)
 
     return {
         "transcript": transcript,
-        "answer_text": resposta,
+        "answer_text": answer_text,
         "audio_path": audio_path,
-        "metric": metric,
-        "language": idioma,
+        "language": "pt",
         "stt_source": stt_source,
         "stt_latency": stt_latency,
+        "tts_source": tts_source,
+        "tts_status": tts_status,
+        "tts_error": tts_error,
+        "tts_latency": tts_latency,
     }

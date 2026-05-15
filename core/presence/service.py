@@ -9,11 +9,16 @@ from infra.realtime.event_bus import publish
 from repositories.presence_repository import PresenceRepository
 
 from core.sensors.climate_store import save_climate
-from core.totem.orchestrator import TotemOrchestrator
+# from core.totem.orchestrator import TotemOrchestrator
 from core.vision.rekognition_adapter import RekognitionAdapter
 
+
+def _get_orchestrator():
+    from core.totem.orchestrator import TotemOrchestrator
+    return TotemOrchestrator()
+    
 _presence_repo = PresenceRepository()
-_orchestrator = TotemOrchestrator()
+_orchestrator = _get_orchestrator()
 
 
 class PresenceService:
