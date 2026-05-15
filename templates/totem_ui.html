@@ -778,6 +778,7 @@
     function handleSSEMessage(event) {
       try {
         const data = JSON.parse(event.data);
+        console.log("SSE COMPLETO:", data);
         const payload = data.payload || {};
 
         if (data.type === "keepalive") {
