@@ -24,7 +24,6 @@ MIN_RMS = 150
 MIN_TEXT_CHARS = 3
 
 
-
 def publish_voice_status(
     session_id: str,
     status: str,
@@ -43,13 +42,10 @@ def publish_voice_status(
     )
 
 
-
 def compute_rms(path: str) -> int:
     try:
         with wave.open(path, "rb") as wav_file:
             frames = wav_file.readframes(wav_file.getnframes())
-
-        from array import array
 
         samples = array("h")
         samples.frombytes(frames)
@@ -64,6 +60,117 @@ def compute_rms(path: str) -> int:
         return 0
 
 
-
 def should_ignore_text(text: str) -> bool:
     cleaned = (text or "").strip()
+
+    if len(cleaned) < MIN_TEXT_CHARS:
+        return True
+
+    return False
+
+
+@router.post("/upload")
+async def upload_voice(
+    session_id: str = Form(...),
+    audio: UploadFile = File(...),
+):
+    temp_path = None
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=".wav",
+        ) as temp_file:
+            temp_file.write(await audio.read())
+            temp_path = temp_file.name
+
+        rms = compute_rms(temp_path)
+
+        if rms < MIN_RMS:
+            publish_voice_status(
+                session_id,
+                "silence",
+                "Áudio muito baixo.",
+            )
+
+            return {
+                "ok": False,
+                "error": "Áudio muito baixo",
+            }
+
+        audio_base64 = base64.b64encode(
+            Path(temp_path).read_bytes()
+        ).decode("utf-8")
+
+        text, latency, provider = stt_from_base64(audio_base64)
+
+        text = (text or "").strip()
+
+        if not text or should_ignore_text(text):
+            publish_voice_status(
+                session_id,
+                "empty_transcription",
+                "Não consegui entender o áudio.",
+            )
+
+            return {
+                "ok": False,
+                "error": "Transcrição vazia",
+            }
+
+        publish_voice_status(
+            session_id,
+            "transcribed",
+            text,
+        )
+
+        resposta, recommendations, audio_path, metric, idioma = (
+            orchestrator.interact(
+                company_id=COMPANY_ID,
+                session_id=session_id,
+                pergunta=text,
+                profile={
+                    "input_mode": "voice_upload",
+                },
+                prefer_audio=True,
+            )
+        )
+
+        response_audio_base64 = None
+
+        if audio_path and Path(audio_path).exists():
+            response_audio_base64 = base64.b64encode(
+                Path(audio_path).read_bytes()
+            ).decode("utf-8")
+
+        publish(
+            company_id=COMPANY_ID,
+            event="voice_response",
+            payload={
+                "session_id": session_id,
+                "question": text,
+                "response": resposta,
+                "audio_base64": response_audio_base64,
+            },
+        )
+
+        return {
+            "ok": True,
+            "text": text,
+            "response": resposta,
+            "audio_base64": response_audio_base64,
+            "provider": provider,
+            "latency": latency,
+        }
+
+    except Exception as exc:
+        publish_voice_status(
+            session_id,
+            "error",
+            str(exc),
+        )
+
+        return {
+            "ok": False,
+            "error": str(exc),
+        }
