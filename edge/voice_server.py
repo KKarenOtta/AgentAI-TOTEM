@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-
 import json
-import socket
 import sys
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import time
 from pathlib import Path
+
+import requests
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
@@ -15,120 +14,85 @@ if str(ROOT_DIR) not in sys.path:
 
 from edge.voice_agent import capture_once
 
-HOST = "0.0.0.0"
-PORT = 5000
+API_BASE_URL = "http://52.201.76.45:8000"
+COMPANY_ID = "FLX-001"
+
+EVENTS_URL = f"{API_BASE_URL}/api/events/{COMPANY_ID}"
 
 
-def get_local_ip() -> str:
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+def process_event(event_data: dict) -> None:
+    event_type = event_data.get("event")
 
-    try:
-        sock.connect(("8.8.8.8", 80))
-        ip = sock.getsockname()[0]
-    except Exception:
-        ip = "127.0.0.1"
-    finally:
-        sock.close()
-
-    return ip
-
-
-def run_capture_async(session_id: str) -> None:
-    try:
-        capture_once(session_id)
-    except Exception as exc:
-        print("[VOICE SERVER] capture error:", exc)
-
-
-class Handler(BaseHTTPRequestHandler):
-    def log_message(self, format, *args):
+    if event_type != "voice_capture_requested":
         return
 
-    def do_POST(self):
-        if self.path != "/capture":
-            self.send_response(404)
-            self.end_headers()
-            return
+    payload = event_data.get("payload") or {}
 
+    session_id = (payload.get("session_id") or "").strip()
+
+    if not session_id:
+        print("[VOICE SERVER] session_id ausente")
+        return
+
+    print("")
+    print("=" * 60)
+    print("[VOICE SERVER] captura solicitada")
+    print("[VOICE SERVER] session:", session_id)
+    print("=" * 60)
+    print("")
+
+    try:
+        capture_once(session_id)
+
+    except Exception as exc:
+        print("[VOICE SERVER] erro capture_once:", exc)
+
+
+def listen_forever() -> None:
+    while True:
         try:
-            content_length = int(self.headers.get("Content-Length", 0))
-            raw_body = self.rfile.read(content_length)
+            print("")
+            print("=" * 60)
+            print("VOICE EDGE LISTENER ONLINE")
+            print("Escutando eventos SSE da AWS...")
+            print(EVENTS_URL)
+            print("=" * 60)
+            print("")
 
-            payload = json.loads(raw_body.decode("utf-8"))
+            with requests.get(
+                EVENTS_URL,
+                stream=True,
+                timeout=300,
+            ) as response:
 
-            session_id = (payload.get("session_id") or "").strip()
+                for raw_line in response.iter_lines():
+                    if not raw_line:
+                        continue
 
-            if not session_id:
-                self.send_response(400)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
+                    line = raw_line.decode("utf-8").strip()
 
-                self.wfile.write(
-                    json.dumps(
-                        {
-                            "ok": False,
-                            "error": "session_id obrigatório",
-                        }
-                    ).encode("utf-8")
-                )
-                return
+                    if not line.startswith("data:"):
+                        continue
 
-            print("[VOICE SERVER] trigger:", session_id)
+                    try:
+                        json_data = line.removeprefix("data:").strip()
 
-            thread = threading.Thread(
-                target=run_capture_async,
-                args=(session_id,),
-                daemon=True,
-            )
+                        event_data = json.loads(json_data)
 
-            thread.start()
+                        process_event(event_data)
 
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
+                    except Exception as exc:
+                        print("[VOICE SERVER] erro parse evento:", exc)
 
-            self.wfile.write(
-                json.dumps(
-                    {
-                        "ok": True,
-                        "session_id": session_id,
-                        "mode": "async",
-                    }
-                ).encode("utf-8")
-            )
+        except requests.RequestException as exc:
+            print("[VOICE SERVER] conexão perdida:", exc)
 
         except Exception as exc:
-            print("[VOICE SERVER] erro:", exc)
+            print("[VOICE SERVER] erro geral:", exc)
 
-            self.send_response(500)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-
-            self.wfile.write(
-                json.dumps(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                    }
-                ).encode("utf-8")
-            )
-
-
-def run() -> None:
-    local_ip = get_local_ip()
-
-    print("")
-    print("=" * 60)
-    print("VOICE SERVER ONLINE")
-    print(f"Local : http://127.0.0.1:{PORT}")
-    print(f"Rede  : http://{local_ip}:{PORT}")
-    print("=" * 60)
-    print("")
-
-    server = HTTPServer((HOST, PORT), Handler)
-
-    server.serve_forever()
+        print("[VOICE SERVER] reconectando em 5s...")
+        time.sleep(5)
 
 
 if __name__ == "__main__":
-    run()
+    listen_forever()
