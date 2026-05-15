@@ -40,6 +40,8 @@ if IS_EDGE:
     from app.routes.audio import router as audio_router
     from app.routes.voice_status import router as voice_status_router
   # from app.routes.voice_control import router as voice_control_router
+    from app.routes.edge_ws import router as edge_ws_router
+    from app.routes.edge_audio import router as edge_audio_router
 
     app.include_router(rag_test_router)
     app.include_router(dashboard_router)
@@ -54,6 +56,8 @@ if IS_EDGE:
     app.include_router(semantic_router)
     app.include_router(device_router)
     app.include_router(totem_options_router)
+    app.include_router(edge_ws_router)
+    app.include_router(edge_audio_router)
 
 # ROUTERS CLOUD (AWS / processamento pesado)
 if IS_CLOUD:
@@ -85,6 +89,9 @@ async def auth_middleware(request: Request, call_next):
 
     public = [
         "/login",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
         "/device",
         "/store",
         "/campaign",
