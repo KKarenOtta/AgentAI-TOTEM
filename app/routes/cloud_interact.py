@@ -3,7 +3,7 @@ import base64
 from fastapi import APIRouter, File, Form, UploadFile
 
 from core.totem.stt import stt_from_base64
-from core.tts.tts import gerar_audio
+from core.totem.tts import gerar_audio
 
 router = APIRouter()
 
