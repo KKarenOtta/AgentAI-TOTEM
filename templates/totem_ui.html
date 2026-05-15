@@ -321,60 +321,79 @@
       }
     }
 
-    async function playAudio(audioBase64, key) {
-      stopAudio();
+   async function playAudio(audioBase64, key) {
+  stopAudio();
 
-      if (!audioBase64) return false;
+  if (!audioBase64) {
+    debug("Audio ausente");
+    return false;
+  }
 
-      const audioKey = key || String(audioBase64.length);
+  const audioKey = key || String(audioBase64.length);
 
-      if (playedAudioKeys.has(audioKey)) {
-        debug("Áudio ignorado por duplicidade: " + audioKey);
-        return false;
+  if (playedAudioKeys.has(audioKey)) {
+    debug("Áudio ignorado por duplicidade: " + audioKey);
+    return false;
+  }
+
+  playedAudioKeys.add(audioKey);
+
+  return new Promise((resolve) => {
+    try {
+      function tryPlay(mimeType) {
+        currentAudio = new Audio(
+          `data:${mimeType};base64,${audioBase64}`
+        );
+
+        currentAudio.onended = () => {
+          debug("Áudio finalizado: " + audioKey);
+          resolve(true);
+        };
+
+        currentAudio.onerror = async () => {
+          debug("Falha ao reproduzir como " + mimeType);
+
+          if (mimeType === "audio/mp3") {
+            try {
+              tryPlay("audio/wav");
+              return;
+            } catch (_) {}
+          }
+
+          playedAudioKeys.delete(audioKey);
+          resolve(false);
+        };
+
+        const playPromise = currentAudio.play();
+
+        if (playPromise && typeof playPromise.catch === "function") {
+          playPromise.catch((error) => {
+            debug("Audio.play bloqueado: " + error.message);
+
+            playedAudioKeys.delete(audioKey);
+
+            show("btnAudio");
+
+            setStatus(
+              "Áudio bloqueado",
+              "Clique em Ativar áudio para continuar.",
+              "O navegador bloqueou a reprodução automática."
+            );
+
+            resolve(false);
+          });
+        }
       }
 
-      playedAudioKeys.add(audioKey);
+      tryPlay("audio/mp3");
 
-      return new Promise((resolve) => {
-        try {
-          currentAudio = new Audio("data:audio/mp3;base64," + audioBase64);
-
-          currentAudio.onended = () => {
-            debug("Áudio finalizado: " + audioKey);
-            resolve(true);
-          };
-
-          currentAudio.onerror = () => {
-            debug("Erro no elemento de áudio: " + audioKey);
-            resolve(false);
-          };
-
-          const playPromise = currentAudio.play();
-
-          if (playPromise && typeof playPromise.catch === "function") {
-            playPromise.catch((error) => {
-              playedAudioKeys.delete(audioKey);
-
-              debug("Audio.play bloqueado: " + error.message);
-
-              show("btnAudio");
-
-              setStatus(
-                "Áudio bloqueado",
-                "Clique em Ativar áudio para continuar.",
-                "O navegador bloqueou a reprodução automática."
-              );
-
-              resolve(false);
-            });
-          }
-        } catch (e) {
-          playedAudioKeys.delete(audioKey);
-          debug("Falha ao preparar áudio: " + e.message);
-          resolve(false);
-        }
-      });
+    } catch (e) {
+      playedAudioKeys.delete(audioKey);
+      debug("Falha ao preparar áudio: " + e.message);
+      resolve(false);
     }
+  });
+}
 
     function enableInteraction() {
       show("btnVoice");
