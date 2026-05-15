@@ -67,4 +67,3 @@ def compute_rms(path: str) -> int:
 
 def should_ignore_text(text: str) -> bool:
     cleaned = (text or "").strip()
-    }
