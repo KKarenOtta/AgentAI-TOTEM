@@ -25,7 +25,7 @@ from app.routes.auth import router as auth_router
 from app.routes.audio import router as audio_router
 from app.routes.voice_status import router as voice_status_router
 from app.routes.voice_control import router as voice_control_router
-
+from app.routes.voice_upload import router as voice_upload_router
 from core.totem.orchestrator import start_presence_listener
 from app.services.aws_db_service import init_db_pool, close_db_pool
 
@@ -51,6 +51,7 @@ app.include_router(faq_admin_router)
 app.include_router(semantic_router)
 app.include_router(device_router)
 app.include_router(totem_options_router)
+app.include_router(voice_upload_router)
 
 
 @app.on_event("startup")
