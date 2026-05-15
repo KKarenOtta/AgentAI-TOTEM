@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>-- IA.GORA TOTEM INTERATIVO --</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=50">
+  <link rel="stylesheet" href="/beta-static/style.css?v=50">
 </head>
 <body>
   <main class="page">
@@ -22,6 +22,12 @@
         <p id="message" class="message">Chegue mais perto para iniciar o totem</p>
 
         <p id="subtitle" class="subtitle">Aguardando visitante</p>
+        <div class="ia-panel">
+          <p id="ws-status" class="subtitle">WebSocket: aguardando conexao</p>
+          <p id="transcript" class="message" style="font-size: 1rem;">Transcript aparece aqui</p>
+          <p id="answer" class="subtitle">Resposta aparece aqui</p>
+          <audio id="remote-audio" controls style="margin-top: 16px; width: 100%; max-width: 420px;"></audio>
+        </div>
       </div>
 
       <div class="status-panel">
@@ -35,6 +41,6 @@
     </section>
   </main>
 
-  <script src="{{ url_for('static', filename='app.js') }}?v=50"></script>
+  <script src="/beta-static/app.js?v=50"></script>
 </body>
 </html>
