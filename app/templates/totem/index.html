@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>-- IA.GORA TOTEM INTERATIVO --</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='totem/style.css') }}?v=1">
+</head>
+<body>
+  <main class="page">
+    <section id="screen" class="screen espera">
+      <a href="/login" class="brand" aria-label="Acessar area administrativa">FLEXMEDIA TOTEM</a>
+
+      <div class="center-stage">
+        <div class="pulse-wrap" aria-hidden="true">
+          <span class="pulse-ring ring-1"></span>
+          <span class="pulse-ring ring-2"></span>
+          <span class="pulse-ring ring-3"></span>
+          <span class="pulse-core"></span>
+        </div>
+
+        <p id="message" class="message">Chegue mais perto para iniciar o totem</p>
+        <p id="subtitle" class="subtitle">Aguardando visitante</p>
+      </div>
+
+      <div class="status-panel">
+        <div class="status-card"><span class="label">Temperatura</span><strong id="temp">-- C</strong></div>
+        <div class="status-card"><span class="label">Umidade</span><strong id="hum">-- %</strong></div>
+        <div class="status-card"><span class="label">Sensor 1</span><strong id="dist1">-- cm</strong></div>
+        <div class="status-card"><span class="label">Sensor 2</span><strong id="dist2">-- cm</strong></div>
+        <div class="status-card"><span class="label">Sensor 3</span><strong id="dist3">-- cm</strong></div>
+        <div class="status-card"><span class="label">Estado</span><strong id="led">ESPERA</strong></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', path='totem/app.js') }}?v=1"></script>
+</body>
+</html>

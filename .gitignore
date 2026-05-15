@@ -42,3 +42,10 @@ runtime/logs/*.log
 !runtime/logs/.gitkeep
 data/audio/
 piper/*.tar.gz
+
+cert.pem
+key.pem
+.env
+*.pem
+*.key
+*.crt
