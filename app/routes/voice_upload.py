@@ -54,6 +54,7 @@ def compute_rms(path: str) -> int:
             return 0
 
         total = sum(sample * sample for sample in samples)
+
         return int(math.sqrt(total / len(samples)))
 
     except Exception:
@@ -77,6 +78,12 @@ async def upload_voice(
     temp_path = None
 
     try:
+        publish_voice_status(
+            session_id,
+            "recording",
+            "Áudio recebido do Raspberry.",
+        )
+
         with tempfile.NamedTemporaryFile(
             delete=False,
             suffix=".wav",
@@ -91,6 +98,10 @@ async def upload_voice(
                 session_id,
                 "silence",
                 "Áudio muito baixo.",
+                {
+                    "rms": rms,
+                    "min_rms": MIN_RMS,
+                },
             )
 
             return {
@@ -122,6 +133,10 @@ async def upload_voice(
             session_id,
             "transcribed",
             text,
+            {
+                "provider": provider,
+                "latency": latency,
+            },
         )
 
         resposta, recommendations, audio_path, metric, idioma = (
@@ -143,14 +158,15 @@ async def upload_voice(
                 Path(audio_path).read_bytes()
             ).decode("utf-8")
 
-        publish(
-            company_id=COMPANY_ID,
-            event="voice_response",
-            payload={
-                "session_id": session_id,
-                "question": text,
-                "response": resposta,
+        publish_voice_status(
+            session_id,
+            "answer_ready",
+            resposta,
+            {
                 "audio_base64": response_audio_base64,
+                "recommendations": recommendations,
+                "metric": metric,
+                "language": idioma,
             },
         )
 
@@ -161,12 +177,14 @@ async def upload_voice(
             "audio_base64": response_audio_base64,
             "provider": provider,
             "latency": latency,
+            "metric": metric,
+            "language": idioma,
         }
 
     except Exception as exc:
         publish_voice_status(
             session_id,
-            "error",
+            "interaction_error",
             str(exc),
         )
 
@@ -174,3 +192,10 @@ async def upload_voice(
             "ok": False,
             "error": str(exc),
         }
+
+    finally:
+        if temp_path:
+            try:
+                Path(temp_path).unlink(missing_ok=True)
+            except Exception:
+                pass
