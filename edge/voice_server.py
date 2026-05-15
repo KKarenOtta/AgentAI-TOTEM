@@ -21,7 +21,20 @@ EVENTS_URL = f"{API_BASE_URL}/api/events/{COMPANY_ID}"
 
 
 def process_event(event_data: dict) -> None:
-    event_type = event_data.get("event")
+    """
+    Processa eventos SSE recebidos da AWS.
+    """
+
+    print("[VOICE SERVER] evento recebido:", event_data)
+
+    # tenta múltiplos formatos possíveis
+    event_type = (
+        event_data.get("event")
+        or event_data.get("type")
+        or event_data.get("event_name")
+    )
+
+    print("[VOICE SERVER] tipo evento:", event_type)
 
     if event_type != "voice_capture_requested":
         return
@@ -36,7 +49,7 @@ def process_event(event_data: dict) -> None:
 
     print("")
     print("=" * 60)
-    print("[VOICE SERVER] captura solicitada")
+    print("[VOICE SERVER] CAPTURA SOLICITADA")
     print("[VOICE SERVER] session:", session_id)
     print("=" * 60)
     print("")
@@ -49,6 +62,11 @@ def process_event(event_data: dict) -> None:
 
 
 def listen_forever() -> None:
+    """
+    Escuta eventos SSE continuamente.
+    Reconecta automaticamente caso a conexão caia.
+    """
+
     while True:
         try:
             print("")
@@ -65,30 +83,63 @@ def listen_forever() -> None:
                 timeout=300,
             ) as response:
 
+                print(
+                    "[VOICE SERVER] conectado SSE:",
+                    response.status_code,
+                )
+
                 for raw_line in response.iter_lines():
                     if not raw_line:
                         continue
 
-                    line = raw_line.decode("utf-8").strip()
+                    try:
+                        line = raw_line.decode("utf-8").strip()
 
+                    except Exception as exc:
+                        print("[VOICE SERVER] erro decode:", exc)
+                        continue
+
+                    print("[VOICE SERVER] raw:", line)
+
+                    # ignorar linhas não-data
                     if not line.startswith("data:"):
                         continue
 
                     try:
                         json_data = line.removeprefix("data:").strip()
 
+                        print(
+                            "[VOICE SERVER] json bruto:",
+                            json_data,
+                        )
+
                         event_data = json.loads(json_data)
 
                         process_event(event_data)
 
+                    except json.JSONDecodeError as exc:
+                        print(
+                            "[VOICE SERVER] erro json:",
+                            exc,
+                        )
+
                     except Exception as exc:
-                        print("[VOICE SERVER] erro parse evento:", exc)
+                        print(
+                            "[VOICE SERVER] erro parse evento:",
+                            exc,
+                        )
 
         except requests.RequestException as exc:
-            print("[VOICE SERVER] conexão perdida:", exc)
+            print(
+                "[VOICE SERVER] conexão perdida:",
+                exc,
+            )
 
         except Exception as exc:
-            print("[VOICE SERVER] erro geral:", exc)
+            print(
+                "[VOICE SERVER] erro geral:",
+                exc,
+            )
 
         print("[VOICE SERVER] reconectando em 5s...")
         time.sleep(5)
