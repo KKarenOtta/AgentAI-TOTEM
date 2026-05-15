@@ -30,8 +30,8 @@ if IS_EDGE:
     from app.routes.rag_test import router as rag_test_router
     from app.routes.dashboard import router as dashboard_router
     from app.routes.api import router as api_router
-    from app.routes.totem import router as totem_router
-    from app.routes.presence import router as presence_router
+  # from app.routes.totem import router as totem_router
+  # from app.routes.presence import router as presence_router
     from app.routes.analytics import router as analytics_router
     from app.routes.faq_admin import router as faq_admin_router
     from app.routes.semantic_dashboard import router as semantic_router
@@ -39,16 +39,16 @@ if IS_EDGE:
     from app.routes.totem_options import router as totem_options_router
     from app.routes.audio import router as audio_router
     from app.routes.voice_status import router as voice_status_router
-    from app.routes.voice_control import router as voice_control_router
+  # from app.routes.voice_control import router as voice_control_router
 
     app.include_router(rag_test_router)
     app.include_router(dashboard_router)
     app.include_router(api_router)
-    app.include_router(totem_router)
+  # app.include_router(totem_router)
     app.include_router(audio_router)
     app.include_router(voice_status_router)
-    app.include_router(voice_control_router)
-    app.include_router(presence_router)
+  # app.include_router(voice_control_router)
+  # app.include_router(presence_router)
     app.include_router(analytics_router)
     app.include_router(faq_admin_router)
     app.include_router(semantic_router)
@@ -68,9 +68,9 @@ async def startup_event():
         from app.services.aws_db_service import init_db_pool
         await init_db_pool()
 
-    if IS_EDGE:
-        from core.totem.orchestrator import start_presence_listener
-        start_presence_listener()
+  # if IS_EDGE:
+  #     from core.totem.orchestrator import start_presence_listener
+  #     start_presence_listener()
 
 
 @app.on_event("shutdown")
