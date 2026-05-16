@@ -14,6 +14,9 @@ except ModuleNotFoundError:
 
 try:
     import board
+    if not hasattr(board, "D4"):
+        BOARD_AVAILABLE = False
+        board = None
 except ModuleNotFoundError:
     BOARD_AVAILABLE = False
     board = None
