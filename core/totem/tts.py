@@ -10,8 +10,11 @@ from openai import OpenAI
 
 load_dotenv()
 
-AUDIO_DIR = Path("data/audio")
+BASE_DIR = Path(__file__).resolve().parents[2]
+AUDIO_DIR = BASE_DIR / "static" / "audio"
 AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+
+PUBLIC_AUDIO_FILE = AUDIO_DIR / "resposta.mp3"
 
 
 def _truthy(value: str | None) -> bool:
@@ -51,10 +54,9 @@ def _elevenlabs_tts(texto: str):
     if response.status_code != 200:
         return None, "elevenlabs_error", response.status_code, response.text, 0
 
-    path = AUDIO_DIR / f"voz_elevenlabs_{int(time())}.mp3"
-    path.write_bytes(response.content)
+    PUBLIC_AUDIO_FILE.write_bytes(response.content)
 
-    return str(path), "elevenlabs", 200, None, round(time() - start, 3)
+    return str(PUBLIC_AUDIO_FILE), "elevenlabs", 200, None, round(time() - start, 3)
 
 
 def _openai_tts(texto: str):
@@ -68,17 +70,15 @@ def _openai_tts(texto: str):
     model = os.getenv("OPENAI_TTS_MODEL", "gpt-4o-mini-tts")
     voice = os.getenv("OPENAI_TTS_VOICE", "alloy")
 
-    path = AUDIO_DIR / f"voz_openai_{int(time())}.mp3"
-
     with client.audio.speech.with_streaming_response.create(
         model=model,
         voice=voice,
         input=texto,
         response_format="mp3",
     ) as response:
-        response.stream_to_file(path)
+        response.stream_to_file(PUBLIC_AUDIO_FILE)
 
-    return str(path), "openai", 200, None, round(time() - start, 3)
+    return str(PUBLIC_AUDIO_FILE), "openai", 200, None, round(time() - start, 3)
 
 
 def gerar_audio(texto: str, lang: str = "pt"):
@@ -104,4 +104,4 @@ def gerar_audio(texto: str, lang: str = "pt"):
     if provider == "openai":
         return _openai_tts(texto)
 
-    return None, "invalid_provider", 400, f"TTS_PROVIDER inválido: {provider}", 0
+    return None, "invalid_provider", 400, f"TTS_PROVIDER invalido: {provider}", 0
