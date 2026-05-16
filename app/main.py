@@ -7,8 +7,6 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 
 load_dotenv()
 
@@ -26,18 +24,14 @@ BETA_STATIC_DIR = BASE_DIR / "beta_integration" / "static"
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.mount("/beta-static", StaticFiles(directory=str(BETA_STATIC_DIR)), name="beta_static")
 
-# ROUTERS SEMPRE ATIVOS
 app.include_router(auth_router)
 
-# ROUTERS EDGE (Raspberry / runtime local)
 if IS_EDGE:
     from app.routes.rag_test import router as rag_test_router
     from app.routes.edge_status import router as edge_status_router
     from app.routes.integration_ui import router as integration_ui_router
     from app.routes.dashboard import router as dashboard_router
     from app.routes.api import router as api_router
-  # from app.routes.totem import router as totem_router
-  # from app.routes.presence import router as presence_router
     from app.routes.analytics import router as analytics_router
     from app.routes.faq_admin import router as faq_admin_router
     from app.routes.semantic_dashboard import router as semantic_router
@@ -45,7 +39,6 @@ if IS_EDGE:
     from app.routes.totem_options import router as totem_options_router
     from app.routes.audio import router as audio_router
     from app.routes.voice_status import router as voice_status_router
-  # from app.routes.voice_control import router as voice_control_router
     from app.routes.edge_ws import router as edge_ws_router
     from app.routes.edge_audio import router as edge_audio_router
 
@@ -54,11 +47,8 @@ if IS_EDGE:
     app.include_router(integration_ui_router)
     app.include_router(dashboard_router)
     app.include_router(api_router)
-  # app.include_router(totem_router)
     app.include_router(audio_router)
     app.include_router(voice_status_router)
-  # app.include_router(voice_control_router)
-  # app.include_router(presence_router)
     app.include_router(analytics_router)
     app.include_router(faq_admin_router)
     app.include_router(semantic_router)
@@ -67,7 +57,6 @@ if IS_EDGE:
     app.include_router(edge_ws_router)
     app.include_router(edge_audio_router)
 
-# ROUTERS CLOUD (AWS / processamento pesado)
 if IS_CLOUD:
     from app.routes.cloud_interact import router as cloud_interact_router
 
@@ -79,10 +68,6 @@ async def startup_event():
     if os.getenv("AWS_DB_STARTUP_ENABLED", "false").strip().lower() in {"1", "true", "yes"}:
         from app.services.aws_db_service import init_db_pool
         await init_db_pool()
-
-  # if IS_EDGE:
-  #     from core.totem.orchestrator import start_presence_listener
-  #     start_presence_listener()
 
 
 @app.on_event("shutdown")
@@ -136,6 +121,7 @@ async def auth_middleware(request: Request, call_next):
     if path.startswith("/admin/faq"):
         if user["role"] not in ("admin", "company"):
             return RedirectResponse("/")
+
     elif path.startswith("/admin") and user["role"] != "admin":
         return RedirectResponse("/")
 
