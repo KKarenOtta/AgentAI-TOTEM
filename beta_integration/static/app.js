@@ -2,9 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const $ = (id) => document.getElementById(id);
 
   const els = {
-    wsStatus: $("ws-status"),
     message: $("message"),
-    subtitle: $("subtitle"),
     transcript: $("transcript"),
     answer: $("answer"),
     temp: $("temp"),
@@ -18,6 +16,8 @@ document.addEventListener("DOMContentLoaded", () => {
     sendText: $("send-text"),
     recordBtn: $("record-btn"),
     stopBtn: $("stop-btn"),
+    iaPanel: $("ia-panel"),
+    inputPanel: $("input-panel"),
   };
 
   const EDGE_STATUS_ENDPOINT = "/edge/status";
@@ -29,14 +29,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let busy = false;
   let polling = false;
+  let lastTranscript = "";
+  let lastAnswer = "";
 
-  if (els.wsStatus) {
-    els.wsStatus.textContent = "Modo: polling HTTP (/edge/status) + edge interact";
-  }
-
-  function setText(el, value, fallback = "--") {
+  function setText(el, value, fallback = "") {
     if (!el) return;
     el.textContent = value ?? fallback;
+  }
+
+  function show(el, visible) {
+    if (!el) return;
+    el.hidden = !visible;
   }
 
   function normalizeState(state) {
@@ -57,25 +60,61 @@ document.addEventListener("DOMContentLoaded", () => {
     screen.classList.add(state);
   }
 
-  function updateSubtitle(data) {
-    if (!els.subtitle) return;
+  function renderState(data) {
+    const state = normalizeState(data.totem_state);
 
-    if (data.totem_state === "alerta") {
-      els.subtitle.textContent = "Alerta ativo no totem";
-    } else if (data.totem_state === "sessao") {
-      els.subtitle.textContent = "Sessao iniciada";
-    } else if (data.totem_state === "convite") {
-      els.subtitle.textContent = "Visitante detectado";
-    } else {
-      els.subtitle.textContent = "Sistema em espera";
+    applyScreenState(state);
+
+    if (state === "sessao") {
+      show(els.iaPanel, true);
+      show(els.inputPanel, true);
+
+      if (lastTranscript && lastTranscript.trim()) {
+        setText(els.transcript, lastTranscript);
+        show(els.transcript, true);
+      } else {
+        setText(els.transcript, "");
+        show(els.transcript, false);
+      }
+
+      if (lastAnswer && lastAnswer.trim()) {
+        setText(els.message, lastAnswer);
+      } else {
+        setText(els.message, "Ola, sou o totem inteligente FlexMedia. Como posso lhe ajudar?");
+      }
+
+      show(els.answer, false);
+      return;
     }
+
+    show(els.iaPanel, false);
+    show(els.transcript, false);
+    show(els.answer, false);
+
+    if (els.audio) {
+      els.audio.removeAttribute("src");
+      els.audio.load();
+      show(els.audio, false);
+    }
+
+    lastTranscript = "";
+    lastAnswer = "";
+
+    if (state === "convite") {
+      setText(els.message, "Chegue mais perto para iniciar o totem");
+      return;
+    }
+
+    if (state === "alerta") {
+      setText(els.message, data.message || "Atencao: objeto muito proximo detectado.");
+      return;
+    }
+
+    setText(els.message, "");
   }
 
   function updateUI(data) {
-    applyScreenState(data.totem_state);
-
-    setText(els.message, data.message, "Aguardando visitante");
-    updateSubtitle(data);
+    renderState(data);
 
     setText(els.temp, data.temperature != null ? `${data.temperature} °C` : "--");
     setText(els.hum, data.humidity != null ? `${data.humidity} %` : "--");
@@ -86,22 +125,43 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateCloudResponse(data) {
-    setText(els.transcript, data.transcript || "Sem transcript", "Sem transcript");
-    setText(els.answer, data.answer_text || "Sem resposta", "Sem resposta");
+    lastTranscript = data.transcript || "";
+    lastAnswer = data.answer_text || "";
+
+    const screen = document.querySelector(".screen");
+    const currentState = screen?.dataset?.state || "espera";
+
+    if (currentState === "sessao") {
+      if (lastTranscript.trim()) {
+        setText(els.transcript, lastTranscript);
+        show(els.transcript, true);
+      } else {
+        setText(els.transcript, "");
+        show(els.transcript, false);
+      }
+
+      if (lastAnswer.trim()) {
+        setText(els.message, lastAnswer);
+      } else {
+        setText(els.message, "Ola, sou o totem inteligente FlexMedia. Como posso lhe ajudar?");
+      }
+    }
 
     if (els.audio) {
       if (data.audio_url) {
         els.audio.src = `${data.audio_url}?t=${Date.now()}`;
         els.audio.load();
+        show(els.audio, true);
         els.audio.play().catch(() => {});
       } else {
         els.audio.removeAttribute("src");
         els.audio.load();
+        show(els.audio, false);
       }
     }
   }
 
-  function setBusy(nextBusy, answerText = "") {
+  function setBusy(nextBusy, messageText = "") {
     busy = nextBusy;
 
     if (els.sendText) {
@@ -119,8 +179,8 @@ document.addEventListener("DOMContentLoaded", () => {
       els.stopBtn.style.opacity = "0.6";
     }
 
-    if (answerText && els.answer) {
-      els.answer.textContent = answerText;
+    if (messageText && normalizeState(document.querySelector(".screen")?.dataset?.state) === "sessao") {
+      setText(els.message, messageText);
     }
   }
 
@@ -138,22 +198,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const data = await response.json();
       updateUI(data);
-
-      if (els.wsStatus) {
-        els.wsStatus.textContent = `Modo: polling HTTP (/edge/status) + edge interact | estado: ${normalizeState(data.totem_state)}`;
-      }
     } catch (error) {
       console.error("[integration] erro ao buscar /edge/status:", error);
-      if (els.wsStatus) {
-        els.wsStatus.textContent = "Erro ao ler /edge/status";
-      }
     }
   }
 
   async function sendTextToEdge(message) {
     if (busy) return;
 
-    setBusy(true, "Enviando texto para o Raspberry...");
+    setBusy(true, "...");
 
     try {
       const response = await fetch(EDGE_TEXT_ENDPOINT, {
@@ -177,7 +230,7 @@ document.addEventListener("DOMContentLoaded", () => {
       updateCloudResponse(data.cloud_result || {});
     } catch (error) {
       console.error("[integration] erro ao enviar texto:", error);
-      setText(els.answer, `Erro no edge: ${error.message}`, "Erro no edge");
+      setText(els.message, `Erro no edge: ${error.message}`, "Erro no edge");
     } finally {
       setBusy(false);
     }
@@ -186,7 +239,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function sendAudioToEdge() {
     if (busy) return;
 
-    setBusy(true, "Gravando audio no Raspberry...");
+    setBusy(true, "...");
 
     try {
       const response = await fetch(EDGE_AUDIO_ENDPOINT, {
@@ -209,7 +262,7 @@ document.addEventListener("DOMContentLoaded", () => {
       updateCloudResponse(data.cloud_result || {});
     } catch (error) {
       console.error("[integration] erro ao capturar audio no edge:", error);
-      setText(els.answer, `Erro no edge audio: ${error.message}`, "Erro no edge audio");
+      setText(els.message, `Erro no edge audio: ${error.message}`, "Erro no edge audio");
     } finally {
       setBusy(false);
     }
@@ -220,7 +273,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const message = els.textInput ? els.textInput.value : "";
 
       if (!message || !message.trim()) {
-        setText(els.answer, "Digite uma mensagem para enviar.", "Digite uma mensagem para enviar.");
+        setText(els.message, "Digite uma mensagem para enviar.", "Digite uma mensagem para enviar.");
         return;
       }
 

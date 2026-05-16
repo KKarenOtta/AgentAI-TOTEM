@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>-- IA.GORA TOTEM INTERATIVO --</title>
-  <link rel="stylesheet" href="/beta-static/style.css?v=51">
+  <link rel="stylesheet" href="/beta-static/style.css?v=52">
 </head>
 <body>
   <main class="page">
@@ -19,27 +19,26 @@
           <span class="pulse-core"></span>
         </div>
 
-        <p id="message" class="message">Chegue mais perto para iniciar o totem</p>
+        <p id="transcript" class="subtitle" hidden></p>
 
-        <p id="subtitle" class="subtitle">Aguardando visitante</p>
+        <p id="message" class="message"></p>
 
-        <div class="ia-panel">
-          <p id="ws-status" class="subtitle">Modo: aguardando inicializacao</p>
-          <p id="transcript" class="message" style="font-size: 1rem;">Transcript aparece aqui</p>
-          <p id="answer" class="subtitle">Resposta aparece aqui</p>
+        <div id="ia-panel" class="ia-panel" hidden>
+          <p id="answer" class="subtitle" hidden></p>
 
           <audio
             id="remote-audio"
             controls
             preload="auto"
             style="margin-top: 16px; width: 100%; max-width: 420px;"
+            hidden
           ></audio>
 
-          <div style="margin-top: 16px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 10px;">
+          <div id="input-panel" style="margin-top: 16px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 10px;">
             <input
               id="text-input"
               type="text"
-              placeholder="Digite uma mensagem para testar a cloud"
+              placeholder="Digite uma mensagem"
               style="padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08); color: white; outline: none;"
             />
 
@@ -84,6 +83,6 @@
     </section>
   </main>
 
-  <script src="/beta-static/app.js?v=51"></script>
+  <script src="/beta-static/app.js?v=52"></script>
 </body>
 </html>
