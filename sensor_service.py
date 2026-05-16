@@ -1,3 +1,4 @@
+import os
 import time
 import atexit
 
@@ -24,6 +25,13 @@ except ModuleNotFoundError:
     adafruit_dht = None
 
 
+def _truthy(value):
+    return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+HARDWARE_MODE = os.getenv("HARDWARE_MODE", "real").strip().lower()
+MOCK_SCENARIO = os.getenv("MOCK_SCENARIO", "cycle").strip().lower()
+
 LED_PIN = 18
 DHT_PIN = board.D4 if BOARD_AVAILABLE else None
 
@@ -40,7 +48,9 @@ TEMP_ALERT_HIGH = 40
 TEMP_ALERT_LOW = 5
 DHT_READ_INTERVAL = 3.0
 
-HARDWARE_AVAILABLE = GPIO_AVAILABLE and BOARD_AVAILABLE and DHT_AVAILABLE
+PHYSICAL_HARDWARE_AVAILABLE = GPIO_AVAILABLE and BOARD_AVAILABLE and DHT_AVAILABLE
+MOCK_MODE = HARDWARE_MODE == "mock"
+HARDWARE_AVAILABLE = PHYSICAL_HARDWARE_AVAILABLE and not MOCK_MODE
 
 dht = None
 
@@ -186,6 +196,22 @@ def is_temperature_alert(temperature):
 
 
 def get_message(state, temperature=None):
+    if MOCK_MODE:
+        if state == "alerta":
+            if temperature is not None and temperature > TEMP_ALERT_HIGH:
+                return "Atencao: temperatura simulada acima de 40 graus."
+            if temperature is not None and temperature < TEMP_ALERT_LOW:
+                return "Atencao: temperatura simulada abaixo de 5 graus."
+            return "Atencao: objeto simulado muito proximo detectado."
+
+        if state == "sessao":
+            return "Ola, seja bem-vindo! Eu sou o Totem Inteligente FlexMedia, em que posso lhe ajudar?"
+
+        if state == "convite":
+            return "Modo cloud: aproxime-se para iniciar o totem."
+
+        return "Modo cloud: aguardando visitante."
+
     if not HARDWARE_AVAILABLE:
         return "Modo cloud: hardware indisponivel neste ambiente."
 
@@ -224,15 +250,115 @@ def decide_state(sensor_results, temperature):
     return "espera", None
 
 
+def _mock_profile():
+    phase = int(time.time() / 8) % 4
+
+    if MOCK_SCENARIO == "espera":
+        return {
+            "temperature": 24.5,
+            "humidity": 51.0,
+            "distances": [None, None, None],
+        }
+
+    if MOCK_SCENARIO == "convite":
+        return {
+            "temperature": 24.8,
+            "humidity": 52.0,
+            "distances": [180.0, None, None],
+        }
+
+    if MOCK_SCENARIO == "sessao":
+        return {
+            "temperature": 25.1,
+            "humidity": 53.5,
+            "distances": [None, 72.0, None],
+        }
+
+    if MOCK_SCENARIO == "alerta":
+        return {
+            "temperature": 24.9,
+            "humidity": 50.0,
+            "distances": [None, 5.5, None],
+        }
+
+    if MOCK_SCENARIO == "temp_high":
+        return {
+            "temperature": 41.2,
+            "humidity": 44.0,
+            "distances": [None, None, None],
+        }
+
+    if MOCK_SCENARIO == "temp_low":
+        return {
+            "temperature": 4.2,
+            "humidity": 58.0,
+            "distances": [None, None, None],
+        }
+
+    cycle_profiles = [
+        {"temperature": 24.5, "humidity": 51.0, "distances": [None, None, None]},
+        {"temperature": 24.9, "humidity": 52.2, "distances": [165.0, None, None]},
+        {"temperature": 25.3, "humidity": 53.1, "distances": [None, 68.0, None]},
+        {"temperature": 25.0, "humidity": 50.8, "distances": [None, None, 6.5]},
+    ]
+    return cycle_profiles[phase]
+
+
 def build_mock_sensor_results():
+    profile = _mock_profile()
+    distances = profile["distances"]
+
     return [
-        {"sensor": "Esquerda", "distance_cm": None, "state": "espera"},
-        {"sensor": "Centro", "distance_cm": None, "state": "espera"},
-        {"sensor": "Direita", "distance_cm": None, "state": "espera"},
+        {
+            "sensor": ULTRA_SENSORS[0]["name"],
+            "distance_cm": distances[0],
+            "state": classify_distance(distances[0]),
+        },
+        {
+            "sensor": ULTRA_SENSORS[1]["name"],
+            "distance_cm": distances[1],
+            "state": classify_distance(distances[1]),
+        },
+        {
+            "sensor": ULTRA_SENSORS[2]["name"],
+            "distance_cm": distances[2],
+            "state": classify_distance(distances[2]),
+        },
     ]
 
 
 def update_system_state(logger=None):
+    if MOCK_MODE:
+        profile = _mock_profile()
+        sensor_results = build_mock_sensor_results()
+        temperature = profile["temperature"]
+        humidity = profile["humidity"]
+        totem_state, active_sensor = decide_state(sensor_results, temperature)
+        message = get_message(totem_state, temperature)
+
+        system_data["temperature"] = temperature
+        system_data["humidity"] = humidity
+        system_data["ultrassons"] = sensor_results
+        system_data["presence"] = totem_state in ("convite", "sessao", "alerta")
+        system_data["led"] = bool(system_data["manual_led_override"] or system_data["presence"])
+        system_data["message"] = message
+        system_data["totem_state"] = totem_state
+        system_data["active_sensor"] = active_sensor
+
+        return {
+            "temperature": system_data["temperature"],
+            "humidity": system_data["humidity"],
+            "presence": system_data["presence"],
+            "led": system_data["led"],
+            "message": system_data["message"],
+            "totem_state": system_data["totem_state"],
+            "active_sensor": system_data["active_sensor"],
+            "distance_sensor_1_cm": sensor_results[0]["distance_cm"] if len(sensor_results) > 0 else None,
+            "distance_sensor_2_cm": sensor_results[1]["distance_cm"] if len(sensor_results) > 1 else None,
+            "distance_sensor_3_cm": sensor_results[2]["distance_cm"] if len(sensor_results) > 2 else None,
+            "ultrassons": sensor_results,
+        }
+
     if not HARDWARE_AVAILABLE:
         sensor_results = build_mock_sensor_results()
         system_data["temperature"] = None
