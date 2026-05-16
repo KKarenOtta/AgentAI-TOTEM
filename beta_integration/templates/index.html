@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>-- IA.GORA TOTEM INTERATIVO --</title>
-  <link rel="stylesheet" href="/beta-static/style.css?v=50">
+  <link rel="stylesheet" href="/beta-static/style.css?v=51">
 </head>
 <body>
   <main class="page">
@@ -22,11 +22,54 @@
         <p id="message" class="message">Chegue mais perto para iniciar o totem</p>
 
         <p id="subtitle" class="subtitle">Aguardando visitante</p>
+
         <div class="ia-panel">
-          <p id="ws-status" class="subtitle">WebSocket: aguardando conexao</p>
+          <p id="ws-status" class="subtitle">Modo: aguardando inicializacao</p>
           <p id="transcript" class="message" style="font-size: 1rem;">Transcript aparece aqui</p>
           <p id="answer" class="subtitle">Resposta aparece aqui</p>
-          <audio id="remote-audio" controls style="margin-top: 16px; width: 100%; max-width: 420px;"></audio>
+
+          <audio
+            id="remote-audio"
+            controls
+            preload="auto"
+            style="margin-top: 16px; width: 100%; max-width: 420px;"
+          ></audio>
+
+          <div style="margin-top: 16px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 10px;">
+            <input
+              id="text-input"
+              type="text"
+              placeholder="Digite uma mensagem para testar a cloud"
+              style="padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08); color: white; outline: none;"
+            />
+
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button
+                id="send-text"
+                type="button"
+                style="padding: 12px 16px; border: none; border-radius: 10px; cursor: pointer; background: #00d084; color: #101010; font-weight: 700;"
+              >
+                Enviar texto
+              </button>
+
+              <button
+                id="record-btn"
+                type="button"
+                style="padding: 12px 16px; border: none; border-radius: 10px; cursor: pointer; background: #4da3ff; color: white; font-weight: 700;"
+              >
+                Gravar audio
+              </button>
+
+              <button
+                id="stop-btn"
+                type="button"
+                disabled
+                style="padding: 12px 16px; border: none; border-radius: 10px; cursor: pointer; background: #ff6b6b; color: white; font-weight: 700; opacity: 0.6;"
+              >
+                Parar e enviar
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -36,11 +79,11 @@
         <div class="status-card"><span class="label">Sensor 1</span><strong id="dist1">-- cm</strong></div>
         <div class="status-card"><span class="label">Sensor 2</span><strong id="dist2">-- cm</strong></div>
         <div class="status-card"><span class="label">Sensor 3</span><strong id="dist3">-- cm</strong></div>
-        <div class="status-card"><span class="label">Estado</span><strong id="led">ESPERA</strong></div>
+        <div class="status-card"><span class="label">LED</span><strong id="led">ESPERA</strong></div>
       </div>
     </section>
   </main>
 
-  <script src="/beta-static/app.js?v=50"></script>
+  <script src="/beta-static/app.js?v=51"></script>
 </body>
 </html>
