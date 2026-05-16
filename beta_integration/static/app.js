@@ -13,8 +13,6 @@ document.addEventListener("DOMContentLoaded", () => {
     dist2: $("dist2"),
     dist3: $("dist3"),
     led: $("led"),
-    state: $("totem-state"),
-    activeSensor: $("active-sensor"),
     audio: $("remote-audio"),
     textInput: $("text-input"),
     sendText: $("send-text"),
@@ -22,44 +20,23 @@ document.addEventListener("DOMContentLoaded", () => {
     stopBtn: $("stop-btn"),
   };
 
-  let mediaRecorder = null;
-  let audioChunks = [];
-  let isRecording = false;
-  let cloudBusy = false;
-
-  const CLOUD_ENDPOINT = "/cloud/interact";
   const EDGE_STATUS_ENDPOINT = "/edge/status";
+  const EDGE_TEXT_ENDPOINT = "/edge/interact/text";
+  const EDGE_AUDIO_ENDPOINT = "/edge/interact/audio";
 
   const companyId = "flexmedia";
   const sessionId = "sessao-demo";
 
+  let busy = false;
+  let polling = false;
+
   if (els.wsStatus) {
-    els.wsStatus.textContent = "Modo: polling HTTP (/edge/status) + cloud interact";
+    els.wsStatus.textContent = "Modo: polling HTTP (/edge/status) + edge interact";
   }
 
   function setText(el, value, fallback = "--") {
     if (!el) return;
     el.textContent = value ?? fallback;
-  }
-
-  function setBusyState(busy, label = "Processando...") {
-    cloudBusy = busy;
-
-    if (els.sendText) {
-      els.sendText.disabled = busy;
-      els.sendText.style.opacity = busy ? "0.6" : "1";
-      els.sendText.textContent = busy ? label : "Enviar texto";
-    }
-
-    if (els.recordBtn) {
-      els.recordBtn.disabled = busy || isRecording;
-      els.recordBtn.style.opacity = (busy || isRecording) ? "0.6" : "1";
-    }
-
-    if (els.stopBtn) {
-      els.stopBtn.disabled = busy || !isRecording;
-      els.stopBtn.style.opacity = (busy || !isRecording) ? "0.6" : "1";
-    }
   }
 
   function normalizeState(state) {
@@ -73,10 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const screen = document.querySelector(".screen");
     const state = normalizeState(rawState);
 
-    if (!screen) {
-      console.warn("[integration] .screen nao encontrada para aplicar estado visual");
-      return;
-    }
+    if (!screen) return;
 
     screen.classList.remove("convite", "sessao", "alerta", "espera");
     screen.dataset.state = state;
@@ -103,51 +77,12 @@ document.addEventListener("DOMContentLoaded", () => {
     setText(els.message, data.message, "Aguardando visitante");
     updateSubtitle(data);
 
-    setText(els.state, data.totem_state);
-    setText(els.activeSensor, data.active_sensor);
     setText(els.temp, data.temperature != null ? `${data.temperature} °C` : "--");
     setText(els.hum, data.humidity != null ? `${data.humidity} %` : "--");
     setText(els.dist1, data.distance_sensor_1_cm != null ? `${data.distance_sensor_1_cm} cm` : "--");
     setText(els.dist2, data.distance_sensor_2_cm != null ? `${data.distance_sensor_2_cm} cm` : "--");
     setText(els.dist3, data.distance_sensor_3_cm != null ? `${data.distance_sensor_3_cm} cm` : "--");
     setText(els.led, data.led ? "Ligado" : "Desligado");
-
-    if (els.answer && !els.answer.textContent.trim()) {
-      els.answer.textContent = "Aguardando integracao com resposta da AWS.";
-    }
-
-    if (els.transcript && !els.transcript.textContent.trim()) {
-      els.transcript.textContent = "Transcript ainda nao conectado.";
-    }
-  }
-
-  async function fetchStatus() {
-    try {
-      const response = await fetch(EDGE_STATUS_ENDPOINT, {
-        method: "GET",
-        cache: "no-store",
-        headers: {
-          "Accept": "application/json"
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      updateUI(data);
-
-      if (els.wsStatus) {
-        els.wsStatus.textContent = `Modo: polling HTTP (/edge/status) + cloud interact | estado: ${normalizeState(data.totem_state)}`;
-      }
-    } catch (error) {
-      console.error("[integration] erro ao buscar /edge/status:", error);
-
-      if (els.wsStatus) {
-        els.wsStatus.textContent = "Erro ao ler /edge/status";
-      }
-    }
   }
 
   function updateCloudResponse(data) {
@@ -158,10 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.audio_url) {
         els.audio.src = `${data.audio_url}?t=${Date.now()}`;
         els.audio.load();
-
-        els.audio.play().catch((err) => {
-          console.warn("[integration] autoplay bloqueado:", err);
-        });
+        els.audio.play().catch(() => {});
       } else {
         els.audio.removeAttribute("src");
         els.audio.load();
@@ -169,28 +101,35 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  async function sendToCloud({ message = "", blob = null, filename = "recording.webm" }) {
-    if (cloudBusy) return;
+  function setBusy(nextBusy, answerText = "") {
+    busy = nextBusy;
 
-    setBusyState(true, "Enviando...");
-    setText(els.answer, "Processando resposta da AWS...", "Processando resposta da AWS...");
+    if (els.sendText) {
+      els.sendText.disabled = nextBusy;
+      els.sendText.style.opacity = nextBusy ? "0.6" : "1";
+    }
 
+    if (els.recordBtn) {
+      els.recordBtn.disabled = nextBusy;
+      els.recordBtn.style.opacity = nextBusy ? "0.6" : "1";
+    }
+
+    if (els.stopBtn) {
+      els.stopBtn.disabled = true;
+      els.stopBtn.style.opacity = "0.6";
+    }
+
+    if (answerText && els.answer) {
+      els.answer.textContent = answerText;
+    }
+  }
+
+  async function fetchStatus() {
     try {
-      const formData = new FormData();
-      formData.append("company_id", companyId);
-      formData.append("session_id", sessionId);
-
-      if (message && message.trim()) {
-        formData.append("message", message.trim());
-      }
-
-      if (blob) {
-        formData.append("file", blob, filename);
-      }
-
-      const response = await fetch(CLOUD_ENDPOINT, {
-        method: "POST",
-        body: formData
+      const response = await fetch(EDGE_STATUS_ENDPOINT, {
+        method: "GET",
+        cache: "no-store",
+        headers: { Accept: "application/json" }
       });
 
       if (!response.ok) {
@@ -198,98 +137,81 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const data = await response.json();
-      console.log("[integration] cloud response:", data);
-      updateCloudResponse(data);
+      updateUI(data);
+
+      if (els.wsStatus) {
+        els.wsStatus.textContent = `Modo: polling HTTP (/edge/status) + edge interact | estado: ${normalizeState(data.totem_state)}`;
+      }
     } catch (error) {
-      console.error("[integration] erro ao chamar cloud:", error);
-      setText(els.answer, `Erro na cloud: ${error.message}`, "Erro na cloud");
-    } finally {
-      setBusyState(false);
+      console.error("[integration] erro ao buscar /edge/status:", error);
+      if (els.wsStatus) {
+        els.wsStatus.textContent = "Erro ao ler /edge/status";
+      }
     }
   }
 
-  async function startRecording() {
-    if (cloudBusy || isRecording) return;
+  async function sendTextToEdge(message) {
+    if (busy) return;
+
+    setBusy(true, "Enviando texto para o Raspberry...");
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream);
-      audioChunks = [];
-      isRecording = true;
-
-      mediaRecorder.addEventListener("dataavailable", (event) => {
-        if (event.data && event.data.size > 0) {
-          audioChunks.push(event.data);
-        }
+      const response = await fetch(EDGE_TEXT_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          company_id: companyId,
+          session_id: sessionId,
+          message: message.trim()
+        })
       });
 
-      mediaRecorder.addEventListener("stop", async () => {
-        const tracks = mediaRecorder.stream ? mediaRecorder.stream.getTracks() : [];
-        tracks.forEach((track) => track.stop());
-
-        isRecording = false;
-        setBusyState(false);
-
-        const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || "audio/webm" });
-        audioChunks = [];
-
-        if (audioBlob.size > 0) {
-          await sendToCloud({
-            blob: audioBlob,
-            filename: "totem-recording.webm"
-          });
-        } else {
-          setText(els.answer, "Nenhum audio foi capturado.", "Nenhum audio foi capturado.");
-        }
-      });
-
-      mediaRecorder.start();
-      setBusyState(false);
-      isRecording = true;
-
-      if (els.transcript) {
-        els.transcript.textContent = "Gravando audio...";
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
       }
 
-      if (els.answer) {
-        els.answer.textContent = "Quando terminar, clique em 'Parar e enviar'.";
-      }
-
-      if (els.recordBtn) {
-        els.recordBtn.disabled = true;
-        els.recordBtn.style.opacity = "0.6";
-      }
-
-      if (els.stopBtn) {
-        els.stopBtn.disabled = false;
-        els.stopBtn.style.opacity = "1";
-      }
+      const data = await response.json();
+      updateCloudResponse(data.cloud_result || {});
     } catch (error) {
-      console.error("[integration] erro ao iniciar gravacao:", error);
-      setText(els.answer, `Erro ao acessar microfone: ${error.message}`, "Erro ao acessar microfone");
-      isRecording = false;
-      setBusyState(false);
+      console.error("[integration] erro ao enviar texto:", error);
+      setText(els.answer, `Erro no edge: ${error.message}`, "Erro no edge");
+    } finally {
+      setBusy(false);
     }
   }
 
-  function stopRecording() {
-    if (!mediaRecorder || !isRecording) return;
+  async function sendAudioToEdge() {
+    if (busy) return;
 
-    if (els.transcript) {
-      els.transcript.textContent = "Enviando audio para a cloud...";
-    }
+    setBusy(true, "Gravando audio no Raspberry...");
 
-    if (els.answer) {
-      els.answer.textContent = "Aguardando STT/TTS/IA...";
-    }
+    try {
+      const response = await fetch(EDGE_AUDIO_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          company_id: companyId,
+          session_id: sessionId
+        })
+      });
 
-    if (mediaRecorder.state !== "inactive") {
-      mediaRecorder.stop();
-    }
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
 
-    if (els.stopBtn) {
-      els.stopBtn.disabled = true;
-      els.stopBtn.style.opacity = "0.6";
+      const data = await response.json();
+      updateCloudResponse(data.cloud_result || {});
+    } catch (error) {
+      console.error("[integration] erro ao capturar audio no edge:", error);
+      setText(els.answer, `Erro no edge audio: ${error.message}`, "Erro no edge audio");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -302,7 +224,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      await sendToCloud({ message });
+      await sendTextToEdge(message);
 
       if (els.textInput) {
         els.textInput.value = "";
@@ -314,7 +236,6 @@ document.addEventListener("DOMContentLoaded", () => {
     els.textInput.addEventListener("keydown", async (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
-
         if (els.sendText) {
           els.sendText.click();
         }
@@ -323,16 +244,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (els.recordBtn) {
-    els.recordBtn.addEventListener("click", startRecording);
-  }
-
-  if (els.stopBtn) {
-    els.stopBtn.addEventListener("click", stopRecording);
+    els.recordBtn.addEventListener("click", async () => {
+      await sendAudioToEdge();
+    });
   }
 
   fetchStatus();
-
-  let polling = false;
 
   async function loop() {
     if (polling) return;
