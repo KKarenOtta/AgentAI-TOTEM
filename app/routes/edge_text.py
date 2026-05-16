@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.services.cloud_api_client import cloud_interact
 from app.services.edge_push import publish
+from app.services.interaction_service import process_interaction
 
 router = APIRouter()
 
@@ -15,11 +15,11 @@ class EdgeInteractRequest(BaseModel):
 
 @router.post("/edge/interact/text")
 async def edge_interact_text(payload: EdgeInteractRequest):
-    result = cloud_interact(
+    result = process_interaction(
         company_id=payload.company_id,
         session_id=payload.session_id,
         message=payload.message,
-        audio_path=None,
+        audio_bytes=None,
     )
 
     await publish(payload.session_id, result)
