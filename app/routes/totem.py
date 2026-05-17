@@ -11,6 +11,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.services.aws_db_service import AWSDBService
+from app.services.admin_metrics_service import AdminMetricsService
 from core.totem.orchestrator import DEFAULT_GREETING, TotemOrchestrator
 from core.totem.qr import generate_qr_from_text
 from core.totem.recovery_store import save_session_handoff
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 orchestrator = TotemOrchestrator()
 db = AWSDBService()
+admin_metrics = AdminMetricsService()
 
 HANDOFF_DIR = Path("data/device_handoffs")
 
@@ -194,8 +196,9 @@ async def totem_interact(payload: InteractRequest):
     await db.save_interaction(
         session_id=payload.session_id,
         company_id=payload.company_id,
-        message_user=payload.message,
-        message_bot=resposta,
+        message_user=(payload.message or "").strip(),
+        message_bot=(resposta or "").strip(),
+        input_mode="text",
         response_source=metric.get("response_source"),
         response_time_ms=int(metric.get("latency", 0) * 1000),
         language_detected=idioma,
@@ -267,3 +270,8 @@ async def totem_end(payload: EndRequest):
         "recommendations": handoff.get("recommendations"),
         "message": "Atendimento finalizado. Escaneie o QR Code para continuar no celular, fazer o cadastro e acessar as ofertas.",
     }
+
+@router.get("/admin/api/overview")
+async def admin_api_overview(company_id: Optional[str] = None, limit: int = 10):
+    data = await admin_metrics.get_overview(company_id=company_id, limit=limit)
+    return data

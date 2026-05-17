@@ -6,6 +6,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from app.services.admin_metrics_service import AdminMetricsService
 from core.auth.service import delete_user, public_users, upsert_company_user
 from core.company.store import add_company, delete_company, load_companies
 
@@ -13,6 +14,7 @@ router = APIRouter(tags=["web"])
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+admin_metrics = AdminMetricsService()
 
 
 def _current_user(request: Request) -> dict:
@@ -92,6 +94,17 @@ def admin(request: Request):
             "users": users,
         },
     )
+
+
+@router.get("/admin/api/overview")
+async def admin_api_overview(request: Request, company_id: str | None = None, limit: int = 10):
+    user = _current_user(request)
+
+    if not _is_admin(user):
+        return RedirectResponse(url="/", status_code=303)
+
+    data = await admin_metrics.get_overview(company_id=company_id, limit=limit)
+    return data
 
 
 @router.post("/admin/create")

@@ -32,10 +32,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const GREETING_TEXT = "Ola, sou o totem inteligente FlexMedia. Como posso lhe ajudar?";
   const GREETING_AUDIO_URL = "/static/audio/saudacao.mp3";
-  const INACTIVITY_MS = 9000;
+  const INACTIVITY_MS = 8000;
   const SESSION_END_DISTANCE_CM = 100;
-  const EXTREME_TEMP_MIN = 5;
-  const EXTREME_TEMP_MAX = 40;
+  const EXTREME_TEMP_MIN = 10;
+  const EXTREME_TEMP_MAX = 35;
 
   let busy = false;
   let polling = false;
@@ -115,12 +115,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function shouldPauseAutoEnd() {
+    return busy || isAudioPlaying;
+  }
+
   function resetInactivityTimer() {
     if (!sessionActive) return;
 
     clearInactivityTimer();
 
-    if (isAudioPlaying) {
+    if (shouldPauseAutoEnd()) {
       return;
     }
 
@@ -141,7 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
       !!els.audio.src &&
       els.audio.currentTime >= 0;
 
-    if (isAudioPlaying) {
+    if (shouldPauseAutoEnd()) {
       clearInactivityTimer();
     } else if (sessionActive) {
       resetInactivityTimer();
@@ -206,7 +210,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await els.audio.play();
       updateAudioPlayingState();
     } catch (error) {
-      console.warn("[integration] falha ao tocar saudacao.wav:", error);
+      console.warn("[integration] falha ao tocar saudacao.mp3:", error);
       updateAudioPlayingState();
     }
   }
@@ -323,7 +327,9 @@ document.addEventListener("DOMContentLoaded", () => {
         show(els.transcript, false);
       }
 
-      if (lastAnswer && lastAnswer.trim()) {
+      if (busy) {
+        setText(els.message, "...");
+      } else if (lastAnswer && lastAnswer.trim()) {
         setText(els.message, lastAnswer);
       } else {
         setText(els.message, GREETING_TEXT);
@@ -360,7 +366,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setText(els.dist3, data.distance_sensor_3_cm != null ? `${data.distance_sensor_3_cm} cm` : "--");
     setText(els.led, data.led ? "Ligado" : "Desligado");
 
-    if (sessionActive && !isAudioPlaying) {
+    if (sessionActive && !shouldPauseAutoEnd()) {
       const distance = getPrimaryDistance(data);
       if (distance != null && distance > SESSION_END_DISTANCE_CM) {
         endSession("distance");
@@ -424,6 +430,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (messageText && sessionActive) {
       setText(els.message, messageText);
     }
+
+    if (busy) {
+      clearInactivityTimer();
+    } else if (sessionActive) {
+      resetInactivityTimer();
+    }
   }
 
   async function fetchStatus() {
@@ -451,8 +463,6 @@ document.addEventListener("DOMContentLoaded", () => {
     setBusy(true, "...");
 
     try {
-      resetInactivityTimer();
-
       const response = await fetch(EDGE_TEXT_ENDPOINT, {
         method: "POST",
         headers: {
@@ -486,8 +496,6 @@ document.addEventListener("DOMContentLoaded", () => {
     setBusy(true, "...");
 
     try {
-      resetInactivityTimer();
-
       const response = await fetch(EDGE_AUDIO_ENDPOINT, {
         method: "POST",
         headers: {
@@ -522,7 +530,7 @@ document.addEventListener("DOMContentLoaded", () => {
       event.target.closest("#end-session-btn");
 
     if (clickedInsideControl) {
-      if (sessionActive && !isAudioPlaying) {
+      if (sessionActive && !shouldPauseAutoEnd()) {
         resetInactivityTimer();
       }
       return;
@@ -533,7 +541,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    if (sessionActive && !isAudioPlaying) {
+    if (sessionActive && !shouldPauseAutoEnd()) {
       resetInactivityTimer();
     }
   }
@@ -566,7 +574,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     els.textInput.addEventListener("input", () => {
-      if (sessionActive && !isAudioPlaying) {
+      if (sessionActive && !shouldPauseAutoEnd()) {
         resetInactivityTimer();
       }
     });
@@ -609,13 +617,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ["click", "keydown", "pointerdown"].forEach((eventName) => {
     document.addEventListener(eventName, () => {
-      if (sessionActive && !isAudioPlaying) {
+      if (sessionActive && !shouldPauseAutoEnd()) {
         resetInactivityTimer();
       }
     }, true);
   });
 
   ensureEndSessionButton();
+  hideAudioElement();
   fetchStatus();
 
   async function loop() {
