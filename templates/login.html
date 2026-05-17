@@ -1,27 +1,71 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-  <title>Login</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login administrativo</title>
+  <link rel="stylesheet" href="/static/css/app.css">
 </head>
-<body>
+<body class="login-body">
+  <main class="login-page">
+    <section class="login-screen">
+      <div class="login-pulse-wrap" aria-hidden="true">
+        <span class="login-pulse-ring ring-1"></span>
+        <span class="login-pulse-ring ring-2"></span>
+        <span class="login-pulse-core"></span>
+      </div>
 
-<h2>Login</h2>
+      <div class="login-card">
+        <p class="login-eyebrow">FLEXMEDIA TOTEM</p>
+        <h1 class="login-title">Area administrativa</h1>
+        <p class="login-subtitle">
+          Entre com suas credenciais para acessar o painel tecnico do totem.
+        </p>
 
-{% if error %}
-<p style="color:red">{{ error }}</p>
-{% endif %}
+        {% if error %}
+        <div class="login-alert">
+          <p>{{ error }}</p>
+        </div>
+        {% endif %}
 
-<form method="post">
-  <input name="username" placeholder="Usuário" required>
-  <input name="password" type="password" placeholder="Senha" required>
+        <form method="POST" action="/login" class="login-form">
+          <div class="login-field">
+            <label for="username">Usuario</label>
+            <input
+              type="text"
+              id="username"
+              name="username"
+              required
+              maxlength="50"
+              autocomplete="username"
+            >
+          </div>
 
-  <label>
-    <input type="checkbox" name="lgpd" required>
-    Aceito termos LGPD
-  </label>
+          <div class="login-field">
+            <label for="password">Senha</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              required
+              maxlength="100"
+              autocomplete="current-password"
+            >
+          </div>
 
-  <button type="submit">Entrar</button>
-</form>
+          <label class="login-check">
+            <input type="checkbox" name="lgpd" required>
+            <span>
+              Aceito os termos LGPD e o uso dos dados para autenticacao e auditoria de acesso.
+            </span>
+          </label>
 
+          <button type="submit" class="login-button">Entrar</button>
+        </form>
+
+        <a href="/" class="login-back">Voltar ao totem</a>
+      </div>
+    </section>
+  </main>
 </body>
 </html>
