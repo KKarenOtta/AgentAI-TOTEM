@@ -10,7 +10,6 @@ from openai import OpenAI
 from core.totem.stt import stt_from_base64
 from core.totem.tts import gerar_audio
 
-
 BASE_DIR = Path(__file__).resolve().parents[2]
 PUBLIC_AUDIO_DIR = BASE_DIR / "static" / "audio"
 PUBLIC_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
@@ -75,15 +74,20 @@ def process_interaction(
     message: str = "",
     audio_bytes: bytes | None = None,
 ):
+    input_mode = "text"
     transcript = (message or "").strip()
+    question_text = transcript
     stt_latency = 0
     stt_source = "text"
 
     if audio_bytes:
+        input_mode = "audio"
         audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
         transcript, stt_latency, stt_source = stt_from_base64(audio_b64)
+        transcript = (transcript or "").strip()
+        question_text = transcript
 
-    answer_text, llm_source = _generate_answer_text(transcript)
+    answer_text, llm_source = _generate_answer_text(question_text)
 
     raw_audio_path, tts_source, tts_status, tts_error, tts_latency = gerar_audio(answer_text)
     public_audio_path, public_audio_url = _build_public_audio_result(raw_audio_path)
@@ -91,6 +95,8 @@ def process_interaction(
     return {
         "company_id": company_id,
         "session_id": session_id,
+        "input_mode": input_mode,
+        "question_text": question_text,
         "transcript": transcript,
         "answer_text": answer_text,
         "audio_path": public_audio_path,

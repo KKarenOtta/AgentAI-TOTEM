@@ -1,7 +1,7 @@
 [
   {
     "username": "admin",
-    "password": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    "password": "pbkdf2_sha256$260000$0E/qdXHK4wpDvQ473qe2eg==$hYy+y66vB6riSEhCHrXbax/zOL6r+Cv71nnFilNGwn0=",
     "role": "admin",
     "company_id": "*"
   },

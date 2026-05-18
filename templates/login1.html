@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login</title>
+</head>
+<body>
+
+<h2>Login</h2>
+
+{% if error %}
+<p style="color:red">{{ error }}</p>
+{% endif %}
+
+<form method="post">
+  <input name="username" placeholder="Usuário" required>
+  <input name="password" type="password" placeholder="Senha" required>
+
+  <label>
+    <input type="checkbox" name="lgpd" required>
+    Aceito termos LGPD
+  </label>
+
+  <button type="submit">Entrar</button>
+</form>
+
+</body>
+</html>
