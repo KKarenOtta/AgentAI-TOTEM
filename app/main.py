@@ -42,7 +42,7 @@ if IS_EDGE:
     from app.routes.edge_ws import router as edge_ws_router
     from app.routes.edge_audio import router as edge_audio_router
     from app.routes.edge_text import router as edge_text_router
-    
+    from app.routes.totem import router as totem_router
 
     app.include_router(rag_test_router)
     app.include_router(edge_status_router)
@@ -59,7 +59,7 @@ if IS_EDGE:
     app.include_router(edge_ws_router)
     app.include_router(edge_audio_router)
     app.include_router(edge_text_router)
-    
+    app.include_router(totem_router)
 
 if IS_CLOUD:
     from app.routes.cloud_interact import router as cloud_interact_router

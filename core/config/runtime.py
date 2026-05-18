@@ -5,7 +5,7 @@ APP_ROLE = os.getenv("APP_ROLE", "edge").strip().lower()
 IS_EDGE = APP_ROLE == "edge"
 IS_CLOUD = APP_ROLE == "cloud"
 
-CLOUD_BASE_URL = os.getenv("CLOUD_BASE_URL", "").rstrip("/")
+CLOUD_BASE_URL = os.getenv("TOTEM_CLOUD_BASE_URL", "").rstrip("/")
 EDGE_PUSH_MODE = os.getenv("EDGE_PUSH_MODE", "websocket").strip().lower()
 
 STT_MODE = os.getenv("STT_MODE", "remote").strip().lower()
