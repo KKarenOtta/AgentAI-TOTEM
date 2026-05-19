@@ -434,6 +434,38 @@
         reconnectTimer = setTimeout(connectSSE, 2000);
       };
     }
+
+    function handleSSEMessage(event) {
+      const data = JSON.parse(event.data);
+    
+      debug("EVENTO RECEBIDO: " + JSON.stringify(data));
+    
+      if (data.type === "greeting") {
+        setStatus(
+          "Atendimento iniciado",
+          "",
+          data.greeting
+        );
+    
+        setActive(true);
+    
+        enableInteraction();
+    
+        if (data.audio_base64) {
+          playAudio(data.audio_base64, data.session_id);
+        }
+      }
+    
+      if (data.type === "reset") {
+        resetSessionState();
+      }
+    }
+    
+   window.addEventListener("load", async () => {
+      await unlockAudio();
+      connectSSE();
+    }); 
+    
   </script>
 </body>
 </html>
