@@ -442,7 +442,7 @@
     
       const payload = data.payload || {};
     
-      // 🎯 EVENTO PRINCIPAL DO SEU BACKEND
+      // 🎯 EVENTO: ATIVAÇÃO
       if (data.type === "totem_activated") {
     
         setStatus(
@@ -463,14 +463,31 @@
         return;
       }
     
-      // reset futuro
+      // 🎯 EVENTO: RESPOSTA DA IA
+      if (data.type === "interaction_completed") {
+    
+        setStatus(
+          "Resposta recebida",
+          "",
+          payload.response || ""
+        );
+    
+        el("answer").textContent = payload.response || "";
+    
+        if (payload.audio_base64) {
+          playAudio(payload.audio_base64, payload.session_id);
+        }
+    
+        return;
+      }
+    
+      // 🎯 EVENTO: RESET
       if (data.type === "reset") {
         resetSessionState();
         return;
       }
     
       debug("EVENTO NÃO MAPEADO: " + JSON.stringify(data));
-      
     }
     
    window.addEventListener("load", () => {
