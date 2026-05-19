@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>-- IA.GORA TOTEM INTERATIVO --</title>
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/beta-static/style.css?v=52">
 </head>
 <body>
@@ -24,6 +25,32 @@
 
         <div id="ia-panel" class="ia-panel" hidden>
           <p id="answer" class="subtitle" hidden></p>
+          
+          <section class="recommendations hidden" id="recommendationsBlock">
+            <div class="recommendations-head">
+            <h2>Veja estas dicas</h2>
+            <p id="recommendationsHint">Ofertas e dicas sugeridas durante o atendimento</p>
+            </div>
+            <div class="recommendations-list" id="recommendationsList"></div>
+          </section>
+          
+          <div id="finalBlock" class="final-block" hidden>
+            <div class="final-head">
+              <h2>Continue no celular</h2>
+              <p>Escaneie o QR Code para receber dicas e continuar o atendimento.</p>
+            </div>
+
+            <img id="qr" class="qr" alt="QR Code para continuar no celular" hidden>
+            <div id="handoff" class="handoff-link" hidden></div>
+
+            <section id="finalRecommendations" class="recommendations" hidden>
+              <div class="recommendations-head">
+                <h2>Recomendamos para seu perfil</h2>
+                <p>Leve estas dicas para o seu celular.</p>
+              </div>
+              <div class="recommendations-list" id="finalRecommendationsList"></div>
+            </section>
+          </div>
 
           <audio
             id="remote-audio"
@@ -33,7 +60,7 @@
             hidden
           ></audio>
 
-          <div id="input-panel" style="margin-top: 16px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 10px;">
+          <div id="input-panel" style="margin-top: 16px;">
             <input
               id="text-input"
               type="text"
@@ -41,7 +68,7 @@
               style="padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08); color: white; outline: none;"
             />
 
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <div class="input-actions">
               <button
                 id="send-text"
                 type="button"

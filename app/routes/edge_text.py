@@ -1,12 +1,13 @@
-from fastapi import APIRouter
+from __future__ import annotations
+
+import httpx
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.services.aws_db_service import AWSDBService
+from core.config.runtime import CLOUD_BASE_URL
 from app.services.edge_push import publish
-from app.services.interaction_service import process_interaction
 
 router = APIRouter()
-db = AWSDBService()
 
 
 class EdgeInteractRequest(BaseModel):
@@ -17,38 +18,40 @@ class EdgeInteractRequest(BaseModel):
 
 @router.post("/edge/interact/text")
 async def edge_interact_text(payload: EdgeInteractRequest):
-    result = process_interaction(
-        company_id=payload.company_id,
-        session_id=payload.session_id,
-        message=payload.message,
-        audio_bytes=None,
-    )
+    if not CLOUD_BASE_URL:
+        raise HTTPException(status_code=500, detail="CLOUD_BASE_URL nao configurado.")
 
-    await db.save_interaction(
-        session_id=payload.session_id,
-        company_id=payload.company_id,
-        message_user=result.get("question_text", ""),
-        message_bot=result.get("answer_text", ""),
-        input_mode=result.get("input_mode", "text"),
-        response_source=result.get("llm_source"),
-        response_time_ms=0,
-        language_detected=result.get("language"),
-        llm_meta={
-            "stt_source": result.get("stt_source"),
-            "stt_latency": result.get("stt_latency"),
-            "llm_source": result.get("llm_source"),
-            "tts_source": result.get("tts_source"),
-            "tts_status": result.get("tts_status"),
-            "tts_error": result.get("tts_error"),
-            "tts_latency": result.get("tts_latency"),
-            "audio_url": result.get("audio_url"),
-        },
-    )
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{CLOUD_BASE_URL}/cloud/interact",
+                data={
+                    "company_id": payload.company_id,
+                    "session_id": payload.session_id,
+                    "message": payload.message or "",
+                },
+            )
 
-    await publish(payload.session_id, result)
+        response.raise_for_status()
+        result = response.json()
 
-    return {
-        "status": "ok",
-        "session_id": payload.session_id,
-        "cloud_result": result,
-    }
+        await publish(payload.session_id, result)
+
+        return {
+            "status": "ok",
+            "session_id": payload.session_id,
+            "cloud_result": result,
+        }
+
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=exc.response.status_code,
+            detail=f"Cloud retornou erro: {exc.response.text}",
+        )
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Falha ao conectar na cloud: {str(exc)}",
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))

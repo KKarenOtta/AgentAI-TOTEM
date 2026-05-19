@@ -1,0 +1,141 @@
+[1mdiff --git a/app/routes/cloud_interact.py b/app/routes/cloud_interact.py[m
+[1mindex e21932d..7ebcc5b 100644[m
+[1m--- a/app/routes/cloud_interact.py[m
+[1m+++ b/app/routes/cloud_interact.py[m
+[36m@@ -1,12 +1,53 @@[m
+[32m+[m[32mfrom __future__ import annotations[m
+[32m+[m
+ import base64[m
+[32m+[m[32mimport logging[m
+ from pathlib import Path[m
+ [m
+ from fastapi import APIRouter, File, Form, Request, UploadFile[m
+ [m
+[32m+[m[32mfrom app.services.aws_db_service import AWSDBService[m
+[32m+[m[32mfrom core.totem.orchestrator import TotemOrchestrator[m
+[32m+[m[32mfrom core.totem.session_store import set_last_recommendations[m
+ from core.totem.stt import stt_from_base64[m
+[31m-from core.totem.tts import gerar_audio[m
+[32m+[m
+[32m+[m[32mlogger = logging.getLogger(__name__)[m
+ [m
+ router = APIRouter()[m
+[32m+[m[32mdb = AWSDBService()[m
+[32m+[m[32morchestrator = TotemOrchestrator()[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef _audio_to_base64(path: str | None) -> str | None:[m
+[32m+[m[32m    if not path:[m
+[32m+[m[32m        return None[m
+[32m+[m
+[32m+[m[32m    audio_path = Path(path)[m
+[32m+[m[32m    if not audio_path.exists():[m
+[32m+[m[32m        return None[m
+[32m+[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        return base64.b64encode(audio_path.read_bytes()).decode("utf-8")[m
+[32m+[m[32m    except Exception as exc:[m
+[32m+[m[32m        logger.warning("Falha ao converter audio para base64: %s", exc)[m
+[32m+[m[32m        return None[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef _audio_url_from_path(audio_path: str | None) -> str | None:[m
+[32m+[m[32m    if not audio_path:[m
+[32m+[m[32m        return None[m
+[32m+[m
+[32m+[m[32m    audio_str = str(audio_path).replace("\\", "/")[m
+[32m+[m[32m    marker = "/static/"[m
+[32m+[m
+[32m+[m[32m    if marker in audio_str:[m
+[32m+[m[32m        return audio_str[audio_str.index(marker):][m
+[32m+[m
+[32m+[m[32m    path_obj = Path(audio_str)[m
+[32m+[m[32m    if path_obj.exists():[m
+[32m+[m[32m        return f"/static/{path_obj.name}"[m
+[32m+[m
+[32m+[m[32m    return None[m
+ [m
+ [m
+ @router.post("/cloud/interact")[m
+[36m@@ -26,36 +67,48 @@[m [masync def cloud_interact([m
+         audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")[m
+         transcript, stt_latency, stt_source = stt_from_base64(audio_b64)[m
+ [m
+[31m-    if not transcript:[m
+[31m-        transcript = ""[m
+[32m+[m[32m    transcript = (transcript or "").strip()[m
+ [m
+[31m-    answer_text = f"Recebido na cloud. company_id={company_id}, session_id={session_id}, texto={transcript}"[m
+[32m+[m[32m    resposta, recommendations, audio_path, metric, idioma = orchestrator.interact([m
+[32m+[m[32m        company_id=company_id,[m
+[32m+[m[32m        session_id=session_id,[m
+[32m+[m[32m        pergunta=transcript,[m
+[32m+[m[32m        profile={},[m
+[32m+[m[32m        prefer_audio=True,[m
+[32m+[m[32m    )[m
+ [m
+[31m-    audio_path, tts_source, tts_status, tts_error, tts_latency = gerar_audio(answer_text)[m
+[32m+[m[32m    set_last_recommendations(session_id, recommendations)[m
+ [m
+[31m-    audio_url = None[m
+[32m+[m[32m    llm_meta = {[m
+[32m+[m[32m        **(metric or {}),[m
+[32m+[m[32m        "stt_source": stt_source,[m
+[32m+[m[32m        "stt_latency": stt_latency,[m
+[32m+[m[32m    }[m
+ [m
+[31m-    if audio_path:[m
+[31m-        audio_str = str(audio_path).replace("\\", "/")[m
+[31m-        marker = "/static/"[m
+[32m+[m[32m    await db.save_interaction([m
+[32m+[m[32m        session_id=session_id,[m
+[32m+[m[32m        company_id=company_id,[m
+[32m+[m[32m        message_user=transcript,[m
+[32m+[m[32m        message_bot=resposta,[m
+[32m+[m[32m        response_source=(metric or {}).get("response_source"),[m
+[32m+[m[32m        response_time_ms=int(((metric or {}).get("latency") or 0) * 1000),[m
+[32m+[m[32m        language_detected=idioma,[m
+[32m+[m[32m        llm_meta=llm_meta,[m
+[32m+[m[32m    )[m
+ [m
+[31m-        if marker in audio_str:[m
+[31m-            audio_url = audio_str[audio_str.index(marker):][m
+[31m-        else:[m
+[31m-            path_obj = Path(audio_str)[m
+[31m-            if path_obj.exists():[m
+[31m-                audio_url = f"/static/{path_obj.name}"[m
+[32m+[m[32m    audio_url = _audio_url_from_path(audio_path)[m
+ [m
+     return {[m
+[32m+[m[32m        "status": "ok",[m
+[32m+[m[32m        "session_id": session_id,[m
+         "transcript": transcript,[m
+[31m-        "answer_text": answer_text,[m
+[32m+[m[32m        "answer_text": resposta,[m
+         "audio_path": audio_path,[m
+[32m+[m[32m        "audio_base64": _audio_to_base64(audio_path),[m
+         "audio_url": audio_url,[m
+[31m-        "language": "pt",[m
+[32m+[m[32m        "language": idioma,[m
+[32m+[m[32m        "recommendations": recommendations,[m
+         "stt_source": stt_source,[m
+         "stt_latency": stt_latency,[m
+[31m-        "tts_source": tts_source,[m
+[31m-        "tts_status": tts_status,[m
+[31m-        "tts_error": tts_error,[m
+[31m-        "tts_latency": tts_latency,[m
+[32m+[m[32m        "metric": metric,[m
+     }[m
+[1mdiff --git a/core/config/runtime.py b/core/config/runtime.py[m
+[1mindex f20b661..fbd8890 100644[m
+[1m--- a/core/config/runtime.py[m
+[1m+++ b/core/config/runtime.py[m
+[36m@@ -5,7 +5,7 @@[m [mAPP_ROLE = os.getenv("APP_ROLE", "edge").strip().lower()[m
+ IS_EDGE = APP_ROLE == "edge"[m
+ IS_CLOUD = APP_ROLE == "cloud"[m
+ [m
+[31m-CLOUD_BASE_URL = os.getenv("CLOUD_BASE_URL", "").rstrip("/")[m
+[32m+[m[32mCLOUD_BASE_URL = os.getenv("TOTEM_CLOUD_BASE_URL", "").rstrip("/")[m
+ EDGE_PUSH_MODE = os.getenv("EDGE_PUSH_MODE", "websocket").strip().lower()[m
+ [m
+ STT_MODE = os.getenv("STT_MODE", "remote").strip().lower()[m

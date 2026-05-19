@@ -13,7 +13,6 @@ from infra.realtime.event_bus import publish, subscribe
 from marketing.campaigns import get_active_campaigns
 from recommender.rules import recommend_actions
 
-from ml.intent.predictor import predict as predict_intent
 from ml.semantic.cache import get as cache_get, set as cache_set
 from ml.semantic.faq_engine import FAQEngine
 
@@ -39,6 +38,8 @@ def normalize(text: str) -> str:
 
 def detect_intent_safe(text: str) -> tuple[str | None, float]:
     try:
+        from ml.intent.predictor import predict as predict_intent
+
         intent, confidence = predict_intent(text)
     except Exception:
         return None, 0.0

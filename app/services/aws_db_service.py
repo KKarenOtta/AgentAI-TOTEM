@@ -88,7 +88,7 @@ async def close_db_pool() -> None:
 
     if _pool:
         await _pool.close()
-        _pool = None
+    _pool = None
 
 
 class AWSDBService:
@@ -144,21 +144,13 @@ class AWSDBService:
         company_id: str,
         message_user: str,
         message_bot: str,
-        input_mode: str = "text",
         response_source: str | None = None,
         response_time_ms: int | None = None,
         language_detected: str | None = None,
         llm_meta: dict[str, Any] | None = None,
-    ) ->None:
+    ) -> None:
         if not _pool:
             return
-
-        normalized_input_mode = (input_mode or "text").strip().lower()
-        if normalized_input_mode not in {"text", "audio"}:
-            normalized_input_mode = "text"
-
-        normalized_message_user = (message_user or "").strip()
-        normalized_message_bot = (message_bot or "").strip()
 
         async with _pool.acquire() as conn:
             turn_index = await conn.fetchval(
@@ -185,7 +177,7 @@ class AWSDBService:
                     llm_provider_used,
                     latency_llm_s,
                     latency_tts_s,
-                        latency_total_s,
+                    latency_total_s,
                     llm_meta,
                     created_at
                 )
@@ -194,9 +186,9 @@ class AWSDBService:
                 session_id,
                 company_id,
                 turn_index,
-                normalized_input_mode,
-                normalized_message_user,
-                normalized_message_bot,
+                "text",
+                message_user,
+                message_bot,
                 language_detected,
                 response_source,
                 latency_total_s,
@@ -204,6 +196,15 @@ class AWSDBService:
                 latency_total_s,
                 _json(llm_meta),
                 _now(),
+            )
+
+            await conn.execute(
+                """
+                UPDATE sessions
+                SET total_turns = COALESCE(total_turns, 0) + 1
+                WHERE session_id = $1
+                """,
+                session_id,
             )
 
     async def save_event(

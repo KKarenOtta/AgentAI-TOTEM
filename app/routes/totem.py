@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-import base64
 import json
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Optional
 
+import httpx
 from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.services.aws_db_service import AWSDBService
 from app.services.admin_metrics_service import AdminMetricsService
-from core.totem.orchestrator import DEFAULT_GREETING, TotemOrchestrator
 from core.totem.qr import generate_qr_from_text
 from core.totem.recovery_store import save_session_handoff
 from core.totem.session_store import (
@@ -25,11 +25,11 @@ from core.totem.session_store import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-orchestrator = TotemOrchestrator()
 db = AWSDBService()
 admin_metrics = AdminMetricsService()
 
 HANDOFF_DIR = Path("data/device_handoffs")
+DEFAULT_GREETING = "Olá! Como posso ajudar você hoje?"
 
 
 class ActivateRequest(BaseModel):
@@ -59,23 +59,12 @@ class EndRequest(BaseModel):
     reason: str = "completed"
 
 
-def _audio_to_base64(path: str | None) -> str | None:
-    if not path:
-        return None
-
-    audio_path = Path(path)
-    if not audio_path.exists():
-        return None
-
-    try:
-        return base64.b64encode(audio_path.read_bytes()).decode("utf-8")
-    except Exception as exc:
-        logger.warning("Falha ao converter áudio para base64: %s", exc)
-        return None
-
-
 def _public_base_url() -> str:
     return os.getenv("TOTEM_PUBLIC_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+
+
+def _cloud_base_url() -> str:
+    return os.getenv("TOTEM_CLOUD_BASE_URL", "").rstrip("/")
 
 
 def _handoff_url(company_id: str, session_id: str) -> str:
@@ -152,19 +141,10 @@ async def totem_activate(payload: ActivateRequest):
             "audio_base64": None,
         }
 
-    orchestrator.on_presence_event(
-        company_id=payload.company_id,
-        payload={
-            "company_id": payload.company_id,
-            "device_id": "manual",
-            "session_id": payload.session_id,
-            "present": True,
-            "validated": True,
-            "force": True,
-            "sensor_payload": {"source": "manual_activate"},
-            "attributes": {"human_validated": True, "validation_engine": "manual"},
-        },
-    )
+    session["activated_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    session["company_id"] = payload.company_id
+    session["device_id"] = "manual"
+    session["validated"] = True
 
     await db.save_session_start(
         session_id=payload.session_id,
@@ -183,27 +163,50 @@ async def totem_activate(payload: ActivateRequest):
 
 @router.post("/totem/interact")
 async def totem_interact(payload: InteractRequest):
-    resposta, recommendations, audio_path, metric, idioma = orchestrator.interact(
-        company_id=payload.company_id,
-        session_id=payload.session_id,
-        pergunta=payload.message,
-        profile=payload.profile or {},
-        prefer_audio=payload.prefer_audio,
-    )
+    cloud_base_url = _cloud_base_url()
+    if not cloud_base_url:
+        raise RuntimeError("TOTEM_CLOUD_BASE_URL não configurado no edge.")
+
+    form_data = {
+        "company_id": payload.company_id,
+        "session_id": payload.session_id,
+        "message": (payload.message or "").strip(),
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            response = await client.post(
+                f"{cloud_base_url}/cloud/interact",
+                data=form_data,
+            )
+            response.raise_for_status()
+            cloud_payload = response.json()
+    except httpx.HTTPError as exc:
+        logger.exception("Falha ao chamar /cloud/interact: %s", exc)
+        raise RuntimeError("Falha ao consultar o serviço cloud do totem.") from exc
+
+    resposta = (cloud_payload.get("answer_text") or "").strip()
+    recommendations = cloud_payload.get("recommendations") or {}
+    audio_base64 = cloud_payload.get("audio_base64")
+    audio_path = cloud_payload.get("audio_path")
+    metric = cloud_payload.get("metric") or {}
+    idioma = cloud_payload.get("language") or "pt"
 
     set_last_recommendations(payload.session_id, recommendations)
 
-    await db.save_interaction(
-        session_id=payload.session_id,
-        company_id=payload.company_id,
-        message_user=(payload.message or "").strip(),
-        message_bot=(resposta or "").strip(),
-        input_mode="text",
-        response_source=metric.get("response_source"),
-        response_time_ms=int(metric.get("latency", 0) * 1000),
-        language_detected=idioma,
-        llm_meta=metric,
-    )
+    try:
+        await db.save_interaction(
+            session_id=payload.session_id,
+            company_id=payload.company_id,
+            message_user=(payload.message or "").strip(),
+            message_bot=resposta,
+            response_source=metric.get("response_source"),
+            response_time_ms=int(metric.get("latency", 0) * 1000),
+            language_detected=idioma,
+            llm_meta=metric,
+        )
+    except Exception as exc:
+        logger.exception("Falha ao salvar interacao no RDS: %s", exc)    
 
     return {
         "text": resposta,
@@ -211,7 +214,7 @@ async def totem_interact(payload: InteractRequest):
         "marketing_locked": True,
         "marketing_message": "Ofertas disponíveis após cadastro e aceite LGPD no device.",
         "audio_path": audio_path,
-        "audio_base64": _audio_to_base64(audio_path),
+        "audio_base64": audio_base64,
         "metric": metric,
         "language": idioma,
     }
@@ -233,12 +236,6 @@ async def totem_nps(payload: NPSRequest):
 
 @router.post("/totem/end")
 async def totem_end(payload: EndRequest):
-    orchestrator.end_presence_session(
-        company_id=payload.company_id,
-        session_id=payload.session_id,
-        reason=payload.reason,
-    )
-
     await db.save_session_end(
         session_id=payload.session_id,
         reason=payload.reason,
@@ -270,6 +267,7 @@ async def totem_end(payload: EndRequest):
         "recommendations": handoff.get("recommendations"),
         "message": "Atendimento finalizado. Escaneie o QR Code para continuar no celular, fazer o cadastro e acessar as ofertas.",
     }
+
 
 @router.get("/admin/api/overview")
 async def admin_api_overview(company_id: Optional[str] = None, limit: int = 10):

@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-import os
-
+import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.services.aws_db_service import AWSDBService
+from core.config.runtime import CLOUD_BASE_URL
 from app.services.edge_audio_capture import record_question
 from app.services.edge_push import publish
-from app.services.interaction_service import process_interaction
 
 router = APIRouter()
-db = AWSDBService()
 
 
 class EdgeAudioInteractRequest(BaseModel):
@@ -21,56 +18,68 @@ class EdgeAudioInteractRequest(BaseModel):
 
 @router.post("/edge/interact/audio")
 async def edge_interact_audio(payload: EdgeAudioInteractRequest):
-    audio_path = None
+    if not CLOUD_BASE_URL:
+        raise HTTPException(status_code=500, detail="CLOUD_BASE_URL nao configurado.")
 
     try:
         audio_path = record_question(payload.session_id)
 
         with open(audio_path, "rb") as f:
             audio_bytes = f.read()
+            
+        print("=== EDGE: audio capturado ===", {
+            "session_id": payload.session_id,
+            "audio_path": audio_path,
+            "audio_size": len(audio_bytes),
+        }, flush=True)
 
-        result = process_interaction(
-            company_id=payload.company_id,
-            session_id=payload.session_id,
-            message="",
-            audio_bytes=audio_bytes,
-        )
+        files = {
+            "audio_file": (f"{payload.session_id}.wav", audio_bytes, "audio/wav"),
+        }
 
-        await db.save_interaction(
-            session_id=payload.session_id,
-            company_id=payload.company_id,
-            message_user=result.get("question_text", ""),
-            message_bot=result.get("answer_text", ""),
-            input_mode=result.get("input_mode", "audio"),
-            response_source=result.get("llm_source"),
-            response_time_ms=0,
-            language_detected=result.get("language"),
-            llm_meta={
-                "stt_source": result.get("stt_source"),
-                "stt_latency": result.get("stt_latency"),
-                "llm_source": result.get("llm_source"),
-                "tts_source": result.get("tts_source"),
-                "tts_status": result.get("tts_status"),
-                "tts_error": result.get("tts_error"),
-                "tts_latency": result.get("tts_latency"),
-                "audio_url": result.get("audio_url"),
-            },
-        )
+        data = {
+            "company_id": payload.company_id,
+            "session_id": payload.session_id,
+            "message": "",
+        }
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                f"{CLOUD_BASE_URL}/cloud/interact",
+                data=data,
+                files=files,
+            )
+
+        response.raise_for_status()
+        result = response.json()
+
+        print({
+            "session_id": payload.session_id,
+            "audio_path": audio_path,
+            "transcript": result.get("transcript"),
+            "question_text": result.get("question_text"),
+            "llm_source": result.get("llm_source"),
+            "answer_text": result.get("answer_text"),
+        }, flush=True)
 
         await publish(payload.session_id, result)
 
         return {
             "status": "ok",
             "session_id": payload.session_id,
+            "audio_path": audio_path,
             "cloud_result": result,
         }
 
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=exc.response.status_code,
+            detail=f"Cloud retornou erro: {exc.response.text}",
+        )
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Falha ao conectar na cloud: {str(exc)}",
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
-
-    finally:
-        if audio_path and os.path.exists(audio_path):
-            try:
-                os.remove(audio_path)
-            except Exception:
-                pass

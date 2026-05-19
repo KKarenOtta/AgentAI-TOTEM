@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any
 
 import joblib
-from sentence_transformers import SentenceTransformer
 
 
 MODEL_DIR = Path("data/ml/intent/models")
@@ -32,6 +31,8 @@ def _load():
 
     if not is_available():
         raise FileNotFoundError("Modelo de intenção ainda não treinado.")
+
+    from sentence_transformers import SentenceTransformer
 
     label_map = json.loads(LABEL_MAP_PATH.read_text(encoding="utf-8"))
 
