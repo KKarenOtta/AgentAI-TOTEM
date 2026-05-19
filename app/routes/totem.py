@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from uuid import uuid4
 import base64
 import json
 import logging
@@ -150,27 +150,21 @@ def _save_device_handoff(company_id: str, session_id: str, url: str) -> dict:
 @router.post("/totem/activate")
 async def totem_activate(payload: ActivateRequest):
 
-    # 1. garante session em memória
-    session = get_or_create_session(
-        company_id=payload.company_id,
-        session_id=payload.session_id,
-        profile={"source": "manual_activate"},
-    )
+    # 🔥 CRIA SESSION ID ÚNICO SEMPRE
+    session_id = str(uuid4())
 
-    # 2. garante session no banco (UMA VEZ só)
     await db.save_session_start(
-        session_id=payload.session_id,
+        session_id=session_id,
         company_id=payload.company_id,
         device_id="manual",
     )
 
-    # 3. dispara presença SEM CONDIÇÃO
     orchestrator.on_presence_event(
         company_id=payload.company_id,
         payload={
             "company_id": payload.company_id,
             "device_id": "manual",
-            "session_id": payload.session_id,
+            "session_id": session_id,
             "present": True,
             "validated": True,
             "force": True,
@@ -182,28 +176,22 @@ async def totem_activate(payload: ActivateRequest):
         },
     )
 
-    # 4. áudio
-    audio_path, audio_base64 = _build_greeting_audio(
-        payload.prefer_audio
-    )
+    audio_path, audio_base64 = _build_greeting_audio(payload.prefer_audio)
 
-    # 5. SSE event
     publish(
         company_id=payload.company_id,
         event="totem_activated",
         payload={
-            "session_id": payload.session_id,
+            "session_id": session_id,
             "message": DEFAULT_GREETING,
             "audio_base64": audio_base64,
         },
     )
 
-    # 6. resposta
     return {
         "status": "activated",
-        "session_id": payload.session_id,
+        "session_id": session_id,  # 🔥 FRONT AGORA RECEBE ISSO
         "greeting": DEFAULT_GREETING,
-        "audio_path": audio_path,
         "audio_base64": audio_base64,
     }
 
@@ -211,11 +199,15 @@ async def totem_activate(payload: ActivateRequest):
 @router.post("/totem/interact")
 async def totem_interact(payload: InteractRequest):
 
-    await db.save_session_start(
-        session_id=payload.session_id,
-        company_id=payload.company_id,
-        device_id="manual",
-)
+    # 🔥 BLOQUEIA SESSION INVÁLIDA
+    session = get_session(payload.session_id)
+
+    if not session:
+        return {
+            "error": "session_not_found",
+            "message": "Sessão não foi ativada corretamente."
+        }
+
     resposta, recommendations, audio_path, metric, idioma = orchestrator.interact(
         company_id=payload.company_id,
         session_id=payload.session_id,
@@ -240,8 +232,6 @@ async def totem_interact(payload: InteractRequest):
     return {
         "text": resposta,
         "recommendations": {},
-        "marketing_locked": True,
-        "marketing_message": "Ofertas disponíveis após cadastro e aceite LGPD no device.",
         "audio_path": audio_path,
         "audio_base64": _audio_to_base64(audio_path),
         "metric": metric,
