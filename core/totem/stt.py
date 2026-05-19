@@ -12,11 +12,11 @@ from openai import OpenAI
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT_DIR / ".env", override=True)
-
+print("=== STT MODULE CARREGADO ===", __file__, flush=True)
 
 def stt_from_base64(audio_base64: str, language_hint: str | None = "pt") -> Tuple[str, float, str]:
     started = time.perf_counter()
-
+    print("=== STT: entrou em stt_from_base64 ===", flush=True)
     try:
         audio_bytes = base64.b64decode(audio_base64, validate=True)
     except Exception:
@@ -47,3 +47,5 @@ def stt_from_base64(audio_base64: str, language_hint: str | None = "pt") -> Tupl
 
     except Exception as exc:
         return "", round(time.perf_counter() - started, 3), f"openai_error:{type(exc).__name__}"
+
+sttfrombase64 = stt_from_base64

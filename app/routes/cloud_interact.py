@@ -58,7 +58,7 @@ async def cloud_interact(
     company_id: str = Form(...),
     session_id: str = Form(...),
     message: str = Form(""),
-    file: UploadFile | None = File(None),
+    audio_file: UploadFile | None = File(None),
 ):
     print("DEBUG 1: entrou no /cloud/interact")
     print(
@@ -69,7 +69,7 @@ async def cloud_interact(
         "| message =",
         repr(message),
         "| has_file =",
-        file is not None,
+        audio_file is not None,
     )
 
     try:
@@ -79,9 +79,9 @@ async def cloud_interact(
 
         print("DEBUG 3: transcript inicial =", repr(transcript))
 
-        if file is not None:
+        if audio_file is not None:
             print("DEBUG 4: lendo arquivo enviado...")
-            audio_bytes = await file.read()
+            audio_bytes = await audio_file.read()
             print("DEBUG 5: bytes lidos =", len(audio_bytes))
 
             audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
@@ -168,3 +168,4 @@ async def cloud_interact(
     except Exception as exc:
         print("DEBUG ERRO cloud_interact:", repr(exc))
         raise
+print("=== CLOUD: recebeu requisicao /cloud/interact ===", flush=True)
