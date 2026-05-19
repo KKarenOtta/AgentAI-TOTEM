@@ -461,10 +461,13 @@
       }
     }
     
-   window.addEventListener("load", async () => {
-      await unlockAudio();
-      connectSSE();
-    }); 
+  window.addEventListener("load", () => {
+        connectSSE();
+      
+        el("btnAudio").addEventListener("click", async () => {
+          await unlockAudio();
+        });
+      });
     
   </script>
 </body>
