@@ -440,37 +440,37 @@
     
       debug("EVENTO RECEBIDO: " + JSON.stringify(data));
     
-      const isGreeting =
-        data.type === "greeting" ||
-        data.status === "active" ||
-        data.status === "already_active";
+      const payload = data.payload || {};
     
-      if (isGreeting) {
+      // 🎯 EVENTO PRINCIPAL DO SEU BACKEND
+      if (data.type === "totem_activated") {
+    
         setStatus(
           "Atendimento iniciado",
           "",
-          data.greeting || "Olá!"
+          payload.message || "Olá!"
         );
     
         setActive(true);
         enableInteraction();
     
-        sessionId = data.session_id;
+        sessionId = payload.session_id;
     
-        if (data.audio_base64) {
-          playAudio(data.audio_base64, data.session_id);
+        if (payload.audio_base64) {
+          playAudio(payload.audio_base64, payload.session_id);
         }
     
         return;
       }
     
+      // reset futuro
       if (data.type === "reset") {
         resetSessionState();
         return;
       }
     
-      // fallback limpo
       debug("EVENTO NÃO MAPEADO: " + JSON.stringify(data));
+      
     }
     
    window.addEventListener("load", () => {
