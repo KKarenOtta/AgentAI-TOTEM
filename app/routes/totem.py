@@ -67,7 +67,7 @@ def _audio_to_base64(path: str | None) -> str | None:
     if not audio_path.exists():
         return None
 
-    try
+    try:
         return base64.b64encode(audio_path.read_bytes()).decode("utf-8")
     except Exception as exc:
         logger.warning("Falha ao converter áudio para base64: %s", exc)
