@@ -440,28 +440,40 @@
     
       debug("EVENTO RECEBIDO: " + JSON.stringify(data));
     
-      if (data.type === "greeting") {
+      const isGreeting =
+        data.type === "greeting" ||
+        data.status === "active" ||
+        data.status === "already_active";
+    
+      if (isGreeting) {
         setStatus(
           "Atendimento iniciado",
           "",
-          data.greeting
+          data.greeting || "Olá!"
         );
     
         setActive(true);
-    
         enableInteraction();
+    
+        sessionId = data.session_id;
     
         if (data.audio_base64) {
           playAudio(data.audio_base64, data.session_id);
         }
+    
+        return;
       }
     
       if (data.type === "reset") {
         resetSessionState();
+        return;
       }
+    
+      // fallback limpo
+      debug("EVENTO NÃO MAPEADO: " + JSON.stringify(data));
     }
     
-  window.addEventListener("load", () => {
+   window.addEventListener("load", () => {
         connectSSE();
       
         el("btnAudio").addEventListener("click", async () => {
