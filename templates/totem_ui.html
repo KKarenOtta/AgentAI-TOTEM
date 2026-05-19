@@ -493,10 +493,63 @@
    window.addEventListener("load", () => {
         connectSSE();
       
-        el("btnAudio").addEventListener("click", async () => {
-          await unlockAudio();
-        });
+   window.addEventListener("load", () => {
+      connectSSE();
+    
+      el("btnAudio").addEventListener("click", async () => {
+        await unlockAudio();
       });
+    
+      el("btnVoice").addEventListener("click", async () => {
+        const message = el("message").value;
+    
+        if (!message || !sessionId) return;
+    
+        setVoiceBusy(true);
+    
+        try {
+          await fetch("/totem/interact", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              company_id: companyId,
+              session_id: sessionId,
+              message,
+              prefer_audio: false
+            })
+          });
+        } finally {
+          setVoiceBusy(false);
+        }
+      });
+    
+      el("btnSendText").addEventListener("click", async () => {
+        const message = el("message").value;
+    
+        if (!message || !sessionId) return;
+    
+        setVoiceBusy(true);
+    
+        try {
+          await fetch("/totem/interact", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              company_id: companyId,
+              session_id: sessionId,
+              message,
+              prefer_audio: false
+            })
+          });
+        } finally {
+          setVoiceBusy(false);
+        }
+      });
+    
+      el("btnFinish").addEventListener("click", () => {
+        resetSessionState();
+      });
+    });
     
   </script>
 </body>
