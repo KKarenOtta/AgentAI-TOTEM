@@ -168,4 +168,7 @@ async def cloud_interact(
     except Exception as exc:
         print("DEBUG ERRO cloud_interact:", repr(exc))
         raise
+<<<<<<< HEAD
 print("=== CLOUD: recebeu requisicao /cloud/interact ===", flush=True)
+=======
+>>>>>>> 3fcc2d5083f40a520be268d70f73cb00bb2d7457

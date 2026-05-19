@@ -282,15 +282,17 @@ def _login_html(error: str | None = None) -> str:
             <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="100" />
           </div>
 
+          <!--
           <label class="login-check">
             <input type="checkbox" name="lgpd" required />
             <span>Aceito os termos LGPD e o uso dos dados para autenticação e auditoria de acesso.</span>
           </label>
+          -->
 
           <button class="login-button" type="submit">Entrar</button>
         </form>
 
-        <a href="/" class="login-back">Voltar ao totem</a>
+        <a href="/integration" class="login-back">Voltar ao totem</a>
       </div>
     </section>
   </main>
@@ -309,10 +311,10 @@ def login(
     request: Request,
     username: str = Form(...),
     password: str = Form(...),
-    lgpd: str = Form("off"),
+    # lgpd: str = Form("off"),
 ):
-    if lgpd != "on":
-        return HTMLResponse(_login_html("Aceite LGPD obrigatório."), status_code=400)
+    # if lgpd != "on":
+    #     return HTMLResponse(_login_html("Aceite LGPD obrigatório."), status_code=400)
 
     user = authenticate(username.strip(), password)
 

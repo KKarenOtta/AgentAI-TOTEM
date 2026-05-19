@@ -831,3 +831,130 @@ body {
 .admin-input::placeholder {
   color: rgba(255, 244, 214, 0.45);
 }
+
+.recommendations {
+  width: 100%;
+  max-width: 720px;
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  text-align: left;
+}
+
+.recommendations-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #ffffff;
+}
+
+.recommendations-head p {
+  margin: 6px 0 0;
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.recommendations-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.recommendation-card {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 215, 120, 0.18);
+}
+
+.recommendation-card h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  color: #ffd36e;
+}
+
+.recommendation-card p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.86);
+  line-height: 1.45;
+}
+
+.recommendation-meta {
+  margin-top: 8px;
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.final-block {
+  width: 100%;
+  max-width: 720px;
+  margin-top: 20px;
+  padding: 20px;
+  border-radius: 18px;
+  background: rgba(255, 215, 120, 0.08);
+  border: 1px solid rgba(255, 215, 120, 0.18);
+  text-align: center;
+}
+
+.final-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #fff;
+}
+
+.final-head p {
+  margin: 8px 0 0;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.qr {
+  display: block;
+  width: 220px;
+  max-width: 100%;
+  margin: 18px auto 0;
+  padding: 10px;
+  background: #fff;
+  border-radius: 16px;
+}
+
+.handoff-link {
+  margin-top: 12px;
+  color: #ffd36e;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+#input-panel {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+}
+
+#input-panel > div {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+#input-panel .admin-button,
+#end-session-btn {
+  width: 100%;
+  min-height: 48px;
+}
+
+#end-session-btn {
+  max-width: 420px;
+  margin-top: 12px;
+}
+
+.input-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
