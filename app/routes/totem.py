@@ -67,7 +67,7 @@ def _audio_to_base64(path: str | None) -> str | None:
     if not audio_path.exists():
         return None
 
-    try:
+    try
         return base64.b64encode(audio_path.read_bytes()).decode("utf-8")
     except Exception as exc:
         logger.warning("Falha ao converter áudio para base64: %s", exc)
@@ -149,35 +149,22 @@ def _save_device_handoff(company_id: str, session_id: str, url: str) -> dict:
 
 @router.post("/totem/activate")
 async def totem_activate(payload: ActivateRequest):
+
+    # 1. garante session em memória
     session = get_or_create_session(
         company_id=payload.company_id,
         session_id=payload.session_id,
         profile={"source": "manual_activate"},
     )
 
-    if session.get("activated_at"):
-        audio_path, audio_base64 = _build_greeting_audio(
-            payload.prefer_audio
-        )
+    # 2. garante session no banco (UMA VEZ só)
+    await db.save_session_start(
+        session_id=payload.session_id,
+        company_id=payload.company_id,
+        device_id="manual",
+    )
 
-        publish(
-            company_id=payload.company_id,
-            event="totem_activated",
-            payload={
-                "session_id": payload.session_id,
-                "message": DEFAULT_GREETING,
-                "audio_base64": audio_base64,
-            },
-        )
-
-        return {
-            "status": "already_active",
-            "session_id": payload.session_id,
-            "greeting": DEFAULT_GREETING,
-            "audio_path": audio_path,
-            "audio_base64": audio_base64,
-        }
-
+    # 3. dispara presença SEM CONDIÇÃO
     orchestrator.on_presence_event(
         company_id=payload.company_id,
         payload={
@@ -195,16 +182,12 @@ async def totem_activate(payload: ActivateRequest):
         },
     )
 
-    await db.save_session_start(
-        session_id=payload.session_id,
-        company_id=payload.company_id,
-        device_id="manual",
-    )
-
+    # 4. áudio
     audio_path, audio_base64 = _build_greeting_audio(
         payload.prefer_audio
     )
 
+    # 5. SSE event
     publish(
         company_id=payload.company_id,
         event="totem_activated",
@@ -215,6 +198,7 @@ async def totem_activate(payload: ActivateRequest):
         },
     )
 
+    # 6. resposta
     return {
         "status": "activated",
         "session_id": payload.session_id,
@@ -226,6 +210,12 @@ async def totem_activate(payload: ActivateRequest):
 
 @router.post("/totem/interact")
 async def totem_interact(payload: InteractRequest):
+
+    await db.save_session_start(
+        session_id=payload.session_id,
+        company_id=payload.company_id,
+        device_id="manual",
+)
     resposta, recommendations, audio_path, metric, idioma = orchestrator.interact(
         company_id=payload.company_id,
         session_id=payload.session_id,
