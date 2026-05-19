@@ -9,7 +9,7 @@ from typing import Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel
-
+from infra.realtime.event_bus import publish
 from app.services.aws_db_service import AWSDBService
 from core.totem.orchestrator import DEFAULT_GREETING, TotemOrchestrator
 from core.totem.qr import generate_qr_from_text
@@ -156,7 +156,19 @@ async def totem_activate(payload: ActivateRequest):
     )
 
     if session.get("activated_at"):
-        audio_path, audio_base64 = _build_greeting_audio(payload.prefer_audio)
+        audio_path, audio_base64 = _build_greeting_audio(
+            payload.prefer_audio
+        )
+
+        publish(
+            company_id=payload.company_id,
+            event="totem_activated",
+            payload={
+                "session_id": payload.session_id,
+                "message": DEFAULT_GREETING,
+                "audio_base64": audio_base64,
+            },
+        )
 
         return {
             "status": "already_active",
@@ -189,7 +201,19 @@ async def totem_activate(payload: ActivateRequest):
         device_id="manual",
     )
 
-    audio_path, audio_base64 = _build_greeting_audio(payload.prefer_audio)
+    audio_path, audio_base64 = _build_greeting_audio(
+        payload.prefer_audio
+    )
+
+    publish(
+        company_id=payload.company_id,
+        event="totem_activated",
+        payload={
+            "session_id": payload.session_id,
+            "message": DEFAULT_GREETING,
+            "audio_base64": audio_base64,
+        },
+    )
 
     return {
         "status": "activated",
