@@ -60,7 +60,7 @@ class EndRequest(BaseModel):
 
 
 def _public_base_url() -> str:
-    return os.getenv("TOTEM_PUBLIC_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+    return os.getenv("TOTEM_PUBLIC_BASE_URL", "http://52.201.76.45:8000").rstrip("/")
 
 
 def _cloud_base_url() -> str:
@@ -245,25 +245,27 @@ async def totem_end(payload: EndRequest):
     handoff = _save_device_handoff(payload.company_id, payload.session_id, url)
     qr_url = generate_qr_from_text(url)
 
-    await db.save_event(
-        company_id=payload.company_id,
-        session_id=payload.session_id,
-        event_type="totem_session_ended",
-        payload={
-            "reason": payload.reason,
-            "handoff_url": url,
-            "handoff_qr_url": qr_url,
-            "summary": handoff.get("summary"),
-            "recommendations": handoff.get("recommendations"),
-        },
-    )
+#    await db.save_event(
+#        company_id=payload.company_id,
+#        session_id=payload.session_id,
+#        event_type="totem_session_ended",
+#        payload={
+#            "reason": payload.reason,
+#            "handoff_url": url,
+#            "handoff_qr_url": qr_url,
+#            "summary": handoff.get("summary"),
+#            "recommendations": handoff.get("recommendations"),
+#        },
+#    )
 
     return {
         "ok": True,
         "session_id": payload.session_id,
-        "handoff_url": url,
-        "handoff_qr_url": qr_url,
-        "summary": handoff.get("summary"),
+        "handoff_url": _handoff_url(payload.company_id, payload.session_id),
+	"handoffurl": _handoff_url(payload.company_id, payload.session_id),
+	"handoff_qr_url": qr_url,
+        "handoffqrurl": qr_url,
+	"summary": handoff.get("summary"),
         "recommendations": handoff.get("recommendations"),
         "message": "Atendimento finalizado. Escaneie o QR Code para continuar no celular, fazer o cadastro e acessar as ofertas.",
     }
