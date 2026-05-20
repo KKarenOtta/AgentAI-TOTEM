@@ -54,3 +54,44 @@ def search_knowledge(
         ).mappings().all()
 
     return [dict(r) for r in rows]
+
+def synthesize_answer(question: str, chunks: list[dict]):
+    if not chunks:
+        return "Não encontrei informações na base de conhecimento."
+
+    context = "\n\n---\n\n".join(
+        f"TÍTULO: {c['titulo']}\nCONTEÚDO: {c['conteudo']}"
+        for c in chunks
+    )
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Você é um assistente de um sistema de informações (totem). "
+                    "Responda SOMENTE com base no contexto fornecido. "
+                    "Se a informação não estiver no contexto, diga que não encontrou dados. "
+                    "Organize a resposta de forma clara e estruturada."
+                )
+            },
+            {
+                "role": "user",
+                "content": f"""
+PERGUNTA:
+{question}
+
+CONTEXTO:
+{context}
+"""
+            }
+        ],
+        temperature=0.2
+    )
+
+    return response.choices[0].message.content
+
+def ask_rag(company_id: str, question: str):
+    chunks = search_knowledge(company_id, question)
+    return synthesize_answer(question, chunks)
