@@ -199,106 +199,80 @@ class TotemOrchestrator:
             intent_confidence=intent_confidence,
         )
 
-       def _answer(
-            self,
-            company_id: str,
-            pergunta: str,
-            intent: str | None,
-        ) -> tuple[str, float, str, str | None]:
-        
-            if not pergunta:
-                return "Pode me dizer o que você procura?", 1.0, "system", None
-        
-            # =========================
-            # 🌦 CLIMA (regra fixa)
-            # =========================
-            climate_answer = answer_climate(company_id, pergunta)
-            if climate_answer:
-                text, score, source = climate_answer
-                return text, score, source, None
-        
-            # =========================
-            # 💾 CACHE
-            # =========================
-            cache_key = f"faq:{company_id}:{intent or 'general'}:{normalize(pergunta)}"
-            cached = cache_get(cache_key)
-        
-            if cached:
-                return cached, 1.0, "cache", None
-        
-            # =========================
-            # 🏢 CONTEXTO DA EMPRESA
-            # =========================
-            local_answer, local_score, local_source = answer_from_company_context(
-                company_id,
-                pergunta,
-            )
-        
-            print("DEBUG LOCAL SCORE:", local_score)
-            print("DEBUG LOCAL SOURCE:", local_source)
-        
-            if local_answer and local_score >= 0.78:
-                answer = local_answer.strip()
-                cache_set(cache_key, answer)
-                return answer, float(local_score), local_source or "company_context", None
-        
-            # =========================
-            # 📚 FAQ ENGINE
-            # =========================
-            faq_answer, faq_score, matched_question = self.faq.search(
-                company_id=company_id,
-                query=pergunta,
-                intent=intent,
-                min_score=0.78,
-            )
-        
-            print("DEBUG FAQ SCORE:", faq_score)
-            print("DEBUG MATCHED QUESTION:", matched_question)
-        
-            if faq_answer:
-                answer = faq_answer.strip()
-                cache_set(cache_key, answer)
-                return answer, faq_score, "faq", matched_question
-        
-            # =========================
-            # 🔎 RAG LAYER (NOVO)
-            # =========================
-            try:
-                rag_result = ask_rag(company_id, pergunta)
-        
-                print("🔥 RAG EXECUTOU")
-                print("RAG RESULT:", rag_result)
-        
-                if isinstance(rag_result, dict):
-                    answer = rag_result.get("answer")
-                    chunks = rag_result.get("chunks", [])
-        
-                    if chunks:
-                        rag_score = max(c.get("score", 0.0) for c in chunks)
-                    else:
-                        rag_score = 0.0
-        
-                    if answer and rag_score >= 0.60:
-                        cache_set(cache_key, answer)
-                        return (
-                            answer,
-                            float(rag_score),
-                            "rag",
-                            None
-                        )
-        
-            except Exception as e:
-                print("🔥 RAG ERROR:", str(e))
-        
-            # =========================
-            # ❌ FALLBACK FINAL
-            # =========================
-            return (
-                "Não encontrei essa informação na base de conhecimento do zoológico.",
-                0.0,
-                "no_match",
-                None,
-            )
+    def _answer(
+        self,
+        company_id: str,
+        pergunta: str,
+        intent: str | None,
+    ) -> tuple[str, float, str, str | None]:
+
+        if not pergunta:
+            return "Pode me dizer o que você procura?", 1.0, "system", None
+
+        climate_answer = answer_climate(company_id, pergunta)
+        if climate_answer:
+            text, score, source = climate_answer
+            return text, score, source, None
+
+        cache_key = f"faq:{company_id}:{intent or 'general'}:{normalize(pergunta)}"
+        cached = cache_get(cache_key)
+
+        if cached:
+            return cached, 1.0, "cache", None
+
+        local_answer, local_score, local_source = answer_from_company_context(
+            company_id,
+            pergunta,
+        )
+
+        print("DEBUG LOCAL SCORE:", local_score)
+        print("DEBUG LOCAL SOURCE:", local_source)
+
+        if local_answer and local_score >= 0.78:
+            answer = local_answer.strip()
+            cache_set(cache_key, answer)
+            return answer, float(local_score), local_source or "company_context", None
+
+        faq_answer, faq_score, matched_question = self.faq.search(
+            company_id=company_id,
+            query=pergunta,
+            intent=intent,
+            min_score=0.78,
+        )
+
+        print("DEBUG FAQ SCORE:", faq_score)
+        print("DEBUG MATCHED QUESTION:", matched_question)
+
+        if faq_answer:
+            answer = faq_answer.strip()
+            cache_set(cache_key, answer)
+            return answer, faq_score, "faq", matched_question
+
+        try:
+            rag_result = ask_rag(company_id, pergunta)
+
+            print("🔥 RAG EXECUTOU")
+            print("RAG RESULT:", rag_result)
+
+            if isinstance(rag_result, dict):
+                answer = rag_result.get("answer")
+                chunks = rag_result.get("chunks", [])
+
+                rag_score = max(c.get("score", 0.0) for c in chunks) if chunks else 0.0
+
+                if answer and rag_score >= 0.60:
+                    cache_set(cache_key, answer)
+                    return answer, float(rag_score), "rag", None
+
+        except Exception as e:
+            print("🔥 RAG ERROR:", str(e))
+
+        return (
+            "Não encontrei essa informação na base de conhecimento do zoológico.",
+            0.0,
+            "no_match",
+            None,
+        )
 
     def _llm_answer(self, company_id: str, pergunta: str, intent: str | None = None) -> str:
         context = load_company_context(company_id)
