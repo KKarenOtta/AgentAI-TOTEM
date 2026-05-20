@@ -8,10 +8,10 @@ document.addEventListener("DOMContentLoaded", () => {
     answer: $("answer"),
     temp: $("temp"),
     hum: $("hum"),
+    led: $("led"),
     dist1: $("dist1"),
     dist2: $("dist2"),
     dist3: $("dist3"),
-    led: $("led"),
     audio: $("remote-audio"),
     textInput: $("text-input"),
     sendText: $("send-text"),
@@ -70,7 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   
-  
+  let finalHandoffActive = false;
   let currentSessionId = generateSessionId();
   let busy = false;
   let polling = false;
@@ -150,6 +150,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function clearFinalHandoff() {
+    finalHandoffActive = false;
+    
     if (els.qr) {
       els.qr.hidden = true;
       els.qr.removeAttribute("src");
@@ -188,35 +190,36 @@ document.addEventListener("DOMContentLoaded", () => {
   
   function renderFinalHandoff(data) {
     console.log("[totem] renderFinalHandoff =", data);
-
+    finalHandoffActive = true;
     if (!els.finalBlock) return;
 
-    const qrUrl =
+    const qrUrl = normalizePublicUrl(
       data?.handoff_qr_url ||
       data?.handoffQrUrl ||
       data?.handoffqrurl ||
-      "";
+      ""
+    );
 
-    const handoffUrl =
+    const handoffUrl = normalizePublicUrl(
       data?.handoff_url ||
       data?.handoffUrl ||
       data?.handoffurl ||
-      "";
+      ""
+    );
 
-    if (els.qr) {
-      els.qr.onerror = () => {
-        console.error("[totem] erro ao carregar QR:", els.qr.src);
-        els.qr.hidden = true;
-      };
+    clearFinalScreenTimer();
+    applyScreenState("sessao");
   
-      if (qrUrl) {
-        els.qr.src = `${qrUrl}${qrUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
-        els.qr.hidden = false;
-      } else {
-        els.qr.hidden = true;
-        els.qr.removeAttribute("src");
-      }
-    }
+    show(els.recommendationsBlock, false);
+    show(els.inputPanel, false);
+    showEndSessionButton(false);
+    show(els.finalBlock, true);
+    show(els.iaPanel, true);
+  
+    setText(
+      els.message,
+      data?.message || "Atendimento finalizado. Continue no celular."
+    );
 
     if (els.handoff) {
       if (handoffUrl) {
@@ -228,19 +231,29 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    if (els.qr) {
+      els.qr.onerror = () => {
+        console.error("[totem] erro ao carregar QR:", els.qr.dataset.raw || els.qr.src);
+        els.qr.hidden = true;
+      };
+
+      if (qrUrl) {
+        els.qr.removeAttribute("src");
+        els.qr.dataset.raw = qrUrl;
+        els.qr.src = `${qrUrl}${qrUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
+        els.qr.hidden = false;
+      } else {
+        els.qr.hidden = true;
+        els.qr.removeAttribute("src");
+      }
+    }
+
     renderRecommendations(
-      data.recommendations,
+      data?.recommendations,
       els.finalRecommendationsList,
       els.finalRecommendations
     );
 
-    show(els.recommendationsBlock, false);
-    show(els.inputPanel, false);
-    showEndSessionButton(false);
-    show(els.finalBlock, true);
-    show(els.iaPanel, true);
-
-    setText(els.message, "Atendimento finalizado. Continue no celular.");
     scheduleReturnToInvite();
   }
 
@@ -304,20 +317,24 @@ document.addEventListener("DOMContentLoaded", () => {
   
   function clearFinalScreenTimer() {
     if (finalScreenTimer) {
-      window.clearTimeout(finalScreenTimer);
+      clearTimeout(finalScreenTimer);
       finalScreenTimer = null;
     }
   }
 
   function scheduleReturnToInvite() {
     clearFinalScreenTimer();
+    finalHandoffActive = true;
+
     finalScreenTimer = window.setTimeout(() => {
+      finalHandoffActive = false;
       currentSessionId = generateSessionId();
+      clearFinalHandoff();
+      resetConversationVisuals();
       applyScreenState("convite");
       show(els.iaPanel, false);
       show(els.inputPanel, false);
       showEndSessionButton(false);
-      clearFinalHandoff();
       setText(els.message, "Chegue mais perto e toque a tela para iniciar");
     }, QR_DISPLAY_MS);
   }
@@ -537,64 +554,89 @@ document.addEventListener("DOMContentLoaded", () => {
   async function endSession(reason = "manual") {
     if (!sessionActive && !localSessionStarted) return;
 
-    sessionActive = false;
-    localSessionStarted = false;
-    busy = false;
-
     clearInactivityTimer();
-
-    if (els.sendText) {
-      els.sendText.disabled = false;
-      els.sendText.style.opacity = "1";
-    }
-
-    if (els.recordBtn) {
-      els.recordBtn.disabled = false;
-      els.recordBtn.style.opacity = "1";
-    }
-
-    if (els.stopBtn) {
-      els.stopBtn.disabled = true;
-      els.stopBtn.style.opacity = "0.6";
-    }
-
-    if (els.textInput) {
-      els.textInput.value = "";
-    }
+    clearFinalScreenTimer();
 
     stopRemoteAudio();
 
-    const endData = await notifySessionEnd(reason);
-    console.log("[totem] endSession payload =", endData);
+    const previousSessionId = currentSessionId;
 
-    const hasHandoff =
-      endData &&
-      (
-        endData.handoff_qr_url ||
-        endData.handoff_url ||
-        endData.handoffQrUrl ||
-        endData.handoffUrl ||
-        endData.handoffqrurl ||
-        endData.handoffurl
-      );
+    try {
+      const endData = await notifySessionEnd(reason);
+      console.log("[totem] endSession payload =", endData);
 
-    if (hasHandoff) {
-      renderFinalHandoff(endData);
-      return;
+      sessionActive = false;
+      localSessionStarted = false;
+      busy = false;
+
+      if (els.sendText) {
+        els.sendText.disabled = false;
+        els.sendText.style.opacity = "1";
+      }
+
+      if (els.recordBtn) {
+        els.recordBtn.disabled = false;
+        els.recordBtn.style.opacity = "1";
+      }
+
+      if (els.stopBtn) {
+        els.stopBtn.disabled = true;
+        els.stopBtn.style.opacity = "0.6";
+      }
+
+      if (els.textInput) {
+        els.textInput.value = "";
+      }
+
+      const hasHandoff =
+        endData &&
+        (
+          endData.handoff_qr_url ||
+          endData.handoff_url ||
+          endData.handoffQrUrl ||
+          endData.handoffUrl ||
+          endData.handoffqrurl ||
+          endData.handoffurl
+        );
+
+      if (hasHandoff) {
+        renderFinalHandoff(endData);
+        return;
+      }
+
+      console.warn("[totem] payload de encerramento sem QR/link:", endData);
+
+      currentSessionId = generateSessionId();
+      clearFinalHandoff();
+      resetConversationVisuals();
+      show(els.iaPanel, false);
+      show(els.inputPanel, false);
+      showEndSessionButton(false);
+      applyScreenState("convite");
+      setText(els.message, "Chegue mais perto e toque a tela para iniciar");
+    } catch (err) {
+      console.error("[totem] erro ao encerrar sessao:", err);
+
+      sessionActive = false;
+      localSessionStarted = false;
+      busy = false;
+
+      currentSessionId = generateSessionId();
+      clearFinalHandoff();
+      resetConversationVisuals();
+      show(els.iaPanel, false);
+      show(els.inputPanel, false);
+      showEndSessionButton(false);
+      applyScreenState("convite");
+      setText(els.message, "Chegue mais perto e toque a tela para iniciar");
     }
-
-    console.warn("[totem] payload de encerramento sem QR/link:", endData);
-
-    resetConversationVisuals();
-    show(els.iaPanel, false);
-    show(els.inputPanel, false);
-    showEndSessionButton(false);
-
-    applyScreenState("convite");
-    setText(els.message, "Chegue mais perto e toque a tela para iniciar");
   }
 
   function renderState(data) {
+    if (finalHandoffActive) {
+      return;
+    }  
+    
     const derivedState = getDerivedState(data);
     applyScreenState(derivedState);
 
