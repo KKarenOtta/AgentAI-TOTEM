@@ -39,7 +39,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const companyId = "FLX-001";
-  /*const sessionId = "sessao-teste-01";*/
 
   const GREETING_TEXT = "Ola! Como posso lhe ajudar?";
   const GREETING_AUDIO_URL = "/static/audio/saudacao.mp3";
@@ -48,7 +47,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const QR_DISPLAY_MS = 10000;
   const EXTREME_TEMP_MIN = 10;
   const EXTREME_TEMP_MAX = 35;
-  
   const PUBLIC_BASE_URL = "http://52.201.76.45:8000";
 
   function normalizePublicUrl(rawUrl) {
@@ -69,7 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return rawUrl;
     }
   }
-  
+
   let finalHandoffActive = false;
   let currentSessionId = generateSessionId();
   let busy = false;
@@ -83,7 +81,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let isAudioPlaying = false;
   let currentObjectUrl = null;
   let finalScreenTimer = null;
-  
 
   function setText(el, value, fallback = "") {
     if (!el) return;
@@ -94,7 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!el) return;
     el.hidden = !visible;
   }
-  
+
   function normalizeRecommendations(payload) {
     if (!payload) return [];
     if (Array.isArray(payload)) return payload;
@@ -111,6 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
       item.description ||
       item.why ||
       "Dica pronta para continuar o atendimento.";
+
     const meta = [
       item.cta_label || "",
       item.coupon_code ? `Cupom: ${item.coupon_code}` : "",
@@ -151,7 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function clearFinalHandoff() {
     finalHandoffActive = false;
-    
+
     if (els.qr) {
       els.qr.hidden = true;
       els.qr.removeAttribute("src");
@@ -164,97 +162,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     show(els.finalBlock, false);
     clearRecommendations();
-  }
-
-  /*function renderFinalHandoff(data) {
-    if (!els.finalBlock) return;
-
-    if (els.qr && data.handoff_qr_url) {
-      els.qr.src = data.handoff_qr_url;
-      els.qr.hidden = false;
-    }
-
-    if (els.handoff && data.handoff_url) {
-      els.handoff.textContent = data.handoff_url;
-      els.handoff.hidden = false;
-    }
-
-    renderRecommendations(
-      data.recommendations,
-      els.finalRecommendationsList,
-      els.finalRecommendations
-    );
-
-    show(els.finalBlock, true);
-  }*/
-  
-  function renderFinalHandoff(data) {
-    console.log("[totem] renderFinalHandoff =", data);
-    finalHandoffActive = true;
-    if (!els.finalBlock) return;
-
-    const qrUrl = normalizePublicUrl(
-      data?.handoff_qr_url ||
-      data?.handoffQrUrl ||
-      data?.handoffqrurl ||
-      ""
-    );
-
-    const handoffUrl = normalizePublicUrl(
-      data?.handoff_url ||
-      data?.handoffUrl ||
-      data?.handoffurl ||
-      ""
-    );
-
-    clearFinalScreenTimer();
-    applyScreenState("sessao");
-  
-    show(els.recommendationsBlock, false);
-    show(els.inputPanel, false);
-    showEndSessionButton(false);
-    show(els.finalBlock, true);
-    show(els.iaPanel, true);
-  
-    setText(
-      els.message,
-      data?.message || "Atendimento finalizado. Continue no celular."
-    );
-
-    if (els.handoff) {
-      if (handoffUrl) {
-        els.handoff.textContent = handoffUrl;
-        els.handoff.hidden = false;
-      } else {
-        els.handoff.textContent = "";
-        els.handoff.hidden = true;
-      }
-    }
-
-    if (els.qr) {
-      els.qr.onerror = () => {
-        console.error("[totem] erro ao carregar QR:", els.qr.dataset.raw || els.qr.src);
-        els.qr.hidden = true;
-      };
-
-      if (qrUrl) {
-        els.qr.removeAttribute("src");
-        els.qr.dataset.raw = qrUrl;
-        els.qr.src = `${qrUrl}${qrUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
-        els.qr.hidden = false;
-      } else {
-        els.qr.hidden = true;
-        els.qr.removeAttribute("src");
-      }
-    }
-
-    renderRecommendations(
-      data?.recommendations,
-      els.finalRecommendationsList,
-      els.finalRecommendations
-    );
-
-    scheduleReturnToInvite();
   }
 
   function hideAudioElement() {
@@ -314,7 +221,7 @@ document.addEventListener("DOMContentLoaded", () => {
       inactivityTimer = null;
     }
   }
-  
+
   function clearFinalScreenTimer() {
     if (finalScreenTimer) {
       clearTimeout(finalScreenTimer);
@@ -322,29 +229,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function scheduleReturnToInvite() {
-    clearFinalScreenTimer();
-    finalHandoffActive = true;
-
-    finalScreenTimer = window.setTimeout(() => {
-      finalHandoffActive = false;
-      currentSessionId = generateSessionId();
-      clearFinalHandoff();
-      resetConversationVisuals();
-      applyScreenState("convite");
-      show(els.iaPanel, false);
-      show(els.inputPanel, false);
-      showEndSessionButton(false);
-      setText(els.message, "Chegue mais perto e toque a tela para iniciar");
-    }, QR_DISPLAY_MS);
-  }
-
   function shouldPauseAutoEnd() {
     return busy || isAudioPlaying;
   }
 
   function resetInactivityTimer() {
-    if (!sessionActive) return;
+    if (!sessionActive || finalHandoffActive) return;
 
     clearInactivityTimer();
 
@@ -371,7 +261,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (shouldPauseAutoEnd()) {
       clearInactivityTimer();
-    } else if (sessionActive) {
+    } else if (sessionActive && !finalHandoffActive) {
       resetInactivityTimer();
     }
   }
@@ -412,7 +302,25 @@ document.addEventListener("DOMContentLoaded", () => {
     clearFinalScreenTimer();
     clearFinalHandoff();
   }
-  
+
+  function forceHideInteractionControls() {
+    show(els.inputPanel, false);
+    show(els.textInput, false);
+    show(els.sendText, false);
+    show(els.recordBtn, false);
+    show(els.stopBtn, false);
+    showEndSessionButton(false);
+  }
+
+  function forceShowInteractionControls() {
+    show(els.inputPanel, true);
+    show(els.textInput, true);
+    show(els.sendText, true);
+    show(els.recordBtn, true);
+    show(els.stopBtn, true);
+    showEndSessionButton(true);
+  }
+
   function ensureEndSessionButton() {
     if (document.getElementById("end-session-btn")) return;
 
@@ -439,6 +347,103 @@ document.addEventListener("DOMContentLoaded", () => {
     const button = document.getElementById("end-session-btn");
     if (!button) return;
     button.hidden = !visible;
+  }
+
+  function scheduleReturnToInvite() {
+    clearFinalScreenTimer();
+    finalHandoffActive = true;
+
+    finalScreenTimer = window.setTimeout(() => {
+      finalHandoffActive = false;
+      currentSessionId = generateSessionId();
+      clearFinalHandoff();
+      resetConversationVisuals();
+      applyScreenState("convite");
+
+      show(els.finalBlock, false);
+      show(els.iaPanel, false);
+      forceHideInteractionControls();
+
+      setText(els.message, "Chegue mais perto e toque a tela para iniciar");
+    }, QR_DISPLAY_MS);
+  }
+
+  function renderFinalHandoff(data) {
+    console.log("[totem] renderFinalHandoff =", data);
+
+    finalHandoffActive = true;
+    sessionActive = false;
+    localSessionStarted = false;
+    busy = false;
+
+    clearInactivityTimer();
+    clearFinalScreenTimer();
+    stopRemoteAudio();
+
+    if (!els.finalBlock) return;
+
+    const qrUrl = normalizePublicUrl(
+      data?.handoff_qr_url ||
+      data?.handoffQrUrl ||
+      data?.handoffqrurl ||
+      ""
+    );
+
+    const handoffUrl = normalizePublicUrl(
+      data?.handoff_url ||
+      data?.handoffUrl ||
+      data?.handoffurl ||
+      ""
+    );
+
+    applyScreenState("sessao");
+
+    show(els.recommendationsBlock, false);
+    show(els.recommendationsList, false);
+
+    forceHideInteractionControls();
+    show(els.iaPanel, true);
+    show(els.finalBlock, true);
+
+    setText(
+      els.message,
+      data?.message || "Atendimento finalizado. Continue no celular."
+    );
+
+    if (els.handoff) {
+      if (handoffUrl) {
+        els.handoff.textContent = handoffUrl;
+        els.handoff.hidden = false;
+      } else {
+        els.handoff.textContent = "";
+        els.handoff.hidden = true;
+      }
+    }
+
+    if (els.qr) {
+      els.qr.onerror = () => {
+        console.error("[totem] erro ao carregar QR:", els.qr.dataset.raw || els.qr.src);
+        els.qr.hidden = true;
+      };
+
+      if (qrUrl) {
+        els.qr.removeAttribute("src");
+        els.qr.dataset.raw = qrUrl;
+        els.qr.src = `${qrUrl}${qrUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
+        els.qr.hidden = false;
+      } else {
+        els.qr.hidden = true;
+        els.qr.removeAttribute("src");
+      }
+    }
+
+    renderRecommendations(
+      data?.recommendations,
+      els.finalRecommendationsList,
+      els.finalRecommendations
+    );
+
+    scheduleReturnToInvite();
   }
 
   async function playGreetingAudio() {
@@ -478,28 +483,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  /*async function notifySessionEnd(reason) {
-    try {
-      const response = await fetch(EDGE_SESSION_END_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify({
-          company_id: companyId,
-          session_id: sessionId,
-          reason
-        })
-      });
-
-      if (!response.ok && response.status !== 404) {
-        console.warn("[integration] fim de sessao retornou", response.status);
-      }
-    } catch (error) {
-      console.warn("[integration] nao foi possivel sincronizar fim da sessao:", error);
-    }
-  }*/
   async function notifySessionEnd(reason) {
     try {
       const response = await fetch(EDGE_SESSION_END_ENDPOINT, {
@@ -532,15 +515,15 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function startSession() {
-    if (sessionActive || busy) return;
+    if (finalHandoffActive || sessionActive || busy) return;
 
     sessionActive = true;
     localSessionStarted = true;
 
     applyScreenState("sessao");
+    show(els.finalBlock, false);
     show(els.iaPanel, true);
-    show(els.inputPanel, true);
-    showEndSessionButton(true);
+    forceShowInteractionControls();
 
     setText(els.transcript, "");
     show(els.transcript, false);
@@ -556,10 +539,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     clearInactivityTimer();
     clearFinalScreenTimer();
-
     stopRemoteAudio();
-
-    const previousSessionId = currentSessionId;
 
     try {
       const endData = await notifySessionEnd(reason);
@@ -610,8 +590,7 @@ document.addEventListener("DOMContentLoaded", () => {
       clearFinalHandoff();
       resetConversationVisuals();
       show(els.iaPanel, false);
-      show(els.inputPanel, false);
-      showEndSessionButton(false);
+      forceHideInteractionControls();
       applyScreenState("convite");
       setText(els.message, "Chegue mais perto e toque a tela para iniciar");
     } catch (err) {
@@ -625,8 +604,7 @@ document.addEventListener("DOMContentLoaded", () => {
       clearFinalHandoff();
       resetConversationVisuals();
       show(els.iaPanel, false);
-      show(els.inputPanel, false);
-      showEndSessionButton(false);
+      forceHideInteractionControls();
       applyScreenState("convite");
       setText(els.message, "Chegue mais perto e toque a tela para iniciar");
     }
@@ -634,16 +612,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function renderState(data) {
     if (finalHandoffActive) {
+      show(els.iaPanel, true);
+      show(els.finalBlock, true);
+      forceHideInteractionControls();
       return;
-    }  
-    
+    }
+
     const derivedState = getDerivedState(data);
     applyScreenState(derivedState);
 
     if (derivedState === "sessao") {
       show(els.iaPanel, true);
-      show(els.inputPanel, true);
-      showEndSessionButton(true);
+      forceShowInteractionControls();
 
       if (lastTranscript && lastTranscript.trim()) {
         setText(els.transcript, lastTranscript);
@@ -665,9 +645,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     show(els.iaPanel, false);
+    forceHideInteractionControls();
     show(els.transcript, false);
     show(els.answer, false);
-    showEndSessionButton(false);
 
     if (derivedState === "convite") {
       setText(els.message, "Chegue mais perto e toque a tela para iniciar");
@@ -683,7 +663,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateUI(data) {
-    renderState(data);
+    if (finalHandoffActive) {
+      show(els.iaPanel, true);
+      show(els.finalBlock, true);
+      forceHideInteractionControls();
+    } else {
+      renderState(data);
+    }
 
     setText(els.temp, data.temperature != null ? `${data.temperature} °C` : "--");
     setText(els.hum, data.humidity != null ? `${data.humidity} %` : "--");
@@ -692,11 +678,10 @@ document.addEventListener("DOMContentLoaded", () => {
     setText(els.dist3, data.distance_sensor_3_cm != null ? `${data.distance_sensor_3_cm} cm` : "--");
     setText(els.led, data.led ? "Ligado" : "Desligado");
 
-    if (sessionActive && !shouldPauseAutoEnd()) {
+    if (sessionActive && !finalHandoffActive && !shouldPauseAutoEnd()) {
       const distance = getPrimaryDistance(data);
       if (distance != null && distance > SESSION_END_DISTANCE_CM) {
         endSession("distance");
-        return;
       }
     }
   }
@@ -704,14 +689,14 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateCloudResponse(data) {
     lastTranscript = data.transcript || "";
     lastAnswer = data.answer_text || "";
-    
+
     renderRecommendations(
       data.recommendations,
       els.recommendationsList,
       els.recommendationsBlock
     );
 
-    if (sessionActive) {
+    if (sessionActive && !finalHandoffActive) {
       if (lastTranscript.trim()) {
         setText(els.transcript, lastTranscript);
         show(els.transcript, true);
@@ -726,7 +711,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setText(els.message, GREETING_TEXT);
       }
     }
-    
+
     if (
       data.handoff_qr_url ||
       data.handoff_url ||
@@ -736,6 +721,7 @@ document.addEventListener("DOMContentLoaded", () => {
       data.handoffurl
     ) {
       renderFinalHandoff(data);
+      return;
     }
 
     const base64 = data.audio_base64 || "";
@@ -801,13 +787,13 @@ document.addEventListener("DOMContentLoaded", () => {
     busy = nextBusy;
 
     if (els.sendText) {
-      els.sendText.disabled = nextBusy;
-      els.sendText.style.opacity = nextBusy ? "0.6" : "1";
+      els.sendText.disabled = nextBusy || finalHandoffActive;
+      els.sendText.style.opacity = (nextBusy || finalHandoffActive) ? "0.6" : "1";
     }
 
     if (els.recordBtn) {
-      els.recordBtn.disabled = nextBusy;
-      els.recordBtn.style.opacity = nextBusy ? "0.6" : "1";
+      els.recordBtn.disabled = nextBusy || finalHandoffActive;
+      els.recordBtn.style.opacity = (nextBusy || finalHandoffActive) ? "0.6" : "1";
     }
 
     if (els.stopBtn) {
@@ -815,13 +801,13 @@ document.addEventListener("DOMContentLoaded", () => {
       els.stopBtn.style.opacity = "0.6";
     }
 
-    if (messageText && sessionActive) {
+    if (messageText && sessionActive && !finalHandoffActive) {
       setText(els.message, messageText);
     }
 
     if (busy) {
       clearInactivityTimer();
-    } else if (sessionActive) {
+    } else if (sessionActive && !finalHandoffActive) {
       resetInactivityTimer();
     }
   }
@@ -846,7 +832,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function sendTextToEdge(message) {
-    if (busy || !sessionActive) return;
+    if (busy || !sessionActive || finalHandoffActive) return;
 
     setBusy(true, "...");
 
@@ -884,7 +870,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function sendAudioToEdge() {
-    if (busy || !sessionActive) return;
+    if (busy || !sessionActive || finalHandoffActive) return;
 
     setBusy(true, "...");
 
@@ -921,6 +907,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function handleSessionTouchStart(event) {
+    if (finalHandoffActive) return;
+
     const state = normalizeState(els.screen?.dataset?.state || lastKnownState);
 
     const clickedInsideControl =
@@ -965,14 +953,14 @@ document.addEventListener("DOMContentLoaded", () => {
     els.textInput.addEventListener("keydown", async (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
-        if (sessionActive && els.sendText) {
+        if (sessionActive && !finalHandoffActive && els.sendText) {
           els.sendText.click();
         }
       }
     });
 
     els.textInput.addEventListener("input", () => {
-      if (sessionActive && !shouldPauseAutoEnd()) {
+      if (sessionActive && !finalHandoffActive && !shouldPauseAutoEnd()) {
         resetInactivityTimer();
       }
     });
@@ -980,6 +968,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (els.recordBtn) {
     els.recordBtn.addEventListener("click", async () => {
+      if (finalHandoffActive) return;
       await sendAudioToEdge();
     });
   }
@@ -1001,7 +990,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     els.audio.addEventListener("timeupdate", () => {
-      if (sessionActive && isAudioPlaying) {
+      if (sessionActive && isAudioPlaying && !finalHandoffActive) {
         clearInactivityTimer();
       }
     });
@@ -1018,6 +1007,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ["click", "keydown", "pointerdown"].forEach((eventName) => {
     document.addEventListener(eventName, () => {
+      if (finalHandoffActive) return;
       if (sessionActive && !shouldPauseAutoEnd()) {
         resetInactivityTimer();
       }
@@ -1026,6 +1016,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ensureEndSessionButton();
   hideAudioElement();
+  forceHideInteractionControls();
   fetchStatus();
 
   async function loop() {
