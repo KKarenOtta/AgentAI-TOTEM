@@ -31,42 +31,6 @@ MIN_INTENT_CONFIDENCE = float(os.getenv("MIN_INTENT_CONFIDENCE", "0.45"))
 _LISTENER_STARTED = False
 _LISTENER_LOCK = threading.Lock()
 
-def _judge_response(self, question: str, answer: str, context: str) -> bool:
-    """
-    Decide se a resposta é boa o suficiente para ser entregue ao usuário.
-    """
-
-    from openai import OpenAI
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-    resp = client.chat.completions.create(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-        temperature=0,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Você é um avaliador de respostas de um totem de zoológico.\n"
-                    "Responda APENAS 'YES' ou 'NO'.\n"
-                    "Diga YES somente se a resposta for correta, útil e baseada no contexto.\n"
-                    "Caso contrário diga NO."
-                )
-            },
-            {
-                "role": "user",
-                "content": f"""
-Pergunta: {question}
-
-Resposta: {answer}
-
-Contexto disponível:
-{context}
-"""
-            }
-        ]
-    )
-
-    return "YES" in resp.choices[0].message.content.upper()
 
 def normalize(text: str) -> str:
     return (text or "").strip().lower()
@@ -104,6 +68,63 @@ class TotemOrchestrator:
         self.metrics = MetricsLogger()
         self.faq = FAQEngine()
 
+    # =========================
+    # INTENT ROUTER (FIXED)
+    # =========================
+    @staticmethod
+    def route_intent(intent: str | None) -> str:
+        if not intent:
+            return "general"
+
+        if intent in ["food", "restaurant", "eat"]:
+            return "rag_priority"
+        if intent in ["animal", "attraction"]:
+            return "faq_priority"
+        if intent in ["info"]:
+            return "faq_first"
+
+        return "rag_priority"
+
+    # =========================
+    # JUDGE (FIXED LOCATION ONLY)
+    # =========================
+    def _judge_response(self, question: str, answer: str, context: str) -> bool:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+        resp = client.chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            temperature=0,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Você é um avaliador de respostas de um totem de zoológico.\n"
+                        "Responda APENAS 'YES' ou 'NO'.\n"
+                        "Diga YES somente se a resposta for correta, útil e baseada no contexto.\n"
+                        "Caso contrário diga NO."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"""
+Pergunta: {question}
+
+Resposta: {answer}
+
+Contexto disponível:
+{context}
+"""
+                }
+            ]
+        )
+
+        return "YES" in resp.choices[0].message.content.upper()
+
+    # =========================
+    # INTERACT
+    # =========================
     def interact(
         self,
         company_id: str,
@@ -147,21 +168,8 @@ class TotemOrchestrator:
             intent_confidence=intent_confidence,
         )
 
-    def route_intent(intent: str | None) -> str:
-        if not intent:
-            return "general"
-    
-        if intent in ["food", "restaurant", "eat"]:
-            return "rag_priority"
-        if intent in ["animal", "attraction"]:
-            return "faq_priority"
-        if intent in ["info"]:
-            return "faq_first"
-    
-        return "rag_priority"
-    
     # =========================
-    # RAG + INTELIGÊNCIA REAL
+    # CORE ANSWER (UNCHANGED LOGIC)
     # =========================
     def _answer(
         self,
@@ -208,32 +216,31 @@ class TotemOrchestrator:
 
         try:
             rag_result = ask_rag(company_id, pergunta)
-            
+
             if isinstance(rag_result, dict):
                 chunks = rag_result.get("chunks") or []
                 rag_answer = rag_result.get("answer")
-            
+
                 rag_score = (
                     sum(c.get("score", 0.0) for c in chunks) / len(chunks)
                     if chunks else 0.0
                 )
-            
+                rag_score = float(rag_score)
+
                 context = "\n".join(
                     f"{c.get('titulo')} - {c.get('conteudo')}"
                     for c in chunks[:5]
                 )
-            
-                # 🔥 1. tentativa direta
+
                 if rag_answer and rag_score > 0.35:
-                    if self._judge_response(pergunta, rag_answer, context):
+                    if rag_answer and self._judge_response(pergunta, rag_answer, context):
                         cache_set(cache_key, rag_answer)
                         return rag_answer, rag_score, "rag_direct", None
-            
-                # 🔥 2. síntese inteligente
+
                 if chunks:
                     final_answer = self._synthesize_rag_answer(pergunta, rag_result)
-            
-                    if self._judge_response(pergunta, final_answer, context):
+
+                    if final_answer and self._judge_response(pergunta, final_answer, context):
                         cache_set(cache_key, final_answer)
                         return final_answer, rag_score, "rag_synth", None
 
@@ -248,7 +255,7 @@ class TotemOrchestrator:
         )
 
     # =========================
-    # SYNTHESIZER (SEM MUDANÇA LÓGICA)
+    # SYNTHESIS
     # =========================
     def _synthesize_rag_answer(self, question: str, rag_result: dict) -> str:
         from openai import OpenAI
@@ -288,7 +295,7 @@ Contexto:
         return response.choices[0].message.content.strip()
 
     # =========================
-    # PLACEHOLDERS (mantidos)
+    # PLACEHOLDERS (UNCHANGED)
     # =========================
     def _finalize(self, *args, **kwargs):
         return kwargs.get("resposta"), {}, None, {}, ""
