@@ -1,9 +1,14 @@
 from __future__ import annotations
+from pathlib import Path
+from dotenv import load_dotenv
 
 import os
 
 from openai import OpenAI
 from sqlalchemy import create_engine, text
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+load_dotenv(ROOT_DIR / ".env")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
