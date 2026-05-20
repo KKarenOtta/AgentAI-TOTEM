@@ -49,6 +49,27 @@ document.addEventListener("DOMContentLoaded", () => {
   const EXTREME_TEMP_MIN = 10;
   const EXTREME_TEMP_MAX = 35;
   
+  const PUBLIC_BASE_URL = "http://52.201.76.45:8000";
+
+  function normalizePublicUrl(rawUrl) {
+    if (!rawUrl) return "";
+    try {
+      const parsed = new URL(rawUrl, PUBLIC_BASE_URL);
+
+      if (
+        parsed.hostname === "192.168.15.108" ||
+        parsed.hostname === "127.0.0.1" ||
+        parsed.hostname === "localhost"
+      ) {
+        return new URL(parsed.pathname + parsed.search, PUBLIC_BASE_URL).href;
+      }
+
+      return parsed.href;
+    } catch {
+      return rawUrl;
+    }
+  }
+  
   
   let currentSessionId = generateSessionId();
   let busy = false;
