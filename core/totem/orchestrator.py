@@ -9,16 +9,16 @@ from typing import Any
 
 from infra.async_tasks.tasks import log_training_task
 from infra.realtime.event_bus import publish, subscribe
-from ml.semantic.retriever import ask_rag
 from marketing.campaigns import get_active_campaigns
 from recommender.rules import recommend_actions
 
+from ml.semantic.retriever import ask_rag
 from ml.semantic.cache import get as cache_get, set as cache_set
 from ml.semantic.faq_engine import FAQEngine
 
 from core.faq.learning import register_use
 from core.sensors.climate_store import answer_climate
-from core.totem.company_context import answer_from_company_context
+from core.totem.company_context import answer_from_company_context, load_company_context
 from core.totem.language import detect_language
 from core.totem.metrics import MetricsLogger
 from core.totem.session_store import add_turn, get_or_create_session, get_state, set_state
@@ -39,6 +39,7 @@ def normalize(text: str) -> str:
 def detect_intent_safe(text: str) -> tuple[str | None, float]:
     try:
         from ml.intent.predictor import predict as predict_intent
+
         intent, confidence = predict_intent(text)
     except Exception:
         return None, 0.0
@@ -71,38 +72,49 @@ class TotemOrchestrator:
     # =========================
     # LLM FALLBACK (CORRIGIDO)
     # =========================
-    def _llm_fallback(self, pergunta: str):
-        from openai import OpenAI
-        import os
+    def _llm_answer(self, company_id: str, pergunta: str, intent: str | None = None) -> str:
+        context = load_company_context(company_id)
+        api_key = os.getenv("OPENAI_API_KEY")
 
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        if not api_key:
+            return "Não tenho essa informação agora."
 
-        response = client.chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Você é um assistente inteligente geral de um totem. "
-                        "Responda de forma natural, útil e amigável. "
-                        "Não limite sua resposta à base do zoológico quando for fallback."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": pergunta,
-                },
-            ],
-            temperature=0.7,
-            max_tokens=220,
-        )
+        try:
+            from openai import OpenAI
 
-        text = response.choices[0].message.content.strip()
+            client = OpenAI(api_key=api_key)
+            intent_context = f"Intenção classificada: {intent}" if intent else "Intenção classificada: não disponível"
 
-        return text, 0.6, "llm_fallback", None
+            response = client.chat.completions.create(
+                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Você é o assistente de um totem de atendimento. "
+                            "Responda de forma objetiva, útil e adequada ao contexto da empresa."
+                        ),
+                    },
+                    {
+                        "role": "system",
+                        "content": f"{intent_context}\n\nContexto da empresa:\n{context}",
+                    },
+                    {
+                        "role": "user",
+                        "content": pergunta,
+                    },
+                ],
+                temperature=0.2,
+                max_tokens=220,
+            )
+
+            return response.choices[0].message.content or "Não consegui responder agora."
+
+        except Exception:
+            return "Não consegui responder agora."
 
     # =========================
-    # ROUTER (UNCHANGED)
+    # ROUTER
     # =========================
     @staticmethod
     def route_intent(intent: str | None) -> str:
@@ -182,18 +194,15 @@ class TotemOrchestrator:
             text, score, source = climate_answer
             return text, score, source, None
 
-        cache_key = f"smart:{company_id}:{intent}:{hash(normalize(pergunta))}"
+        cache_key = f"faq:{company_id}:{intent or 'general'}:{normalize(pergunta)}"
         cached = cache_get(cache_key)
 
         if cached:
             return cached, 1.0, "cache", None
 
-        local_answer, local_score, local_source = answer_from_company_context(
-            company_id,
-            pergunta,
-        )
+        local_answer, local_score, local_source = answer_from_company_context(company_id, pergunta)
 
-        if local_answer and local_score >= 0.78:
+        if local_answer and local_score >= 0.35:
             answer = local_answer.strip()
             cache_set(cache_key, answer)
             return answer, float(local_score), local_source or "company_context", None
@@ -202,7 +211,7 @@ class TotemOrchestrator:
             company_id=company_id,
             query=pergunta,
             intent=intent,
-            min_score=0.78,
+            min_score=0.5,
         )
 
         if faq_answer:
@@ -210,88 +219,90 @@ class TotemOrchestrator:
             cache_set(cache_key, answer)
             return answer, faq_score, "faq", matched_question
 
+        # =========================
+        # FALLBACK LLM (CORRIGIDO PIPELINE)
+        # =========================
+        llm_text = self._llm_answer(company_id, pergunta, intent)
+        return llm_text, 0.55, "llm", None
+
+    # =========================
+    # FINALIZE (TTS GARANTIDO)
+    # =========================
+    def _finalize(
+        self,
+        company_id: str,
+        session_id: str,
+        pergunta: str,
+        resposta: str,
+        idioma: str,
+        prefer_audio: bool,
+        started: float,
+        score: float,
+        source: str,
+        matched_question: str | None,
+        profile: dict[str, Any],
+        intent: str | None,
+        intent_confidence: float,
+    ):
+        add_turn(session_id, pergunta, resposta)
+
         try:
-            rag_result = ask_rag(company_id, pergunta)
+            log_training_task.delay(session_id, pergunta, resposta, score)
+        except Exception:
+            pass
 
-            if isinstance(rag_result, dict):
-                chunks = rag_result.get("chunks") or []
-                rag_answer = rag_result.get("answer")
+        self._transition(session_id, Event.ANSWER_READY)
 
-                rag_score = (
-                    sum(c.get("score", 0.0) for c in chunks) / len(chunks)
-                    if chunks else 0.0
-                )
-
-                context = "\n".join(
-                    f"{c.get('titulo')} - {c.get('conteudo')}"
-                    for c in chunks[:5]
-                )
-
-                if rag_answer and rag_score > 0.35:
-                    if self._judge_response(pergunta, rag_answer, context):
-                        cache_set(cache_key, rag_answer)
-                        return rag_answer, rag_score, "rag_direct", None
-
-                if chunks:
-                    final_answer = self._synthesize_rag_answer(pergunta, rag_result)
-
-                    if self._judge_response(pergunta, final_answer, context):
-                        cache_set(cache_key, final_answer)
-                        return final_answer, rag_score, "rag_synth", None
-
-        except Exception as e:
-            print("🔥 RAG ERROR:", str(e))
-
-        # =========================
-        # FALLBACK FINAL (CORRIGIDO)
-        # =========================
-        return self._llm_fallback(pergunta)
-
-    # =========================
-    # SYNTHESIS
-    # =========================
-    def _synthesize_rag_answer(self, question: str, rag_result: dict) -> str:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-        context = "\n\n".join(
-            f"- {c.get('titulo', '')}: {c.get('conteudo', '')}"
-            for c in rag_result.get("chunks", [])
+        campaigns = get_active_campaigns(company_id)
+        recommendations = recommend_actions(
+            profile=profile,
+            active_campaigns=campaigns,
+            intent=intent,
+            company_id=company_id,
         )
 
-        response = client.chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Você é um assistente de um totem de zoológico. "
-                        "Reescreva de forma natural e clara."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": f"""
-Pergunta:
-{question}
+        audio_path = None
+        if prefer_audio:
+            audio_path, *_ = gerar_audio(resposta, idioma)
 
-Contexto:
-{context}
-""",
-                },
-            ],
-            temperature=0.4,
-            max_tokens=250,
+        latency = round(time.perf_counter() - started, 3)
+
+        metric = {
+            "response_source": source,
+            "score": score,
+            "latency": latency,
+            "matched_question": matched_question,
+            "intent": intent,
+            "intent_confidence": round(float(intent_confidence or 0.0), 4),
+        }
+
+        publish(
+            company_id=company_id,
+            event="interaction_completed",
+            payload={
+                "session_id": session_id,
+                "response": resposta,
+                "recommendations": recommendations,
+                "audio_path": audio_path,
+                "audio_base64": audio_to_base64(audio_path),
+                "metric": metric,
+            },
         )
 
-        return response.choices[0].message.content.strip()
+        return resposta, recommendations, audio_path, metric, idioma
 
     # =========================
-    # PLACEHOLDERS (UNCHANGED)
+    # STATE
     # =========================
-    def _finalize(self, *args, **kwargs):
-        return kwargs.get("resposta"), {}, None, {}, ""
+    def _transition(self, session_id: str, event: Event):
+        try:
+            current = State(get_state(session_id))
+        except Exception:
+            current = State.IDLE
 
-    def _transition(self, *args, **kwargs):
-        pass
+        next_state = TRANSITIONS.get((current, event))
+        if not next_state:
+            return current
+
+        set_state(session_id, next_state.value)
+        return next_state
