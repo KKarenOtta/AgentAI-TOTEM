@@ -94,4 +94,10 @@ CONTEXTO:
 
 def ask_rag(company_id: str, question: str):
     chunks = search_knowledge(company_id, question)
-    return synthesize_answer(question, chunks)
+
+    answer = synthesize_answer(question, chunks)
+
+    return {
+        "answer": answer,
+        "chunks": chunks
+    }
