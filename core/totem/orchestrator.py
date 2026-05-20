@@ -68,6 +68,36 @@ class TotemOrchestrator:
         self.metrics = MetricsLogger()
         self.faq = FAQEngine()
 
+    def _llm_fallback(self, pergunta: str):
+    from openai import OpenAI
+    import os
+
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    response = client.chat.completions.create(
+        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Você é um assistente inteligente geral de um totem. "
+                    "Responda de forma natural, útil e amigável. "
+                    "Se possível, dê sugestões práticas. "
+                    "Não invente que está no banco de dados do zoológico."
+                ),
+            },
+            {
+                "role": "user",
+                "content": pergunta,
+            },
+        ],
+        temperature=0.7,
+        max_tokens=220,
+    )
+
+    text = response.choices[0].message.content.strip()
+
+    return text, 0.6, "llm_fallback", None
     # =========================
     # INTENT ROUTER (FIXED)
     # =========================
