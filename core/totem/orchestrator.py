@@ -200,45 +200,60 @@ class TotemOrchestrator:
         )
 
     def _answer(
-        self,
-        company_id: str,
-        pergunta: str,
-        intent: str | None,
-    ) -> tuple[str, float, str, str | None]:
-        if not pergunta:
-            return "Pode me dizer o que você procura?", 1.0, "system", None
-
-        climate_answer = answer_climate(company_id, pergunta)
-        if climate_answer:
-            text, score, source = climate_answer
-            return text, score, source, None
-
-        cache_key = f"faq:{company_id}:{intent or 'general'}:{normalize(pergunta)}"
-        cached = cache_get(cache_key)
-
-        if cached:
-            return cached, 1.0, "cache", None
-
-        local_answer, local_score, local_source = answer_from_company_context(company_id, pergunta)
-
-        if local_answer and local_score >= 0.35:
-            answer = local_answer.strip()
-            cache_set(cache_key, answer)
-            return answer, float(local_score), local_source or "company_context", None
-
-        faq_answer, faq_score, matched_question = self.faq.search(
-            company_id=company_id,
-            query=pergunta,
-            intent=intent,
-            min_score=0.5,
-        )
-
-        if faq_answer:
-            answer = faq_answer.strip()
-            cache_set(cache_key, answer)
-            return answer, faq_score, "faq", matched_question
-
-        return self._llm_answer(company_id, pergunta, intent), 0.55, "llm", None
+            self,
+            company_id: str,
+            pergunta: str,
+            intent: str | None,
+        ) -> tuple[str, float, str, str | None]:
+            if not pergunta:
+                return "Pode me dizer o que você procura?", 1.0, "system", None
+        
+            climate_answer = answer_climate(company_id, pergunta)
+            if climate_answer:
+                text, score, source = climate_answer
+                return text, score, source, None
+        
+            cache_key = f"faq:{company_id}:{intent or 'general'}:{normalize(pergunta)}"
+            cached = cache_get(cache_key)
+        
+            if cached:
+                return cached, 1.0, "cache", None
+        
+            local_answer, local_score, local_source = answer_from_company_context(
+                company_id,
+                pergunta,
+            )
+        
+            print("DEBUG LOCAL SCORE:", local_score)
+            print("DEBUG LOCAL SOURCE:", local_source)
+            print("DEBUG PERGUNTA:", pergunta)
+        
+            if local_answer and local_score >= 0.78:
+                answer = local_answer.strip()
+                cache_set(cache_key, answer)
+                return answer, float(local_score), local_source or "company_context", None
+        
+            faq_answer, faq_score, matched_question = self.faq.search(
+                company_id=company_id,
+                query=pergunta,
+                intent=intent,
+                min_score=0.78,
+            )
+        
+            print("DEBUG FAQ SCORE:", faq_score)
+            print("DEBUG MATCHED QUESTION:", matched_question)
+        
+            if faq_answer:
+                answer = faq_answer.strip()
+                cache_set(cache_key, answer)
+                return answer, faq_score, "faq", matched_question
+        
+            return (
+                "Não encontrei essa informação na base de conhecimento do zoológico.",
+                0.0,
+                "no_match",
+                None,
+            )
 
     def _llm_answer(self, company_id: str, pergunta: str, intent: str | None = None) -> str:
         context = load_company_context(company_id)
@@ -253,14 +268,20 @@ class TotemOrchestrator:
             client = OpenAI(api_key=api_key)
             intent_context = f"Intenção classificada: {intent}" if intent else "Intenção classificada: não disponível"
 
-            response = client.chat.completions.create(
+           response = client.chat.completions.create(
                 model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
                 messages=[
                     {
                         "role": "system",
                         "content": (
-                            "Você é o assistente de um totem de atendimento. "
-                            "Responda de forma objetiva, útil e adequada ao contexto da empresa."
+                            "Você é um assistente de um totem do Zoológico de São Paulo.\n"
+                            "Responda SOMENTE usando informações presentes no contexto fornecido.\n"
+                            "Se a informação não estiver claramente disponível no contexto, "
+                            "responda exatamente:\n"
+                            "'Não encontrei essa informação na base de conhecimento do zoológico.'\n"
+                            "Não invente informações.\n"
+                            "Não faça suposições.\n"
+                            "Não responda perguntas fora do escopo do zoológico."
                         ),
                     },
                     {
@@ -272,7 +293,7 @@ class TotemOrchestrator:
                         "content": pergunta,
                     },
                 ],
-                temperature=0.2,
+                temperature=0.1,
                 max_tokens=220,
             )
 
