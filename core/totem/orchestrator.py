@@ -260,13 +260,11 @@ class TotemOrchestrator:
 
                 rag_score = max(c.get("score", 0.0) for c in chunks) if chunks else 0.0
 
-                if chunks and rag_score >= 0.60:
-                    final_answer = self._synthesize_rag_answer(pergunta, rag_result)
+            if chunks:
+                final_answer = self._synthesize_rag_answer(pergunta, rag_result)
+                cache_set(cache_key, final_answer)
+                return final_answer, float(rag_score), "rag", None
                 
-                    cache_set(cache_key, final_answer)
-                
-                    return final_answer, float(rag_score), "rag", None
-
         except Exception as e:
             print("🔥 RAG ERROR:", str(e))
 
