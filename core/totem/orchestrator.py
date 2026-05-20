@@ -316,7 +316,14 @@ class TotemOrchestrator:
                 temperature=0.1,
                 max_tokens=220,
             )
+            
+            rag_result = ask_rag(company_id, pergunta)
 
+            print("=== RAG DEBUG ===")
+            print("PERGUNTA:", pergunta)
+            print("CHUNKS:", rag_result.get("chunks"))
+            print("ANSWER:", rag_result.get("answer"))
+            
             return response.choices[0].message.content or "Não consegui responder agora."
 
         except Exception:
