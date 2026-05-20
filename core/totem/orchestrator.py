@@ -268,7 +268,7 @@ class TotemOrchestrator:
             client = OpenAI(api_key=api_key)
             intent_context = f"Intenção classificada: {intent}" if intent else "Intenção classificada: não disponível"
 
-           response = client.chat.completions.create(
+            response = client.chat.completions.create(
                 model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
                 messages=[
                     {
