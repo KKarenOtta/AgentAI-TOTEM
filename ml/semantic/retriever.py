@@ -4,6 +4,9 @@ import os
 
 from openai import OpenAI
 from sqlalchemy import create_engine, text
+from dotenv import load_dotenv
+
+load_dotenv("/home/ubuntu/totem.env")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
