@@ -9,7 +9,7 @@ from typing import Any
 
 from infra.async_tasks.tasks import log_training_task
 from infra.realtime.event_bus import publish, subscribe
-
+from ml.semantic.rag import ask_rag
 from marketing.campaigns import get_active_campaigns
 from recommender.rules import recommend_actions
 
