@@ -68,38 +68,41 @@ class TotemOrchestrator:
         self.metrics = MetricsLogger()
         self.faq = FAQEngine()
 
-    def _llm_fallback(self, pergunta: str):
-    from openai import OpenAI
-    import os
-
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-    response = client.chat.completions.create(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Você é um assistente inteligente geral de um totem. "
-                    "Responda de forma natural, útil e amigável. "
-                    "Se possível, dê sugestões práticas. "
-                    "Não invente que está no banco de dados do zoológico."
-                ),
-            },
-            {
-                "role": "user",
-                "content": pergunta,
-            },
-        ],
-        temperature=0.7,
-        max_tokens=220,
-    )
-
-    text = response.choices[0].message.content.strip()
-
-    return text, 0.6, "llm_fallback", None
     # =========================
-    # INTENT ROUTER (FIXED)
+    # LLM FALLBACK (CORRIGIDO)
+    # =========================
+    def _llm_fallback(self, pergunta: str):
+        from openai import OpenAI
+        import os
+
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+        response = client.chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Você é um assistente inteligente geral de um totem. "
+                        "Responda de forma natural, útil e amigável. "
+                        "Não limite sua resposta à base do zoológico quando for fallback."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": pergunta,
+                },
+            ],
+            temperature=0.7,
+            max_tokens=220,
+        )
+
+        text = response.choices[0].message.content.strip()
+
+        return text, 0.6, "llm_fallback", None
+
+    # =========================
+    # ROUTER (UNCHANGED)
     # =========================
     @staticmethod
     def route_intent(intent: str | None) -> str:
@@ -114,43 +117,6 @@ class TotemOrchestrator:
             return "faq_first"
 
         return "rag_priority"
-
-    # =========================
-    # JUDGE (FIXED LOCATION ONLY)
-    # =========================
-    def _judge_response(self, question: str, answer: str, context: str) -> bool:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-        resp = client.chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-            temperature=0,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Você é um avaliador de respostas de um totem de zoológico.\n"
-                        "Responda APENAS 'YES' ou 'NO'.\n"
-                        "Diga YES somente se a resposta for correta, útil e baseada no contexto.\n"
-                        "Caso contrário diga NO."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": f"""
-Pergunta: {question}
-
-Resposta: {answer}
-
-Contexto disponível:
-{context}
-"""
-                }
-            ]
-        )
-
-        return "YES" in resp.choices[0].message.content.upper()
 
     # =========================
     # INTERACT
@@ -199,7 +165,7 @@ Contexto disponível:
         )
 
     # =========================
-    # CORE ANSWER (UNCHANGED LOGIC)
+    # CORE ANSWER
     # =========================
     def _answer(
         self,
@@ -255,7 +221,6 @@ Contexto disponível:
                     sum(c.get("score", 0.0) for c in chunks) / len(chunks)
                     if chunks else 0.0
                 )
-                rag_score = float(rag_score)
 
                 context = "\n".join(
                     f"{c.get('titulo')} - {c.get('conteudo')}"
@@ -263,26 +228,24 @@ Contexto disponível:
                 )
 
                 if rag_answer and rag_score > 0.35:
-                    if rag_answer and self._judge_response(pergunta, rag_answer, context):
+                    if self._judge_response(pergunta, rag_answer, context):
                         cache_set(cache_key, rag_answer)
                         return rag_answer, rag_score, "rag_direct", None
 
                 if chunks:
                     final_answer = self._synthesize_rag_answer(pergunta, rag_result)
 
-                    if final_answer and self._judge_response(pergunta, final_answer, context):
+                    if self._judge_response(pergunta, final_answer, context):
                         cache_set(cache_key, final_answer)
                         return final_answer, rag_score, "rag_synth", None
 
         except Exception as e:
             print("🔥 RAG ERROR:", str(e))
 
-        return (
-            "Não encontrei essa informação na base de conhecimento do zoológico.",
-            0.0,
-            "no_match",
-            None,
-        )
+        # =========================
+        # FALLBACK FINAL (CORRIGIDO)
+        # =========================
+        return self._llm_fallback(pergunta)
 
     # =========================
     # SYNTHESIS
