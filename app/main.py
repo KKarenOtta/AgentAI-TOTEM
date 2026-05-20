@@ -68,7 +68,9 @@ if IS_EDGE:
 if IS_CLOUD:
     from app.routes.cloud_interact import router as cloud_interact_router
     from app.routes.totem import router as totem_router
+    from app.routes.device import router as device_router
 
+    app.include_router(device_router)
     app.include_router(cloud_interact_router)
     app.include_router(totem_router)
 
