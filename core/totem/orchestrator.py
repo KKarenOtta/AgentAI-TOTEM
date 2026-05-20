@@ -260,9 +260,12 @@ class TotemOrchestrator:
 
                 rag_score = max(c.get("score", 0.0) for c in chunks) if chunks else 0.0
 
-                if answer and rag_score >= 0.60:
-                    cache_set(cache_key, answer)
-                    return answer, float(rag_score), "rag", None
+                if chunks and rag_score >= 0.60:
+                    final_answer = self._synthesize_rag_answer(pergunta, rag_result)
+                
+                    cache_set(cache_key, final_answer)
+                
+                    return final_answer, float(rag_score), "rag", None
 
         except Exception as e:
             print("🔥 RAG ERROR:", str(e))
@@ -459,3 +462,45 @@ def start_presence_listener() -> None:
         name="totem-presence-listener",
     )
     thread.start()
+    
+def _synthesize_rag_answer(self, question: str, rag_result: dict) -> str:
+    from openai import OpenAI
+    import os
+
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    context = "\n\n".join(
+        f"- {c['titulo']}: {c['conteudo']}"
+        for c in rag_result.get("chunks", [])
+    )
+
+    response = client.chat.completions.create(
+        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Você é um assistente de um totem de zoológico. "
+                    "Sua função é transformar informações técnicas em respostas naturais, claras e amigáveis. "
+                    "Nunca copie o contexto literalmente. "
+                    "Sempre reescreva com fluidez para o usuário final."
+                )
+            },
+            {
+                "role": "user",
+                "content": f"""
+Pergunta do usuário:
+{question}
+
+Informações recuperadas:
+{context}
+
+Responda de forma natural e útil para o visitante.
+"""
+            }
+        ],
+        temperature=0.4,
+        max_tokens=250,
+    )
+
+    return response.choices[0].message.content.strip()
