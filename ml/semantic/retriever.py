@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-
 from openai import OpenAI
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
@@ -22,7 +21,6 @@ def gerar_embedding(texto: str):
         model="text-embedding-3-small",
         input=texto,
     )
-
     return response.data[0].embedding
 
 
@@ -38,10 +36,10 @@ def search_knowledge(
             titulo,
             conteudo,
             fonte,
-            1 - (embedding <=> :embedding::vector) AS score
+            1 - (embedding <=> CAST(:embedding AS vector)) AS score
         FROM base_conhecimento
         WHERE company_id = :company_id
-        ORDER BY embedding <=> :embedding::vector
+        ORDER BY embedding <=> CAST(:embedding AS vector)
         LIMIT :top_k
     """)
 
@@ -49,7 +47,7 @@ def search_knowledge(
         rows = conn.execute(
             sql,
             {
-                "embedding": str(embedding),
+                "embedding": embedding,   # 👈 FIX PRINCIPAL
                 "company_id": company_id,
                 "top_k": top_k,
             },
