@@ -39,7 +39,6 @@ def normalize(text: str) -> str:
 def detect_intent_safe(text: str) -> tuple[str | None, float]:
     try:
         from ml.intent.predictor import predict as predict_intent
-
         intent, confidence = predict_intent(text)
     except Exception:
         return None, 0.0
@@ -70,48 +69,114 @@ class TotemOrchestrator:
         self.faq = FAQEngine()
 
     # =========================
-    # LLM FALLBACK (CORRIGIDO)
+    # JUDGE (RESTAURADO)
     # =========================
-    def _llm_answer(self, company_id: str, pergunta: str, intent: str | None = None) -> str:
-        context = load_company_context(company_id)
-        api_key = os.getenv("OPENAI_API_KEY")
-
-        if not api_key:
-            return "Não tenho essa informação agora."
-
+    def _judge_response(self, question: str, answer: str, context: str) -> bool:
         try:
             from openai import OpenAI
 
-            client = OpenAI(api_key=api_key)
-            intent_context = f"Intenção classificada: {intent}" if intent else "Intenção classificada: não disponível"
+            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-            response = client.chat.completions.create(
+            resp = client.chat.completions.create(
                 model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                temperature=0,
                 messages=[
                     {
                         "role": "system",
                         "content": (
-                            "Você é o assistente de um totem de atendimento. "
-                            "Responda de forma objetiva, útil e adequada ao contexto da empresa."
-                        ),
-                    },
-                    {
-                        "role": "system",
-                        "content": f"{intent_context}\n\nContexto da empresa:\n{context}",
+                            "Você é um avaliador de respostas de um totem. "
+                            "Responda APENAS YES ou NO. "
+                            "Diga YES somente se a resposta estiver correta e baseada no contexto."
+                        )
                     },
                     {
                         "role": "user",
-                        "content": pergunta,
-                    },
-                ],
-                temperature=0.2,
-                max_tokens=220,
+                        "content": f"""
+Pergunta: {question}
+
+Resposta: {answer}
+
+Contexto:
+{context}
+"""
+                    }
+                ]
             )
 
-            return response.choices[0].message.content or "Não consegui responder agora."
+            return "YES" in resp.choices[0].message.content.upper()
 
         except Exception:
-            return "Não consegui responder agora."
+            return True  # fallback seguro para não quebrar fluxo
+
+    # =========================
+    # SYNTHESIS (RESTAURADO)
+    # =========================
+    def _synthesize_rag_answer(self, question: str, rag_result: dict) -> str:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+        context = "\n\n".join(
+            f"- {c.get('titulo', '')}: {c.get('conteudo', '')}"
+            for c in rag_result.get("chunks", [])
+        )
+
+        response = client.chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            temperature=0.4,
+            max_tokens=250,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Você é um assistente de um totem. "
+                        "Reescreva a resposta de forma clara e natural."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"""
+Pergunta:
+{question}
+
+Contexto:
+{context}
+"""
+                }
+            ]
+        )
+
+        return response.choices[0].message.content.strip()
+
+    # =========================
+    # FALLBACK LLM (ÚLTIMO RECURSO)
+    # =========================
+    def _llm_fallback(self, pergunta: str):
+        from openai import OpenAI
+
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+        response = client.chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            temperature=0.7,
+            max_tokens=220,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Você é um assistente geral de totem. "
+                        "Responda de forma natural e útil sem depender do banco local."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": pergunta
+                }
+            ]
+        )
+
+        text = response.choices[0].message.content.strip()
+        return text, 0.55, "llm_fallback", None
 
     # =========================
     # ROUTER
@@ -161,88 +226,84 @@ class TotemOrchestrator:
             register_use(company_id, matched_question)
 
         return self._finalize(
-            company_id=company_id,
-            session_id=session_id,
-            pergunta=pergunta,
-            resposta=resposta,
-            idioma=idioma,
-            prefer_audio=prefer_audio,
-            started=started,
-            score=score,
-            source=source,
-            matched_question=matched_question,
-            profile=profile,
-            intent=intent,
-            intent_confidence=intent_confidence,
+            company_id, session_id, pergunta, resposta,
+            idioma, prefer_audio, started,
+            score, source, matched_question,
+            profile, intent, intent_confidence
         )
 
     # =========================
-    # CORE ANSWER
+    # CORE RAG PIPELINE (RESTAURADO)
     # =========================
-    def _answer(
-        self,
-        company_id: str,
-        pergunta: str,
-        intent: str | None,
-    ) -> tuple[str, float, str, str | None]:
+    def _answer(self, company_id: str, pergunta: str, intent: str | None):
 
         if not pergunta:
             return "Pode me dizer o que você procura?", 1.0, "system", None
 
         climate_answer = answer_climate(company_id, pergunta)
         if climate_answer:
-            text, score, source = climate_answer
-            return text, score, source, None
+            return climate_answer[0], climate_answer[1], climate_answer[2], None
 
-        cache_key = f"faq:{company_id}:{intent or 'general'}:{normalize(pergunta)}"
+        cache_key = f"rag:{company_id}:{intent}:{normalize(pergunta)}"
         cached = cache_get(cache_key)
-
         if cached:
             return cached, 1.0, "cache", None
 
         local_answer, local_score, local_source = answer_from_company_context(company_id, pergunta)
+        if local_answer and local_score >= 0.75:
+            cache_set(cache_key, local_answer)
+            return local_answer, local_score, local_source or "context", None
 
-        if local_answer and local_score >= 0.35:
-            answer = local_answer.strip()
-            cache_set(cache_key, answer)
-            return answer, float(local_score), local_source or "company_context", None
-
-        faq_answer, faq_score, matched_question = self.faq.search(
+        faq_answer, faq_score, matched = self.faq.search(
             company_id=company_id,
             query=pergunta,
             intent=intent,
-            min_score=0.5,
+            min_score=0.75,
         )
 
         if faq_answer:
-            answer = faq_answer.strip()
-            cache_set(cache_key, answer)
-            return answer, faq_score, "faq", matched_question
+            cache_set(cache_key, faq_answer)
+            return faq_answer, faq_score, "faq", matched
 
-        # =========================
-        # FALLBACK LLM (CORRIGIDO PIPELINE)
-        # =========================
-        llm_text = self._llm_answer(company_id, pergunta, intent)
-        return llm_text, 0.55, "llm", None
+        try:
+            rag_result = ask_rag(company_id, pergunta)
+
+            if isinstance(rag_result, dict):
+                chunks = rag_result.get("chunks") or []
+                rag_answer = rag_result.get("answer")
+
+                context = "\n".join(
+                    f"{c.get('titulo')} - {c.get('conteudo')}"
+                    for c in chunks[:5]
+                )
+
+                score = sum(c.get("score", 0.0) for c in chunks) / len(chunks) if chunks else 0.0
+
+                if rag_answer and self._judge_response(pergunta, rag_answer, context):
+                    cache_set(cache_key, rag_answer)
+                    return rag_answer, score, "rag_direct", None
+
+                if chunks:
+                    final = self._synthesize_rag_answer(pergunta, rag_result)
+
+                    if self._judge_response(pergunta, final, context):
+                        cache_set(cache_key, final)
+                        return final, score, "rag_synth", None
+
+        except Exception as e:
+            print("RAG ERROR:", e)
+
+        return self._llm_fallback(pergunta)
 
     # =========================
     # FINALIZE (TTS GARANTIDO)
     # =========================
     def _finalize(
         self,
-        company_id: str,
-        session_id: str,
-        pergunta: str,
-        resposta: str,
-        idioma: str,
-        prefer_audio: bool,
-        started: float,
-        score: float,
-        source: str,
-        matched_question: str | None,
-        profile: dict[str, Any],
-        intent: str | None,
-        intent_confidence: float,
+        company_id, session_id, pergunta, resposta,
+        idioma, prefer_audio, started,
+        score, source, matched_question,
+        profile, intent, intent_confidence
     ):
         add_turn(session_id, pergunta, resposta)
 
@@ -265,15 +326,12 @@ class TotemOrchestrator:
         if prefer_audio:
             audio_path, *_ = gerar_audio(resposta, idioma)
 
-        latency = round(time.perf_counter() - started, 3)
-
         metric = {
-            "response_source": source,
+            "source": source,
             "score": score,
-            "latency": latency,
-            "matched_question": matched_question,
             "intent": intent,
-            "intent_confidence": round(float(intent_confidence or 0.0), 4),
+            "intent_confidence": float(intent_confidence or 0.0),
+            "latency": round(time.perf_counter() - started, 3),
         }
 
         publish(
