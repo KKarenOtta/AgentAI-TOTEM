@@ -34,8 +34,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const EDGE_SESSION_START_ENDPOINT = "/edge/session/start";
   const EDGE_SESSION_END_ENDPOINT = "/edge/session/end";
 
+  function generateSessionId() {
+    return `sessao-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
   const companyId = "FLX-001";
-  const sessionId = "sessao-teste-01";
+  /*const sessionId = "sessao-teste-01";*/
 
   const GREETING_TEXT = "Ola! Como posso lhe ajudar?";
   const GREETING_AUDIO_URL = "/static/audio/saudacao.mp3";
@@ -44,7 +48,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const QR_DISPLAY_MS = 10000;
   const EXTREME_TEMP_MIN = 10;
   const EXTREME_TEMP_MAX = 35;
-
+  
+  
+  let currentSessionId = generateSessionId();
   let busy = false;
   let polling = false;
   let lastTranscript = "";
@@ -56,6 +62,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let isAudioPlaying = false;
   let currentObjectUrl = null;
   let finalScreenTimer = null;
+  
 
   function setText(el, value, fallback = "") {
     if (!el) return;
@@ -72,6 +79,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (Array.isArray(payload)) return payload;
     if (Array.isArray(payload.top_actions)) return payload.top_actions;
     if (Array.isArray(payload.items)) return payload.items;
+    if (Array.isArray(payload.actions)) return payload.actions;
+    if (Array.isArray(payload.recommendations)) return payload.recommendations;
     return [];
   }
 
@@ -161,15 +170,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!els.finalBlock) return;
 
-    const qrUrl = data?.handoff_qr_url || data?.handoffQrUrl || "";
-    const handoffUrl = data?.handoff_url || data?.handoffUrl || "";
+    const qrUrl =
+      data?.handoff_qr_url ||
+      data?.handoffQrUrl ||
+      data?.handoffqrurl ||
+      "";
+
+    const handoffUrl =
+      data?.handoff_url ||
+      data?.handoffUrl ||
+      data?.handoffurl ||
+      "";
 
     if (els.qr) {
       els.qr.onerror = () => {
         console.error("[totem] erro ao carregar QR:", els.qr.src);
         els.qr.hidden = true;
       };
-
+  
       if (qrUrl) {
         els.qr.src = `${qrUrl}${qrUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
         els.qr.hidden = false;
@@ -273,6 +291,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function scheduleReturnToInvite() {
     clearFinalScreenTimer();
     finalScreenTimer = window.setTimeout(() => {
+      currentSessionId = generateSessionId();
       applyScreenState("convite");
       show(els.iaPanel, false);
       show(els.inputPanel, false);
@@ -409,7 +428,7 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         body: JSON.stringify({
           company_id: companyId,
-          session_id: sessionId
+          session_id: currentSessionId
         })
       });
 
@@ -453,7 +472,7 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         body: JSON.stringify({
           company_id: companyId,
-          session_id: sessionId,
+          session_id: currentSessionId,
           reason
         })
       });
@@ -527,7 +546,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const endData = await notifySessionEnd(reason);
     console.log("[totem] endSession payload =", endData);
 
-    if (endData && (endData.handoff_qr_url || endData.handoff_url)) {
+    const hasHandoff =
+      endData &&
+      (
+        endData.handoff_qr_url ||
+        endData.handoff_url ||
+        endData.handoffQrUrl ||
+        endData.handoffUrl ||
+        endData.handoffqrurl ||
+        endData.handoffurl
+      );
+
+    if (hasHandoff) {
       renderFinalHandoff(endData);
       return;
     }
@@ -634,7 +664,14 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
     
-    if (data.handoff_qr_url || data.handoff_url) {
+    if (
+      data.handoff_qr_url ||
+      data.handoff_url ||
+      data.handoffQrUrl ||
+      data.handoffUrl ||
+      data.handoffqrurl ||
+      data.handoffurl
+    ) {
       renderFinalHandoff(data);
     }
 
@@ -759,7 +796,7 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         body: JSON.stringify({
           company_id: companyId,
-          session_id: sessionId,
+          session_id: currentSessionId,
           message: message.trim()
         })
       });
@@ -797,7 +834,7 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         body: JSON.stringify({
           company_id: companyId,
-          session_id: sessionId
+          session_id: currentSessionId
         })
       });
 

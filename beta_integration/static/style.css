@@ -958,3 +958,7 @@ body {
   gap: 10px;
   width: 100%;
 }
+
+.hidden {
+  display: none !important;
+}
