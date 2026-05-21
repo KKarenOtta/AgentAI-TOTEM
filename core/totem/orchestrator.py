@@ -11,7 +11,7 @@ from infra.async_tasks.tasks import log_training_task
 from infra.realtime.event_bus import publish, subscribe
 from marketing.campaigns import get_active_campaigns
 from recommender.rules import recommend_actions
-
+from aws_iot import publish_event
 from ml.semantic.retriever import ask_rag
 from ml.semantic.cache import get as cache_get, set as cache_set
 from ml.semantic.faq_engine import FAQEngine
@@ -362,6 +362,19 @@ Contexto:
             },
         )
 
+        publish_event(
+                "totem/interactions",
+                {
+                    "company_id": company_id,
+                    "session_id": session_id,
+                    "question": pergunta,
+                    "response": resposta,
+                    "source": source,
+                }
+            )
+    
+        
+        
         return resposta, recommendations, audio_path, metric, idioma
 
     # =========================
