@@ -62,6 +62,11 @@ def audio_to_base64(path: str | None) -> str | None:
     except Exception:
         return None
 
+def clean_response(text: str) -> str:
+    if not text:
+        return text
+
+    return re.sub(r'https?://\S+', '', text).strip()
 
 class TotemOrchestrator:
     def __init__(self) -> None:
@@ -306,6 +311,8 @@ Contexto:
         profile, intent, intent_confidence
     ):
         add_turn(session_id, pergunta, resposta)
+
+        resposta = clean_response(resposta)
 
         try:
             log_training_task.delay(session_id, pergunta, resposta, score)
