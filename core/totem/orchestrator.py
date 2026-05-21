@@ -63,10 +63,18 @@ def audio_to_base64(path: str | None) -> str | None:
         return None
 
 def clean_response(text: str) -> str:
-    if not isinstance(text, str):
-        return "" if text is None else str(text)
+    if not text:
+        return text
 
-    return re.sub(r'https?://\S+', '', text).strip()
+    import re
+
+    # remove URLs
+    text = re.sub(r'https?://\S+', '', text)
+
+    # remove “Mapa:” se ficar vazio depois
+    text = re.sub(r'Mapa:\s*$', '', text, flags=re.IGNORECASE)
+
+    return text.strip()
     
 class TotemOrchestrator:
     def __init__(self) -> None:
