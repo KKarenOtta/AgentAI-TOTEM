@@ -63,11 +63,11 @@ def audio_to_base64(path: str | None) -> str | None:
         return None
 
 def clean_response(text: str) -> str:
-    if not text:
-        return text
+    if not isinstance(text, str):
+        return "" if text is None else str(text)
 
     return re.sub(r'https?://\S+', '', text).strip()
-
+    
 class TotemOrchestrator:
     def __init__(self) -> None:
         self.metrics = MetricsLogger()
